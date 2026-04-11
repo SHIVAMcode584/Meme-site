@@ -11,6 +11,7 @@ import idontJudge from "../assets/memes/idontjudge.jpeg";
 import iplCameraMan from "../assets/memes/iplcameraman.jpeg";
 import forGfforFriend from '../assets/memes/forgirlfriendforfriend.jpeg';
 import meAtmyWedding from '../assets/memes/meatmywedding.jpeg';
+import financialCondn from '../assets/memes/financialrightnow.jpeg'
 
 
 
@@ -118,5 +119,13 @@ image:forGfforFriend
 mood:'Jealouos',
 category:'Jealouos',
 image:meAtmyWedding
+  },
+  {
+    id:13,
+    title:'Financial condition right now',
+    keyword:['paisa' ,'broken' , 'finance' ,'poor'],
+    image:financialCondn,
+    category:'Fun',
+    mood:'Fun'
   }
 ];
