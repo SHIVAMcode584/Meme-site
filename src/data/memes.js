@@ -1,5 +1,5 @@
 // Here we store memes dat
-import abMaiKyaBolu from "../assets/memes/abkyabolumai.jpeg";
+// import abMaiKyaBolu from "../assets/memes/abkyabolumai.jpeg";
 import homeworkPanic from "../assets/memes/agarwojindahote.jpg";
 import ignoredReply from "../assets/memes/hamerayhaaisahehotahai.jpg";
 import noWay from "../assets/memes/noway.jpeg";
@@ -11,16 +11,16 @@ import idontJudge from "../assets/memes/idontjudge.jpeg";
 import iplCameraMan from "../assets/memes/iplcameraman.jpeg";
 import forGfforFriend from '../assets/memes/forgirlfriendforfriend.jpeg';
 import meAtmyWedding from '../assets/memes/meatmywedding.jpeg';
-import financialCondn from '../assets/memes/financialrightnow.jpeg'
+// import financialCondn from '../assets/memes/financialrightnow.jpeg'
 
-
+// import gadiNikal from '../assets/memes/gadinikal.jpg'
 
 
 export const memes = [
   {
     id: 1,
     title: "Ab Mai Kya Bolu",
-    image: abMaiKyaBolu,
+    image: "https://res.cloudinary.com/dntclntau/image/upload/v1775899746/abkyabolumai_vngxp9.jpg",
     keywords: ["ab", "mai", "kya bolu", "kha fas gya bhai mai", "awkward", "speechless", "reply"],
     mood: "awkward",
     category: "Reply",
@@ -120,11 +120,19 @@ mood:'Jealouos',
 category:'Jealouos',
 image:meAtmyWedding
   },
+  // {
+  //   id:13,
+  //   title:'Financial condition right now',
+  //   keyword:['paisa' ,'broken' , 'finance' ,'poor'],
+  //   image:financialCondn,
+  //   category:'Fun',
+  //   mood:'Fun'
+  // }
   {
     id:13,
-    title:'Financial condition right now',
-    keyword:['paisa' ,'broken' , 'finance' ,'poor'],
-    image:financialCondn,
+    title:'Gadi nikal',
+    keywords:['chal' ,'gadi' , 'nikal' ,'poor'],
+    image:"https://res.cloudinary.com/dntclntau/image/upload/v1775899746/gadinikal_uhqngg.jpg",
     category:'Fun',
     mood:'Fun'
   }
