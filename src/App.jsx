@@ -12,6 +12,8 @@ import UploadMeme from "./components/UploadMeme";
 import MemeEditor from "./components/MemeEditor";
 import { categories, smartSearch, suggestions } from "./utils/helpers";
 import LoginModal from "./components/LoginModal";
+import Auth from './components/Auth'
+import { supabase } from "./lib/supabase";
 
 function getInitialFavorites() {
   try {
@@ -27,10 +29,7 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [activeMeme, setActiveMeme] = useState(null);
   const [favorites, setFavorites] = useState(getInitialFavorites);
-  const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem("meme-user");
-    return savedUser ? JSON.parse(savedUser) : null;
-  });
+ const [user, setUser] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isEditorModalOpen, setIsEditorModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -62,17 +61,21 @@ export default function App() {
     localStorage.setItem("user-uploaded-memes", JSON.stringify(userMemes));
   }, [userMemes]);
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const memeId = params.get("meme");
-    if (memeId) {
-      const allAvailableMemes = [...userMemes, ...memes];
-      const memeToShow = allAvailableMemes.find((m) => m.id === Number(memeId));
-      if (memeToShow) {
-        setActiveMeme(memeToShow);
-      }
+useEffect(() => {
+  const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+  };
+  getUser();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    (_, session) => {
+      setUser(session?.user ?? null);
     }
-  }, [userMemes]);
+  );
+    return () => {
+      subscription.unsubscribe();
+    };
+}, []);
 
  const filteredMemes = useMemo(
   () => smartSearch(viewMode === "uploads" ? userMemes : [...userMemes, ...memes], search, selectedCategory),
@@ -112,9 +115,8 @@ export default function App() {
     localStorage.setItem("meme-user", JSON.stringify(userData));
   };
 
-  const handleLogout = () => {
-    setUser(null);
-    localStorage.removeItem("meme-user");
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
   };
 
   const handleUploadMeme = (meme) => {
@@ -161,9 +163,15 @@ export default function App() {
         {user ? (
           <div className="space-y-4">
             <div className="flex items-center gap-3 p-2">
-              <img src={user.avatar} alt={user.username} className="w-10 h-10 rounded-full border border-violet-500/50" />
+              <img 
+                src={user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`} 
+                alt="avatar" 
+                className="w-10 h-10 rounded-full border border-violet-500/50" 
+              />
               <div className="overflow-hidden">
-                <p className="font-bold truncate">{user.username}</p>
+                <p className="font-bold truncate">
+                  {user.user_metadata?.username || user.email.split('@')[0]}
+                </p>
                 <p className="text-xs text-zinc-500 truncate">{user.email}</p>
               </div>
             </div>
@@ -377,3 +385,6 @@ export default function App() {
     </div>
   );
 }
+
+
+

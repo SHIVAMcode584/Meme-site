@@ -44,7 +44,7 @@ export default function MemeModal({ meme, onClose, toggleFavorite, favorites, on
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center px-4">
-      <div className="relative w-full max-w-4xl bg-[#0d1220] border border-white/10 rounded-3xl overflow-hidden shadow-2xl">
+      <div className="relative w-full max-w-4xl bg-[#0d1220] border border-white/10 rounded-3xl overflow-y-auto max-h-[90vh] md:max-h-none shadow-2xl md:overflow-hidden">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 z-10 p-2 rounded-full bg-black/40 border border-white/20 text-white hover:bg-black/60"
@@ -53,11 +53,11 @@ export default function MemeModal({ meme, onClose, toggleFavorite, favorites, on
         </button>
 
         <div className="grid md:grid-cols-2">
-          <div className="bg-black/50 flex items-center justify-center min-h-[300px] md:min-h-0">
-            <img src={meme.image} alt={meme.title} className="w-full h-full object-contain max-h-[60vh] md:max-h-[80vh]" />
+          <div className="bg-black/50 flex items-center justify-center min-h-[200px] md:min-h-0">
+            <img src={meme.image} alt={meme.title} className="w-full h-full object-contain max-h-[40vh] md:max-h-[80vh]" />
           </div>
 
-          <div className="p-6 sm:p-8 flex flex-col justify-between">
+          <div className="p-5 sm:p-8 flex flex-col justify-between">
             <div>
               <p className="text-sm text-violet-300 mb-2">{meme.category} • {meme.mood}</p>
               <h2 className="text-2xl sm:text-3xl font-bold">{meme.title}</h2>
