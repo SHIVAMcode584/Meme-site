@@ -1,22 +1,28 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { X, User, Mail, LogIn } from "lucide-react";
+import { X, User, Mail, LogIn, Loader2 } from "lucide-react";
 
 export default function LoginModal({ isOpen, onClose, onLogin }) {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!username || !email) return;
-    // Mock user data with a consistent avatar based on username
-    const userData = { 
-      username, 
-      email, 
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}` 
-    };
-    onLogin(userData);
-    onClose();
+    setIsLoading(true);
+    
+    // Mock authentication delay
+    setTimeout(() => {
+      const userData = { 
+        username, 
+        email, 
+        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}` 
+      };
+      onLogin(userData);
+      setIsLoading(false);
+      onClose();
+    }, 1000);
   };
 
   if (!isOpen) return null;
