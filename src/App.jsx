@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import logo from "./assets/meme-logo.png";
+import logo from "./meme-logo.png";
 import { Sparkles, Menu, X, Home, Search, Dices, Pencil, Upload, LogIn, LogOut, Image } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import CategoryFilter from "./components/CategoryFilter";
