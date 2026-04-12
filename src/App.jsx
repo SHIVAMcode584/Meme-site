@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import logo from "./assets/meme-logo.png";
 import { Sparkles, Menu, X, Home, Search, Dices, Pencil, Upload, LogIn, LogOut, Image } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import CategoryFilter from "./components/CategoryFilter";
@@ -226,7 +227,7 @@ useEffect(() => {
               >
                 <Menu size={24} />
               </button>
-              <img src="/meme-logo.png" alt="Meme Hub Logo" className="w-8 h-8 sm:w-10 sm:h-10 object-contain" />
+              <img src={logo} alt="Meme Hub Logo" className="w-8 h-8 sm:w-10 sm:h-10 object-contain" />
               <div className="hidden xs:block">
                 <p className="text-xs uppercase tracking-[0.35em] text-zinc-400">Meme Finder</p>
                 <h1 className="text-lg font-semibold sm:text-xl">Discover & Create</h1>
@@ -385,6 +386,3 @@ useEffect(() => {
     </div>
   );
 }
-
-
-
