@@ -53,14 +53,14 @@ export default function MemeModal({ meme, onClose, toggleFavorite, favorites, on
         </button>
 
         <div className="grid md:grid-cols-2">
-          <div className="bg-black">
-            <img src={meme.image} alt={meme.title} className="w-full h-full object-cover max-h-[80vh]" />
+          <div className="bg-black/50 flex items-center justify-center min-h-[300px] md:min-h-0">
+            <img src={meme.image} alt={meme.title} className="w-full h-full object-contain max-h-[60vh] md:max-h-[80vh]" />
           </div>
 
-          <div className="p-8 flex flex-col justify-between">
+          <div className="p-6 sm:p-8 flex flex-col justify-between">
             <div>
               <p className="text-sm text-violet-300 mb-2">{meme.category} • {meme.mood}</p>
-              <h2 className="text-3xl font-bold">{meme.title}</h2>
+              <h2 className="text-2xl sm:text-3xl font-bold">{meme.title}</h2>
 
               <div className="flex flex-wrap gap-2 mt-6">
                 {meme.keywords.map((tag, i) => (
@@ -74,7 +74,7 @@ export default function MemeModal({ meme, onClose, toggleFavorite, favorites, on
               </div>
             </div>
 
-            <div className="mt-10 space-y-4">
+            <div className="mt-6 sm:mt-10 space-y-4">
               {onNext && (
                 <button
                   onClick={onNext}

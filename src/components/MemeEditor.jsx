@@ -115,10 +115,10 @@ export default function MemeEditor() {
         {image ? (
           <div className="relative w-full max-w-md shadow-2xl rounded-xl overflow-hidden">
             <img src={image} alt="preview" className="w-full h-auto" />
-            <h3 className="absolute top-4 left-0 right-0 px-4 text-center font-black text-white uppercase text-2xl drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] break-words pointer-events-none">
+            <h3 className="absolute top-2 sm:top-4 left-0 right-0 px-4 text-center font-black text-white uppercase text-lg sm:text-2xl drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] break-words pointer-events-none">
               {topText}
             </h3>
-            <h3 className="absolute bottom-4 left-0 right-0 px-4 text-center font-black text-white uppercase text-2xl drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] break-words pointer-events-none">
+            <h3 className="absolute bottom-2 sm:bottom-4 left-0 right-0 px-4 text-center font-black text-white uppercase text-lg sm:text-2xl drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] break-words pointer-events-none">
               {bottomText}
             </h3>
           </div>

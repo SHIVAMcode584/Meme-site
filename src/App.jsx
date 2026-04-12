@@ -47,9 +47,9 @@ export default function App() {
   const SidebarLink = ({ icon, label, onClick }) => (
     <button
       onClick={onClick}
-      className="flex items-center gap-4 w-full p-4 rounded-2xl hover:bg-white/5 text-zinc-400 hover:text-white transition-all group"
+      className="flex items-center gap-3 sm:gap-4 w-full p-3 sm:p-4 rounded-xl sm:rounded-2xl hover:bg-white/5 text-zinc-400 hover:text-white transition-all group"
     >
-      <div className="group-hover:scale-110 transition-transform text-violet-400">{icon}</div>
+      <div className="group-hover:scale-110 transition-transform text-violet-400 scale-90 sm:scale-100">{icon}</div>
       <span className="font-medium">{label}</span>
     </button>
   );
@@ -66,12 +66,13 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     const memeId = params.get("meme");
     if (memeId) {
-      const memeToShow = memes.find((m) => m.id === Number(memeId));
+      const allAvailableMemes = [...userMemes, ...memes];
+      const memeToShow = allAvailableMemes.find((m) => m.id === Number(memeId));
       if (memeToShow) {
         setActiveMeme(memeToShow);
       }
     }
-  }, []);
+  }, [userMemes]);
 
  const filteredMemes = useMemo(
   () => smartSearch(viewMode === "uploads" ? userMemes : [...userMemes, ...memes], search, selectedCategory),
@@ -101,8 +102,9 @@ export default function App() {
   };
 
   const handleRandomMeme = () => {
-    const randomIndex = Math.floor(Math.random() * memes.length);
-    openMeme(memes[randomIndex]);
+    const allAvailableMemes = [...userMemes, ...memes];
+    const randomIndex = Math.floor(Math.random() * allAvailableMemes.length);
+    openMeme(allAvailableMemes[randomIndex]);
   };
 
   const handleLogin = (userData) => {
@@ -115,12 +117,73 @@ export default function App() {
     localStorage.removeItem("meme-user");
   };
 
-const handleUploadMeme = (meme) => {
-  setUserMemes((prev) => [meme, ...prev]);
-};
+  const handleUploadMeme = (meme) => {
+    setUserMemes((prev) => [meme, ...prev]);
+  };
+
+  const SidebarContent = () => (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between mb-10">
+        <div className="font-black text-xl tracking-tighter bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
+          MEME HUB
+        </div>
+        <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-2 hover:bg-white/5 rounded-full text-zinc-500">
+          <X size={20} />
+        </button>
+      </div>
+      <nav className="space-y-1">
+        <SidebarLink icon={<Home size={20}/>} label="Memes" onClick={() => { setViewMode("all"); setIsSidebarOpen(false); window.scrollTo({top: 0, behavior: 'smooth'}); }} />
+        <SidebarLink icon={<Search size={20}/>} label="Search" onClick={() => { setIsSidebarOpen(false); document.querySelector('input')?.focus(); }} />
+        <SidebarLink icon={<Dices size={20}/>} label="Random Meme" onClick={() => { setIsSidebarOpen(false); handleRandomMeme(); }} />
+        {user && (
+          <SidebarLink 
+            icon={<Image size={20}/>} 
+            label="My Uploads" 
+            onClick={() => { 
+              setViewMode("uploads");
+              setIsSidebarOpen(false);
+              window.scrollTo({top: 0, behavior: 'smooth'});
+            }} 
+          />
+        )}
+        <SidebarLink icon={<Pencil size={20}/>} label="Edit Meme" onClick={() => { setIsSidebarOpen(false); setIsEditorModalOpen(true); }} />
+        <SidebarLink 
+          icon={<Upload size={20}/>} 
+          label="Upload Meme" 
+          onClick={() => { 
+            setIsSidebarOpen(false); 
+            user ? setIsUploadModalOpen(true) : setIsLoginModalOpen(true); 
+          }} 
+        />
+      </nav>
+
+      <div className="mt-auto pt-6 border-t border-white/10">
+        {user ? (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 p-2">
+              <img src={user.avatar} alt={user.username} className="w-10 h-10 rounded-full border border-violet-500/50" />
+              <div className="overflow-hidden">
+                <p className="font-bold truncate">{user.username}</p>
+                <p className="text-xs text-zinc-500 truncate">{user.email}</p>
+              </div>
+            </div>
+            <SidebarLink icon={<LogOut size={20}/>} label="Log Out" onClick={() => { setIsSidebarOpen(false); handleLogout(); }} />
+          </div>
+        ) : (
+          <SidebarLink icon={<LogIn size={20}/>} label="Sign In" onClick={() => { setIsSidebarOpen(false); setIsLoginModalOpen(true); }} />
+        )}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="min-h-screen bg-[#070B14] text-white">
-      {/* Sidebar Overlay */}
+    <div className="min-h-screen bg-[#070B14] text-white flex">
+      {/* Desktop Sidebar (Persistent) */}
+      <aside className="hidden lg:block fixed top-0 left-0 z-30 h-screen w-64 bg-[#0d1220] border-r border-white/10 p-6 shadow-2xl overflow-y-auto">
+        <SidebarContent />
+      </aside>
+
+      {/* Mobile Sidebar (Drawer) */}
       <AnimatePresence>
         {isSidebarOpen && (
           <>
@@ -129,82 +192,33 @@ const handleUploadMeme = (meme) => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsSidebarOpen(false)}
-              className="fixed inset-0 z-[50] bg-black/60 backdrop-blur-sm"
+              className="fixed inset-0 z-[50] bg-black/60 backdrop-blur-sm lg:hidden"
             />
             <motion.div
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed top-0 left-0 z-[51] h-screen w-[80%] bg-[#0d1220] border-r border-white/10 p-6 shadow-2xl sm:w-64 lg:w-[20%]"
+              className="fixed top-0 left-0 z-[51] h-screen w-[80%] bg-[#0d1220] border-r border-white/10 p-6 shadow-2xl sm:w-64 lg:hidden overflow-y-auto"
             >
-              <div className="flex flex-col h-full">
-                <div className="flex items-center justify-between mb-10">
-                  <div className="font-black text-xl tracking-tighter bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
-                    MEME HUB
-                  </div>
-                  <button onClick={() => setIsSidebarOpen(false)} className="p-2 hover:bg-white/5 rounded-full text-zinc-500">
-                    <X size={20} />
-                  </button>
-                </div>
-                <nav className="space-y-1">
-                  <SidebarLink icon={<Home size={20}/>} label="Memes" onClick={() => { setViewMode("all"); setIsSidebarOpen(false); window.scrollTo({top: 0, behavior: 'smooth'}); }} />
-                  <SidebarLink icon={<Search size={20}/>} label="Search" onClick={() => { setIsSidebarOpen(false); document.querySelector('input')?.focus(); }} />
-                  <SidebarLink icon={<Dices size={20}/>} label="Random Meme" onClick={() => { setIsSidebarOpen(false); handleRandomMeme(); }} />
-                  {user && (
-                    <SidebarLink 
-                      icon={<Image size={20}/>} 
-                      label="My Uploads" 
-                      onClick={() => { 
-                        setViewMode("uploads");
-                        setIsSidebarOpen(false);
-                        window.scrollTo({top: 0, behavior: 'smooth'});
-                      }} 
-                    />
-                  )}
-                  <SidebarLink icon={<Pencil size={20}/>} label="Edit Meme" onClick={() => { setIsSidebarOpen(false); setIsEditorModalOpen(true); }} />
-                  <SidebarLink 
-                    icon={<Upload size={20}/>} 
-                    label="Upload Meme" 
-                    onClick={() => { 
-                      setIsSidebarOpen(false); 
-                      user ? setIsUploadModalOpen(true) : setIsLoginModalOpen(true); 
-                    }} 
-                  />
-                </nav>
-
-                <div className="mt-auto pt-6 border-t border-white/10">
-                  {user ? (
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-3 p-2">
-                        <img src={user.avatar} alt={user.username} className="w-10 h-10 rounded-full border border-violet-500/50" />
-                        <div className="overflow-hidden">
-                          <p className="font-bold truncate">{user.username}</p>
-                          <p className="text-xs text-zinc-500 truncate">{user.email}</p>
-                        </div>
-                      </div>
-                      <SidebarLink icon={<LogOut size={20}/>} label="Log Out" onClick={() => { setIsSidebarOpen(false); handleLogout(); }} />
-                    </div>
-                  ) : (
-                    <SidebarLink icon={<LogIn size={20}/>} label="Sign In" onClick={() => { setIsSidebarOpen(false); setIsLoginModalOpen(true); }} />
-                  )}
-                </div>
-              </div>
+              <SidebarContent />
             </motion.div>
           </>
         )}
       </AnimatePresence>
 
-      <div className="relative isolate overflow-hidden">
-        <header className="sticky top-0 z-40 border-b border-white/10 bg-[#070B14]/85 backdrop-blur-xl">
+      <div className="flex-1 lg:pl-64 min-w-0">
+        <div className="relative isolate overflow-x-clip">
+          <header className="sticky top-0 z-40 border-b border-white/10 bg-[#070B14]/95 backdrop-blur-xl transition-all">
           <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
             <div className="flex items-center gap-4">
               <button 
                 onClick={() => setIsSidebarOpen(true)}
-                className="p-2 hover:bg-white/5 rounded-xl transition-colors border border-white/5"
+                className="p-2 hover:bg-white/5 rounded-xl transition-colors border border-white/5 lg:hidden"
               >
                 <Menu size={24} />
               </button>
+              <img src="/meme-logo.png" alt="Meme Hub Logo" className="w-8 h-8 sm:w-10 sm:h-10 object-contain" />
               <div className="hidden xs:block">
                 <p className="text-xs uppercase tracking-[0.35em] text-zinc-400">Meme Finder</p>
                 <h1 className="text-lg font-semibold sm:text-xl">Discover & Create</h1>
@@ -226,8 +240,8 @@ const handleUploadMeme = (meme) => {
                 <span className="hidden sm:inline">Get Random Meme</span>
                 <span className="sm:hidden">Random</span>
               </button>
-              <div className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-zinc-300">
-                Favorites: {favorites.length}
+              <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm text-zinc-300">
+                <span className="hidden xs:inline">Favorites: </span>{favorites.length}
               </div>
             </div>
           </div>
@@ -358,6 +372,7 @@ const handleUploadMeme = (meme) => {
           favorites={favorites}
           onNext={handleRandomMeme}
         />
+        </div>
       </div>
     </div>
   );

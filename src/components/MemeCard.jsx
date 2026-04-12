@@ -34,23 +34,23 @@ export default function MemeCard({ meme, onOpen, toggleFavorite, favorites }) {
             e.stopPropagation();
             toggleFavorite(meme.id);
           }}
-          className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center border border-white/20 hover:scale-110 transition"
+          className="absolute top-2 right-2 sm:top-4 sm:right-4 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center border border-white/20 hover:scale-110 transition"
         >
           <Heart
-            className={`w-5 h-5 ${
+            className={`w-4 h-4 sm:w-5 sm:h-5 ${
               isFavorite ? "fill-pink-500 text-pink-500" : "text-white"
             }`}
           />
         </button>
       </div>
 
-      <div className="p-5">
-        <h3 className="text-2xl font-bold">{meme.title}</h3>
-        <p className="text-zinc-400 mt-1">
+      <div className="p-3 sm:p-5">
+        <h3 className="text-sm sm:text-2xl font-bold line-clamp-1 sm:line-clamp-none">{meme.title}</h3>
+        <p className="text-[10px] sm:text-sm text-zinc-400 mt-0.5 sm:mt-1">
           {meme.category} • {meme.mood}
         </p>
 
-        <div className="flex flex-wrap gap-2 mt-4">
+        <div className="hidden sm:flex flex-wrap gap-2 mt-4">
           {meme.keywords.slice(0, 4).map((tag, index) => (
             <span
               key={index}
@@ -63,10 +63,10 @@ export default function MemeCard({ meme, onOpen, toggleFavorite, favorites }) {
 
         <button
           onClick={handleDownload}
-          className="mt-5 w-full h-12 rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white font-semibold flex items-center justify-center gap-2 hover:scale-[1.02] transition"
+          className="mt-3 sm:mt-5 w-full h-9 sm:h-12 rounded-xl sm:rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white text-[10px] sm:text-base font-semibold flex items-center justify-center gap-1.5 sm:gap-2 hover:scale-[1.02] transition"
         >
-          <Download className="w-5 h-5" />
-          Download Meme
+          <Download className="w-4 h-4 sm:w-5 sm:h-5" />
+          <span className="hidden xs:inline">Download</span>
         </button>
       </div>
     </div>

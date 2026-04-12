@@ -40,9 +40,9 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
         initial={{ scale: 0.9, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.9, opacity: 0, y: 20 }}
-        className="relative w-full max-w-md bg-[#0d1220] border border-white/10 rounded-[2.5rem] p-8 shadow-2xl"
+        className="relative w-full max-w-md bg-[#0d1220] border border-white/10 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8 shadow-2xl overflow-y-auto max-h-[90vh]"
       >
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-6 sm:mb-8">
           <h2 className="text-2xl font-bold">Welcome Back 🚀</h2>
           <button onClick={onClose} className="p-2 rounded-full bg-white/5 hover:bg-white/10">
             <X size={20} />
