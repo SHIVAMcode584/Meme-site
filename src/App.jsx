@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import logo from "./meme-logo.png";
+import logo from "./assets/meme-logo.png";
 import { Sparkles, Menu, X, Home, Search, Dices, Pencil, Upload, LogIn, LogOut, Image } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import CategoryFilter from "./components/CategoryFilter";
@@ -111,9 +111,9 @@ useEffect(() => {
     openMeme(allAvailableMemes[randomIndex]);
   };
 
-  const handleLogin = (userData) => {
-    setUser(userData);
-    localStorage.setItem("meme-user", JSON.stringify(userData));
+  const handleLogin = (user) => {
+    // Supabase session listener handles state update
+    setIsLoginModalOpen(false);
   };
 
   const handleLogout = async () => {
