@@ -1,8 +1,44 @@
-import { X, Download, Heart } from "lucide-react";
-import { downloadImage } from "../utils/helpers";
+import { useState } from "react";
+import { X, Download, Heart, SkipForward, Link, MessageCircle, Check } from "lucide-react";
 
-export default function MemeModal({ meme, onClose, toggleFavorite, favorites }) {
+export default function MemeModal({ meme, onClose, toggleFavorite, favorites, onNext }) {
+  const [copied, setCopied] = useState(false);
+
   if (!meme) return null;
+
+  const handleDownload = async () => {
+    try {
+      const response = await fetch(meme.image);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${meme.title}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Download failed:", error);
+    }
+  };
+
+  const getShareUrl = () => {
+    const siteUrl = window.location.origin + window.location.pathname;
+    return `${siteUrl}?meme=${meme.id}`;
+  };
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(getShareUrl());
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const shareWhatsApp = () => {
+    const shareUrl = getShareUrl();
+    const text = encodeURIComponent(`Check out this meme: ${meme.title} - ${shareUrl}`);
+    window.open(`https://wa.me/?text=${text}`, "_blank");
+  };
 
   const isFavorite = favorites.includes(meme.id);
 
@@ -38,26 +74,58 @@ export default function MemeModal({ meme, onClose, toggleFavorite, favorites }) 
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mt-10">
-              <button
-                onClick={() => toggleFavorite(meme.id)}
-                className={`py-3 rounded-2xl border transition flex items-center justify-center gap-2 ${
-                  isFavorite
-                    ? "bg-pink-500/80 border-pink-400 text-white"
-                    : "bg-white/10 border-white/10 text-white hover:bg-white/15"
-                }`}
-              >
-                <Heart size={18} fill={isFavorite ? "currentColor" : "none"} />
-                {isFavorite ? "Saved" : "Save"}
-              </button>
+            <div className="mt-10 space-y-4">
+              {onNext && (
+                <button
+                  onClick={onNext}
+                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:opacity-90 transition flex items-center justify-center gap-2 font-bold text-white shadow-lg shadow-violet-500/20"
+                >
+                  <SkipForward size={20} />
+                  Next Random Meme
+                </button>
+              )}
 
-              <button
-                onClick={() => downloadImage(meme.image, meme.title)}
-                className="py-3 rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:opacity-90 transition flex items-center justify-center gap-2 font-medium"
-              >
-                <Download size={18} />
-                Download
-              </button>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={() => toggleFavorite(meme.id)}
+                  className={`py-3 rounded-2xl border transition flex items-center justify-center gap-2 ${
+                    isFavorite
+                      ? "bg-pink-500/80 border-pink-400 text-white"
+                      : "bg-white/10 border-white/10 text-white hover:bg-white/15"
+                  }`}
+                >
+                  <Heart size={18} fill={isFavorite ? "currentColor" : "none"} />
+                  {isFavorite ? "Saved" : "Save"}
+                </button>
+
+                <button
+                  onClick={handleDownload}
+                  className="py-3 rounded-2xl bg-white/10 border border-white/10 text-white hover:bg-white/15 transition flex items-center justify-center gap-2 font-medium"
+                >
+                  <Download size={18} />
+                  Download
+                </button>
+              </div>
+
+              <div className="pt-6 border-t border-white/5 space-y-3">
+                <p className="text-xs uppercase tracking-[0.2em] text-zinc-500 font-bold">Share Meme</p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleCopyLink}
+                    className="flex-1 h-12 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center justify-center gap-2 text-sm font-semibold"
+                  >
+                    {copied ? <Check size={18} className="text-green-400" /> : <Link size={18} />}
+                    {copied ? "Copied Link" : "Copy Link"}
+                  </button>
+                  <button
+                    onClick={shareWhatsApp}
+                    className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center justify-center text-green-500"
+                    title="Share on WhatsApp"
+                  >
+                    <MessageCircle size={20} />
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

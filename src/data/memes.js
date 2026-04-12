@@ -1,17 +1,19 @@
 // Here we store memes dat
 // import abMaiKyaBolu from "../assets/memes/abkyabolumai.jpeg";
-import homeworkPanic from "../assets/memes/agarwojindahote.jpg";
-import ignoredReply from "../assets/memes/hamerayhaaisahehotahai.jpg";
-import noWay from "../assets/memes/noway.jpeg";
-import streetDogs from "../assets/memes/ledogs.png";
-import overthink from "../assets/memes/overthink.jpeg";
-import nationalPainting from "../assets/memes/nationalpainting.jpeg";
-import mentalHealthnow from "../assets/memes/mentalhealthnow.jpeg";
-import idontJudge from "../assets/memes/idontjudge.jpeg";
-import iplCameraMan from "../assets/memes/iplcameraman.jpeg";
-import forGfforFriend from '../assets/memes/forgirlfriendforfriend.jpeg';
-import meAtmyWedding from '../assets/memes/meatmywedding.jpeg';
+// import homeworkPanic from "../assets/memes/agarwojindahote.jpg";
+// import ignoredReply from "../assets/memes/hamerayhaaisahehotahai.jpg";
+// import noWay from "../assets/memes/noway.jpeg";
+// import streetDogs from "../assets/memes/ledogs.png";
+// import overthink from "../assets/memes/overthink.jpeg";
+// import nationalPainting from "../assets/memes/nationalpainting.jpeg";
+// import mentalHealthnow from "../assets/memes/mentalhealthnow.jpeg";
+// import idontJudge from "../assets/memes/idontjudge.jpeg";
+// import iplCameraMan from "../assets/memes/iplcameraman.jpeg";
+// import forGfforFriend from '../assets/memes/forgirlfriendforfriend.jpeg';
+// import meAtmyWedding from '../assets/memes/meatmywedding.jpeg';
 // import financialCondn from '../assets/memes/financialrightnow.jpeg'
+
+import { keyframes } from "framer-motion";
 
 // import gadiNikal from '../assets/memes/gadinikal.jpg'
 
@@ -27,16 +29,16 @@ export const memes = [
   },
   {
     id: 2,
-    title: "Homework Panic",
-    image: homeworkPanic,
-    keywords: ["teacher", "assignment", "homework", "study", "school", "panic"],
-    mood: "panic",
-    category: "School",
+    title: "It happens",
+    image: "https://res.cloudinary.com/dntclntau/image/upload/q_auto/f_auto/v1775918107/hamerayhaaisahehotahai_yy70v9.jpg",
+    keywords: ["hamera", "yha", "aisa", "ashis", "school", "panic"],
+    mood: "reaction",
+    category: "Reply",
   },
   {
     id: 3,
     title: "Ignored Reply",
-    image: ignoredReply,
+    image: "https://res.cloudinary.com/dntclntau/image/upload/q_auto/f_auto/v1775918105/agarwojindahote_pseglg.jpg",
     keywords: ["ignored", "seen", "crush", "late reply", "ghosted", "reply"],
     mood: "sad",
     category: "Chat",
@@ -44,7 +46,7 @@ export const memes = [
   {
     id: 4,
     title: "No Way",
-    image: noWay,
+    image: "https://res.cloudinary.com/dntclntau/image/upload/q_auto/f_auto/v1775918106/noway_a4vzoc.jpg",
     keywords: ["no way", "shock", "impossible", "disbelief", "reaction"],
     mood: "reaction",
     category: "Reaction",
@@ -52,7 +54,7 @@ export const memes = [
   {
     id: 5,
     title: "Street Dogs",
-    image: streetDogs,
+    image: "https://res.cloudinary.com/dntclntau/image/upload/q_auto/f_auto/v1775918116/ledogs_icpwzo.png",
     keywords: ["dogs", "funny", "reaction", "animal", "meme"],
     mood: "funny",
     category: "Funny",
@@ -61,7 +63,7 @@ export const memes = [
   {
     id:6,
     title: "Overthink",
-    image: overthink,
+    image:"https://res.cloudinary.com/dntclntau/image/upload/q_auto/f_auto/v1775918106/overthink_uoyzuv.jpg",
     keywords: ["overthink", "my overthinking level", "extra thinking", "reaction"],
     mood: "overthink",
     category: "Funny",
@@ -69,7 +71,7 @@ export const memes = [
   },
   {id:7,
     title: "National Painting",
-    image: nationalPainting,
+    image: "https://res.cloudinary.com/dntclntau/image/upload/q_auto/f_auto/v1775918105/nationalpainting_h3mlzn.jpg",
     keywords: ["painting" , "national" , "notalgia" , "school" ],
 
     mood:'nostalgia',
@@ -77,7 +79,7 @@ export const memes = [
   },
   {id:8,
     title: "Mental Health Now",
-    image:mentalHealthnow,
+    image:"https://res.cloudinary.com/dntclntau/image/upload/q_auto/f_auto/v1775918105/mentalhealthnow_vuqlc0.jpg",
     keywords: ["mental health" , "calculation" , "school time calculation" ,"Maths" ],
 
     mood:'logic',
@@ -86,7 +88,7 @@ export const memes = [
   {
     id:9,
     title:"I dont judge",
-    image:idontJudge,
+    image:"https://res.cloudinary.com/dntclntau/image/upload/q_auto/f_auto/v1775918109/idontjudge_nanmp6.jpg",
     keywords:['judge' , 'game' , 'we say and we dont judge'],
     mood:'Play',
     category:'Fun'
@@ -97,7 +99,7 @@ export const memes = [
   {
     id:10,
     title:"IPL Camera Man",
-    image:iplCameraMan,
+    image:"https://res.cloudinary.com/dntclntau/image/upload/q_auto/f_auto/v1775918105/iplcameraman_bvsl9j.jpg",
     keywords:['ipl' , 'cameraman', 'girls', 'beauty' , 'cricket'],
     mood:'Roast',
     category:'Roast'
@@ -109,7 +111,7 @@ export const memes = [
 keywords:['gf' , 'bf' , 'after gf friend be like'],
 mood:'Fun',
 category:'Fun',
-image:forGfforFriend
+image:"https://res.cloudinary.com/dntclntau/image/upload/q_auto/f_auto/v1775918106/forgirlfriendforfriend_ajw1qs.jpg"
 
   }
   ,{
@@ -118,16 +120,9 @@ image:forGfforFriend
   keywords :['ex' , 'marraige' , 'jealous' ,'white' ],
 mood:'Jealouos',
 category:'Jealouos',
-image:meAtmyWedding
+image:"https://res.cloudinary.com/dntclntau/image/upload/q_auto/f_auto/v1775918108/meatmywedding_aukd4c.jpg"
   },
-  // {
-  //   id:13,
-  //   title:'Financial condition right now',
-  //   keyword:['paisa' ,'broken' , 'finance' ,'poor'],
-  //   image:financialCondn,
-  //   category:'Fun',
-  //   mood:'Fun'
-  // }
+
   {
     id:13,
     title:'Gadi nikal',
@@ -135,5 +130,61 @@ image:meAtmyWedding
     image:"https://res.cloudinary.com/dntclntau/image/upload/v1775899746/gadinikal_uhqngg.jpg",
     category:'Fun',
     mood:'Fun'
+  },
+  {
+    id:14,
+    title:'Financial condition right now',
+    keywords:['dost' ,'garibi' , 'meme' ,'money'],
+    image:"https://res.cloudinary.com/dntclntau/image/upload/q_auto/f_auto/v1775918108/financialrightnow_dxebas.jpg",
+    category:'Fun',
+    mood:'Fun'
+  },
+  {
+    id:15,
+    title:'Exception vs reality',
+    keywords:['client' , 'budget' , 'reality check' , 'exception'],
+    image:"https://res.cloudinary.com/dntclntau/image/upload/q_auto/f_auto/v1775918108/expectionvsbudget_gubviy.jpg",
+    category:'Reply',
+    mood:'Fun'
+  },
+  {
+    id:16,
+    title:'Added to a group',
+    keywords:['group' , 'meme' , 'off' , 'notification' , 'mute'],
+    image:"https://res.cloudinary.com/dntclntau/image/upload/q_auto/f_auto/v1775918104/addedtoagroup_tkgniu.jpg",
+    category:'Fun',
+    mood:'fun'
   }
+  // {
+  //   id:15,
+  //   title:'',
+  //   keywords:[],
+  //   image:"",
+  //   category:'',
+  //   mood:''
+  // },
+  // {
+  //   id:15,
+  //   title:'',
+  //   keywords:[],
+  //   image:"",
+  //   category:'',
+  //   mood:''
+  // },
+  // {
+  //   id:15,
+  //   title:'',
+  //   keywords:[],
+  //   image:"",
+  //   category:'',
+  //   mood:''
+  // },
+  // {
+  //   id:15,
+  //   title:'',
+  //   keywords:[],
+  //   image:"",
+  //   category:'',
+  //   mood:''
+  // }
 ];
