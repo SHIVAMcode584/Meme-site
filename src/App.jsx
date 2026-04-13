@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import logo from "../meme-logo.png";
-import { Sparkles, Menu, X, Home, Search, Dices, Pencil, Upload, LogIn, LogOut, Image } from "lucide-react";
+import { Sparkles, Menu, X, Home, Search, Dices, Pencil, Upload, LogIn, LogOut, Image, Heart } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import CategoryFilter from "./components/CategoryFilter";
 import Footer from "./components/Footer";
@@ -25,6 +25,23 @@ function getInitialFavorites() {
   }
 }
 
+// Helper to ensure data from any source matches the component expectations
+const normalizeMeme = (m) => ({
+  ...m,
+  // Fix brackets in category/mood and handle array types from DB
+  category: Array.isArray(m.category) 
+    ? m.category[0] 
+    : (typeof m.category === 'string' ? m.category.replace(/[\[\]"']/g, '').trim() : m.category),
+  mood: Array.isArray(m.mood) 
+    ? m.mood[0] 
+    : (typeof m.mood === 'string' ? m.mood.replace(/[\[\]"']/g, '').trim() : m.mood),
+  // Ensure keywords is always a clean array
+  keywords: Array.isArray(m.keywords) 
+    ? m.keywords 
+    : (typeof m.keywords === 'string' ? m.keywords.replace(/[\[\]"']/g, '').split(/[\s,]+/).filter(Boolean) : []),
+  image: m.image_url || m.image || "",
+});
+
 export default function App() {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -36,14 +53,7 @@ export default function App() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState("all");
-  const [userMemes, setUserMemes] = useState(() => {
-    try {
-      const saved = localStorage.getItem("user-uploaded-memes");
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [dbMemes, setDbMemes] = useState([]);
   const SidebarLink = ({ icon, label, onClick }) => (
     <button
       onClick={onClick}
@@ -58,18 +68,9 @@ export default function App() {
     localStorage.setItem("favorite-memes", JSON.stringify(favorites));
   }, [favorites]);
 
-  useEffect(() => {
-    localStorage.setItem("user-uploaded-memes", JSON.stringify(userMemes));
-  }, [userMemes]);
-
 useEffect(() => {
-  const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-  };
-  getUser();
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-    (_, session) => {
+    (_event, session) => {
       setUser(session?.user ?? null);
     }
   );
@@ -78,10 +79,21 @@ useEffect(() => {
     };
 }, []);
 
- const filteredMemes = useMemo(
-  () => smartSearch(viewMode === "uploads" ? userMemes : [...userMemes, ...memes], search, selectedCategory),
-  [search, selectedCategory, userMemes, viewMode]
-);
+  const allMemesNormalized = useMemo(() => {
+    return [...dbMemes, ...memes].map(normalizeMeme);
+  }, [dbMemes]);
+
+  const filteredMemes = useMemo(() => {
+    let baseList = allMemesNormalized;
+    
+    if (viewMode === "uploads" && user) {
+      baseList = baseList.filter(m => m.user_id === user.id);
+    } else if (viewMode === "favorites") {
+      baseList = baseList.filter(m => favorites.includes(m.id));
+    }
+    
+    return smartSearch(baseList, search, selectedCategory);
+  }, [allMemesNormalized, search, selectedCategory, viewMode, user, favorites]);
 
   function toggleFavorite(id) {
     setFavorites((current) =>
@@ -106,7 +118,7 @@ useEffect(() => {
   };
 
   const handleRandomMeme = () => {
-    const allAvailableMemes = [...userMemes, ...memes];
+    const allAvailableMemes = [...dbMemes, ...memes];
     const randomIndex = Math.floor(Math.random() * allAvailableMemes.length);
     openMeme(allAvailableMemes[randomIndex]);
   };
@@ -121,9 +133,26 @@ useEffect(() => {
   };
 
   const handleUploadMeme = (meme) => {
-    setUserMemes((prev) => [meme, ...prev]);
+    setDbMemes((prev) => [normalizeMeme(meme), ...prev]);
   };
 
+  useEffect(() => {
+    fetchMemes();
+  }, []);
+
+  const fetchMemes = async () => {
+    const { data, error } = await supabase
+      .from("meme-table")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error(error);
+    } else {
+      const formatted = data.map(normalizeMeme);
+      setDbMemes(formatted);
+    }
+  };
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between mb-10">
@@ -134,20 +163,32 @@ useEffect(() => {
           <X size={20} />
         </button>
       </div>
-      <nav className="space-y-1">
+
+      <nav className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-1">
         <SidebarLink icon={<Home size={20}/>} label="Memes" onClick={() => { setViewMode("all"); setIsSidebarOpen(false); window.scrollTo({top: 0, behavior: 'smooth'}); }} />
         <SidebarLink icon={<Search size={20}/>} label="Search" onClick={() => { setIsSidebarOpen(false); document.querySelector('input')?.focus(); }} />
         <SidebarLink icon={<Dices size={20}/>} label="Random Meme" onClick={() => { setIsSidebarOpen(false); handleRandomMeme(); }} />
         {user && (
-          <SidebarLink 
-            icon={<Image size={20}/>} 
-            label="My Uploads" 
-            onClick={() => { 
-              setViewMode("uploads");
-              setIsSidebarOpen(false);
-              window.scrollTo({top: 0, behavior: 'smooth'});
-            }} 
-          />
+          <>
+            <SidebarLink 
+              icon={<Image size={20}/>} 
+              label="My Uploads" 
+              onClick={() => { 
+                setViewMode("uploads");
+                setIsSidebarOpen(false);
+                window.scrollTo({top: 0, behavior: 'smooth'});
+              }} 
+            />
+            <SidebarLink 
+              icon={<Heart size={20}/>} 
+              label="Favorites" 
+              onClick={() => { 
+                setViewMode("favorites");
+                setIsSidebarOpen(false);
+                window.scrollTo({top: 0, behavior: 'smooth'});
+              }} 
+            />
+          </>
         )}
         <SidebarLink icon={<Pencil size={20}/>} label="Edit Meme" onClick={() => { setIsSidebarOpen(false); setIsEditorModalOpen(true); }} />
         <SidebarLink 
@@ -160,7 +201,7 @@ useEffect(() => {
         />
       </nav>
 
-      <div className="mt-auto pt-6 border-t border-white/10">
+      <div className="pt-6 border-t border-white/10 mt-6">
         {user ? (
           <div className="space-y-4">
             <div className="flex items-center gap-3 p-2">
@@ -208,7 +249,7 @@ useEffect(() => {
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed top-0 left-0 z-[51] h-screen w-[80%] bg-[#0d1220] border-r border-white/10 p-6 shadow-2xl sm:w-64 lg:hidden overflow-y-auto"
+              className="fixed top-0 left-0 z-[51] h-screen w-[80%] bg-[#0d1220] border-r border-white/10 p-6 shadow-2xl sm:w-64 lg:hidden"
             >
               <SidebarContent />
             </motion.div>
@@ -249,9 +290,17 @@ useEffect(() => {
                 <span className="hidden sm:inline">Get Random Meme</span>
                 <span className="sm:hidden">Random</span>
               </button>
-              <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm text-zinc-300">
+              <button
+                onClick={() => { setViewMode(viewMode === "favorites" ? "all" : "favorites"); window.scrollTo({top: 0, behavior: 'smooth'}); }}
+                className={`flex items-center gap-2 rounded-full border px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm transition-all ${
+                  viewMode === "favorites" 
+                    ? "border-pink-500/50 bg-pink-500/10 text-pink-400" 
+                    : "border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10"
+                }`}
+              >
+                <Heart size={16} className={viewMode === "favorites" ? "fill-pink-500" : ""} />
                 <span className="hidden xs:inline">Favorites: </span>{favorites.length}
-              </div>
+              </button>
             </div>
           </div>
         </header>
@@ -263,7 +312,6 @@ useEffect(() => {
             <SearchBar
               search={search}
               setSearch={setSearch}
-              suggestions={suggestions}
             />
             <CategoryFilter
               categories={categories}
@@ -276,7 +324,7 @@ useEffect(() => {
             <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <h2 className="text-2xl font-bold sm:text-3xl">
-                  {viewMode === "uploads" ? "My Uploaded Memes" : "Meme Results"}
+                  {viewMode === "uploads" ? "My Uploaded Memes" : viewMode === "favorites" ? "My Favorite Memes" : "Meme Results"}
                 </h2>
                 <p className="text-zinc-400">
                   {filteredMemes.length} meme
@@ -308,7 +356,7 @@ useEffect(() => {
             <h2 className="mb-6 text-2xl font-bold sm:text-3xl flex items-center gap-3">
               <Pencil className="text-violet-400" /> Create Your Meme 😎
             </h2>
-            <MemeEditor />
+            <MemeEditor user={user} onUpload={handleUploadMeme} />
           </section>
         </main>
 
@@ -335,7 +383,7 @@ useEffect(() => {
                   <h2 className="text-2xl font-bold">Meme Editor</h2>
                   <button onClick={() => setIsEditorModalOpen(false)} className="p-2 rounded-full bg-white/5 hover:bg-white/10"><X size={20}/></button>
                 </div>
-                <MemeEditor />
+                <MemeEditor user={user} onUpload={handleUploadMeme} />
               </motion.div>
             </div>
           )}
@@ -362,7 +410,7 @@ useEffect(() => {
                   <h2 className="text-2xl font-bold">Upload Meme 📤</h2>
                   <button onClick={() => setIsUploadModalOpen(false)} className="p-2 rounded-full bg-white/5 hover:bg-white/10"><X size={20}/></button>
                 </div>
-                <UploadMeme onUpload={handleUploadMeme} onSuccess={() => setIsUploadModalOpen(false)} />
+                <UploadMeme user={user} onUpload={handleUploadMeme} onSuccess={() => setIsUploadModalOpen(false)} />
               </motion.div>
             </div>
           )}

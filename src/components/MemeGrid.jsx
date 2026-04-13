@@ -54,7 +54,7 @@ export default function MemeGrid({
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-8">
         {displayedMemes.map((meme, index) => (
           <Motion.div
-            key={meme.id}
+            key={`${meme.id}-${index}`}
             initial={{ opacity: 0, y: 25 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: (index % ITEMS_PER_PAGE) * 0.04 }}

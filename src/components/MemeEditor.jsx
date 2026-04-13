@@ -1,10 +1,17 @@
 import { useState, useRef } from "react";
-import { Download, Upload, Image as ImageIcon, Type } from "lucide-react";
+import { Download, Upload, Image as ImageIcon, Type, CloudUpload, Loader2, Palette, Tag, Smile, FolderSearch } from "lucide-react";
+import { supabase } from "../lib/supabase";
 
-export default function MemeEditor() {
+export default function MemeEditor({ user, onUpload }) {
   const [image, setImage] = useState(null);
   const [topText, setTopText] = useState("");
   const [bottomText, setBottomText] = useState("");
+  const [textColor, setTextColor] = useState("#ffffff");
+  const [category, setCategory] = useState("");
+  const [mood, setMood] = useState("");
+  const [keywords, setKeywords] = useState("");
+  const [uploadTitle, setUploadTitle] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
   const canvasRef = useRef(null);
 
   const handleImageUpload = (e) => {
@@ -14,6 +21,69 @@ export default function MemeEditor() {
       reader.onload = () => setImage(reader.result);
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleUploadToHub = async () => {
+    if (!user) return alert("Please sign in to upload memes!");
+    if (!uploadTitle.trim()) return alert("Please give your meme a title first.");
+    
+    setIsUploading(true);
+    try {
+      // 1. Prepare Canvas & Draw
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext("2d");
+      const img = new Image();
+      img.src = image;
+      
+      const blob = await new Promise((resolve) => {
+        img.onload = () => {
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+          const fontSize = canvas.width / 10;
+          ctx.font = `bold ${fontSize}px Impact, sans-serif`;
+          ctx.fillStyle = textColor;
+          ctx.strokeStyle = "black";
+          ctx.lineWidth = fontSize / 15;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          if (topText) {
+            ctx.strokeText(topText.toUpperCase(), canvas.width / 2, fontSize);
+            ctx.fillText(topText.toUpperCase(), canvas.width / 2, fontSize);
+          }
+          if (bottomText) {
+            ctx.strokeText(bottomText.toUpperCase(), canvas.width / 2, canvas.height - fontSize);
+            ctx.fillText(bottomText.toUpperCase(), canvas.width / 2, canvas.height - fontSize);
+          }
+          canvas.toBlob(resolve, "image/jpeg", 0.9);
+        };
+      });
+
+      // 2. Upload to Cloudinary
+      const formData = new FormData();
+      formData.append("file", blob);
+      formData.append("upload_preset", "meme_upload");
+      const cloudRes = await fetch("https://api.cloudinary.com/v1_1/dntclntau/image/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const cloudData = await cloudRes.json();
+      if (!cloudData.secure_url) throw new Error("Cloudinary upload failed");
+
+      // 3. Save to Supabase
+      const { data, error } = await supabase.from("meme-table").insert([{
+        title: uploadTitle,
+        image_url: cloudData.secure_url,
+        user_id: user.id,
+        category: category,
+        mood: mood,
+        keywords: keywords.split(/[\s,]+/).filter(Boolean),
+      }]).select();
+      if (error) throw error;
+      if (onUpload && data?.[0]) onUpload(data[0]);
+      alert("Meme uploaded to Hub! 🚀");
+    } catch (err) { alert("Upload failed: " + err.message); }
+    setIsUploading(false);
   };
 
   const handleDownload = () => {
@@ -32,7 +102,7 @@ export default function MemeEditor() {
       // Styling the text (Impact is the classic meme font)
       const fontSize = canvas.width / 10;
       ctx.font = `bold ${fontSize}px Impact, sans-serif`;
-      ctx.fillStyle = "white";
+      ctx.fillStyle = textColor;
       ctx.strokeStyle = "black";
       ctx.lineWidth = fontSize / 15;
       ctx.textAlign = "center";
@@ -98,16 +168,88 @@ export default function MemeEditor() {
               className="w-full h-12 pl-12 pr-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-violet-500/50 transition text-white"
             />
           </div>
+
+          <div className="flex items-center gap-4 p-2 bg-white/5 rounded-xl border border-white/10">
+            <Palette className="text-zinc-500 ml-2" size={18} />
+            <span className="text-sm text-zinc-400 mr-2">Color:</span>
+            <div className="flex gap-2">
+              {["#ffffff", "#ffff00", "#ff0000", "#00ff00", "#00ffff"].map(color => (
+                <button 
+                  key={color} 
+                  onClick={() => setTextColor(color)}
+                  className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 ${textColor === color ? 'border-violet-400 scale-110' : 'border-transparent'}`}
+                  style={{ backgroundColor: color }}
+                />
+              ))}
+              <input 
+                type="color" 
+                value={textColor} 
+                onChange={(e) => setTextColor(e.target.value)}
+                className="w-6 h-6 bg-transparent border-none cursor-pointer"
+              />
+            </div>
+          </div>
         </div>
 
         {image && (
-          <button
-            onClick={handleDownload}
-            className="w-full h-14 rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white font-bold flex items-center justify-center gap-2 hover:scale-[1.02] transition shadow-lg shadow-violet-500/20"
-          >
-            <Download size={20} />
-            Download My Meme
-          </button>
+          <div className="space-y-4 pt-4 border-t border-white/10">
+            <button
+              onClick={handleDownload}
+              className="w-full h-14 rounded-2xl bg-white/5 border border-white/10 text-white font-bold flex items-center justify-center gap-2 hover:bg-white/10 transition"
+            >
+              <Download size={20} />
+              Download to Device
+            </button>
+
+            <div className="space-y-3">
+              <div className="relative">
+                <Type className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+                <input
+                  type="text"
+                  placeholder="Meme Title (Required for upload)"
+                  value={uploadTitle}
+                  onChange={(e) => setUploadTitle(e.target.value)}
+                  className="w-full h-12 pl-12 pr-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-violet-500/50 transition text-white text-sm"
+                />
+              </div>
+              <div className="relative">
+                <FolderSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+                <input
+                  placeholder="Category (e.g. Reply, Funny)"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full h-12 pl-12 pr-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-violet-500/50 transition text-white text-sm"
+                />
+              </div>
+              <div className="relative">
+                <Smile className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+                <input
+                  placeholder="Mood (e.g., Happy, Sad, Awkward)"
+                  value={mood}
+                  onChange={(e) => setMood(e.target.value)}
+                  className="w-full h-12 pl-12 pr-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-violet-500/50 transition text-white text-sm"
+                />
+              </div>
+              <div className="relative">
+                <Tag className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+                <input
+                  placeholder="Keywords (comma separated)"
+                  value={keywords}
+                  onChange={(e) => setKeywords(e.target.value)}
+                  className="w-full h-12 pl-12 pr-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-violet-500/50 transition text-white text-sm"
+                />
+              </div>
+              <button
+                onClick={handleUploadToHub}
+                disabled={isUploading || !user}
+                className="w-full h-14 rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white font-black flex items-center justify-center gap-2 hover:scale-[1.02] transition shadow-lg shadow-violet-500/20 disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed"
+              >
+                {isUploading ? <Loader2 className="animate-spin" /> : <CloudUpload size={20} />}
+                {user ? "Upload to Meme Hub" : "Sign In to Upload"}
+              </button>
+              {!user && <p className="text-[10px] text-zinc-500 text-center mt-2">Sign in to share your creation with everyone!</p>}
+            </div>
+          </div>
         )}
       </div>
 
@@ -115,10 +257,12 @@ export default function MemeEditor() {
         {image ? (
           <div className="relative w-full max-w-md shadow-2xl rounded-xl overflow-hidden">
             <img src={image} alt="preview" className="w-full h-auto" />
-            <h3 className="absolute top-2 sm:top-4 left-0 right-0 px-4 text-center font-black text-white uppercase text-lg sm:text-2xl drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] break-words pointer-events-none">
+            <h3 className="absolute top-2 sm:top-4 left-0 right-0 px-4 text-center font-black uppercase text-lg sm:text-2xl drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] break-words pointer-events-none"
+                style={{ color: textColor }}>
               {topText}
             </h3>
-            <h3 className="absolute bottom-2 sm:bottom-4 left-0 right-0 px-4 text-center font-black text-white uppercase text-lg sm:text-2xl drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] break-words pointer-events-none">
+            <h3 className="absolute bottom-2 sm:bottom-4 left-0 right-0 px-4 text-center font-black uppercase text-lg sm:text-2xl drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] break-words pointer-events-none"
+                style={{ color: textColor }}>
               {bottomText}
             </h3>
           </div>

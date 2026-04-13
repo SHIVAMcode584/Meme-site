@@ -1,6 +1,6 @@
 import { Search } from "lucide-react";
 
-export default function SearchBar({ search, setSearch, suggestions }) {
+export default function SearchBar({ search, setSearch }) {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="relative">
@@ -12,18 +12,6 @@ export default function SearchBar({ search, setSearch, suggestions }) {
           onChange={(e) => setSearch(e.target.value)}
           className="w-full h-14 sm:h-16 pl-14 pr-5 rounded-2xl bg-[#101624] border border-white/10 text-white placeholder:text-zinc-500 outline-none focus:border-violet-400/40 focus:ring-2 focus:ring-violet-500/20 transition"
         />
-      </div>
-
-      <div className="flex flex-wrap gap-3 mt-5 justify-center">
-        {suggestions.map((item, index) => (
-          <button
-            key={index}
-            onClick={() => setSearch(item)}
-            className="px-4 py-2 rounded-full bg-white/5 border border-white/10 text-sm text-zinc-300 hover:bg-white/10 transition"
-          >
-            {item}
-          </button>
-        ))}
       </div>
     </div>
   );

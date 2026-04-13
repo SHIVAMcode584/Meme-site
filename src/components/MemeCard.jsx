@@ -51,7 +51,7 @@ export default function MemeCard({ meme, onOpen, toggleFavorite, favorites }) {
         </p>
 
         <div className="hidden sm:flex flex-wrap gap-2 mt-4">
-          {meme.keywords.slice(0, 4).map((tag, index) => (
+          {(Array.isArray(meme.keywords) ? meme.keywords : []).slice(0, 4).map((tag, index) => (
             <span
               key={index}
               className="text-xs px-3 py-1 rounded-full bg-white/5 border border-white/10 text-zinc-300"

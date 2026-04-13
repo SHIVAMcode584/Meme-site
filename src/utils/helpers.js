@@ -21,22 +21,28 @@ export function downloadImage(imageUrl, fileName) {
 export function smartSearch(memes, search, selectedCategory) {
   let filtered = memes;
 
-  if (selectedCategory !== "All") {
-    filtered = filtered.filter((meme) => meme.category === selectedCategory);
+  if (selectedCategory && selectedCategory !== "All") {
+    filtered = filtered.filter((meme) => 
+      meme.category?.toLowerCase().trim() === selectedCategory.toLowerCase().trim()
+    );
   }
 
-  if (!search.trim()) return filtered;
-
-  const queryWords = search.toLowerCase().split(" ").filter(Boolean);
+  // 2. Filter by Search Query
+  const query = search.toLowerCase().trim();
+  if (!query) return filtered;
+  
+  const queryWords = query.split(/\s+/).filter(Boolean);
 
   return filtered.filter((meme) => {
+    const keywordsArray = Array.isArray(meme.keywords) ? meme.keywords : [];
     const searchableText = `
-      ${meme.title}
-      ${meme.keywords.join(" ")}
-      ${meme.mood}
-      ${meme.category}
+      ${meme.title || ""}
+      ${keywordsArray.join(" ")}
+      ${meme.mood || ""}
+      ${meme.category || ""}
     `.toLowerCase();
 
-    return queryWords.some((word) => searchableText.includes(word));
+    // Use 'every' so that multi-word searches are more accurate
+    return queryWords.every((word) => searchableText.includes(word));
   });
 }

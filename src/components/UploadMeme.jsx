@@ -1,21 +1,26 @@
 import { useState } from "react";
-import { Upload, Type, CheckCircle2, Loader2 } from "lucide-react";
+import { supabase } from "../lib/supabase";
+import { Loader2, Upload, Tag, Smile, FolderSearch, Type } from "lucide-react"; 
 
-function UploadMeme({ onUpload, onSuccess }) {
+export default function UploadMeme({ user, onUpload, onSuccess }) {
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState("");
-  const [isUploading, setIsUploading] = useState(false);
+  const [category, setCategory] = useState("");
+  const [mood, setMood] = useState("");
+  const [keywords, setKeywords] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleUpload = async () => {
-    if (!file) return alert("Select image first!");
-    setIsUploading(true);
-    const formData = new FormData();
-    formData.append("file", file);
-    // 1. Make sure 'meme_upload' is an UNSIGNED preset in your Cloudinary settings
-    formData.append("upload_preset", "meme_upload"); 
+    if (!file) return alert("Select an image");
+
+    setLoading(true);
 
     try {
-      // 2. REPLACE 'YOUR_CLOUD_NAME' with your actual Cloudinary cloud name
+      // 🟢 1. Upload to Cloudinary
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", "meme_upload"); // your preset
+
       const res = await fetch(
         "https://api.cloudinary.com/v1_1/dntclntau/image/upload",
         {
@@ -23,84 +28,140 @@ function UploadMeme({ onUpload, onSuccess }) {
           body: formData,
         }
       );
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error?.message || "Upload failed");
-      }
 
       const data = await res.json();
 
-      const newMeme = {
-        id: Date.now(),
-        title: title || "Untitled Meme",
-        image: data.secure_url,
-        category: "User",
-        mood: "Custom",
-        keywords: ["user-upload", (title || "").toLowerCase()],
-      };
+      if (!data.secure_url) {
+        throw new Error("Image upload failed");
+      }
 
-      onUpload(newMeme);
+      if (!user?.id) {
+        console.error("Auth mismatch: user object or ID is missing", user);
+        alert("Login session expired. Please sign in again.");
+        setLoading(false);
+        return;
+      }
+
+      // 🟢 3. Save to Supabase
+      console.log("Attempting Supabase insert with user_id:", user.id);
+      const { data: insertedData, error } = await supabase.from("meme-table").insert([
+        {
+          title,
+          image_url: data.secure_url,
+          category,
+          mood,
+          keywords: keywords.split(/[\s,]+/).filter(Boolean),
+          user_id: user.id,
+        },
+      ]).select();
+
+      if (error) throw error;
+
+      alert("Meme uploaded successfully 🚀");
+
+      // reset
       setFile(null);
       setTitle("");
+      setCategory("");
+      setMood("");
+      setKeywords("");
+
+      if (onUpload && insertedData && insertedData[0]) {
+        onUpload({
+          ...insertedData[0],
+          image: insertedData[0].image_url,
+        });
+      }
       if (onSuccess) onSuccess();
-    } catch (error) {
-      console.error("Cloudinary Error:", error);
-      alert("Upload failed: " + error.message);
-    } finally {
-      setIsUploading(false);
+    } catch (err) {
+      console.error("Upload process error:", err);
+      alert(`Upload failed: ${err.message || "Unknown error"}`);
     }
+
+    setLoading(false);
   };
 
   return (
     <div className="space-y-6">
-      <div className="relative group">
-        <input 
-          type="file" 
-          onChange={(e) => setFile(e.target.files[0])} 
-          className="hidden"
-          id="file-upload"
-          accept="image/*"
-        />
-        <label
-          htmlFor="file-upload"
-          className={`flex flex-col items-center justify-center w-full h-40 rounded-2xl border-2 border-dashed transition-all cursor-pointer ${
-            file ? "border-green-500/50 bg-green-500/5" : "border-white/10 bg-white/5 hover:bg-white/10 hover:border-violet-500/50"
-          }`}
-        >
-          {file ? (
-            <>
-              <CheckCircle2 className="w-10 h-10 mb-2 text-green-400" />
-              <span className="text-sm text-green-300 font-medium">{file.name}</span>
-            </>
-          ) : (
-            <>
-              <Upload className="w-10 h-10 mb-2 text-zinc-500" />
-              <span className="text-sm text-zinc-400">Click to select your meme image</span>
-            </>
-          )}
+      <div>
+        <label htmlFor="file-upload" className="block text-sm font-medium text-zinc-300 mb-2">
+          Image File
         </label>
+        <input
+          id="file-upload"
+          type="file"
+          onChange={(e) => setFile(e.target.files?.[0] || null)}
+          className="block w-full text-sm text-zinc-400
+            file:mr-4 file:py-2 file:px-4
+            file:rounded-full file:border-0
+            file:text-sm file:font-semibold
+            file:bg-violet-500 file:text-white
+            hover:file:bg-violet-600 transition-colors
+            cursor-pointer"
+        />
+        {file && <p className="text-xs text-zinc-500 mt-1">Selected: {file.name}</p>}
       </div>
 
+      {/* Title Input */}
       <div className="relative">
         <Type className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
         <input
-          type="text"
-          placeholder="Give your meme a title..."
+          placeholder="Meme Title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="w-full h-12 pl-12 pr-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-violet-500/50 transition text-white"
+          className="w-full h-12 pl-12 pr-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-violet-500/50 transition text-white placeholder-zinc-500"
         />
       </div>
 
+      {/* Category Input */}
+      <div className="relative">
+        <FolderSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+        <input
+          placeholder="Category (e.g. Reply, Funny)"
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className="w-full h-12 pl-12 pr-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-violet-500/50 transition text-white placeholder-zinc-500"
+        />
+      </div>
+      
+      {/* Mood Input */}
+      <div className="relative">
+        <Smile className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+        <input
+          placeholder="Mood (e.g., Happy, Sad, Awkward)"
+          value={mood}
+          onChange={(e) => setMood(e.target.value)}
+          className="w-full h-12 pl-12 pr-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-violet-500/50 transition text-white placeholder-zinc-500"
+        />
+      </div>
+
+      {/* Keywords Input */}
+      <div className="relative">
+        <Tag className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+        <input
+          placeholder="Keywords (comma separated)"
+          value={keywords}
+          onChange={(e) => setKeywords(e.target.value)}
+          className="w-full h-12 pl-12 pr-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-violet-500/50 transition text-white placeholder-zinc-500"
+        />
+      </div>
+
+      {/* Upload Button */}
       <button
         onClick={handleUpload}
-        disabled={isUploading || !file}
-        className="w-full h-14 rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white font-bold flex items-center justify-center gap-2 hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100 transition shadow-lg shadow-violet-500/20"
+        disabled={loading}
+        className="w-full h-14 rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white font-bold flex items-center justify-center gap-2 hover:scale-[1.02] transition shadow-lg shadow-violet-500/20 disabled:opacity-70 disabled:cursor-not-allowed"
       >
-        {isUploading ? <Loader2 className="animate-spin" size={20} /> : <Upload size={20} />}
-        {isUploading ? "Uploading..." : "Publish Meme"}
+        {loading ? (
+          <>
+            <Loader2 className="animate-spin" size={20} /> Uploading...
+          </>
+        ) : (
+         <>
+            <Upload size={20} /> Upload Meme
+          </>
+        )}
       </button>
     </div>
   );
 }
-export default UploadMeme;
