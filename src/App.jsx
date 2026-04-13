@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+
 import logo from "../meme-logo.png";
-import { Sparkles, Menu, X, Home, Search, Dices, Pencil, Upload, LogIn, LogOut, Image, Heart } from "lucide-react";
+import { Sparkles, Menu, X, Home, Search, Dices, Pencil, Upload, LogIn, LogOut, Image, Heart, User as UserIcon, ChevronRight, KeyRound, CheckCircle2, Loader2 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import CategoryFilter from "./components/CategoryFilter";
 import Footer from "./components/Footer";
@@ -13,8 +14,9 @@ import UploadMeme from "./components/UploadMeme";
 import MemeEditor from "./components/MemeEditor";
 import { categories, smartSearch, suggestions } from "./utils/helpers";
 import LoginModal from "./components/LoginModal";
-import Auth from './components/Auth'
 import { supabase } from "./lib/supabase";
+import AuthModal from "./components/AuthModal";
+import ResetPassword from "./components/ResetPassword";
 
 function getInitialFavorites() {
   try {
@@ -26,21 +28,26 @@ function getInitialFavorites() {
 }
 
 // Helper to ensure data from any source matches the component expectations
-const normalizeMeme = (m) => ({
-  ...m,
-  // Fix brackets in category/mood and handle array types from DB
-  category: Array.isArray(m.category) 
-    ? m.category[0] 
-    : (typeof m.category === 'string' ? m.category.replace(/[\[\]"']/g, '').trim() : m.category),
-  mood: Array.isArray(m.mood) 
-    ? m.mood[0] 
-    : (typeof m.mood === 'string' ? m.mood.replace(/[\[\]"']/g, '').trim() : m.mood),
-  // Ensure keywords is always a clean array
-  keywords: Array.isArray(m.keywords) 
-    ? m.keywords 
-    : (typeof m.keywords === 'string' ? m.keywords.replace(/[\[\]"']/g, '').split(/[\s,]+/).filter(Boolean) : []),
-  image: m.image_url || m.image || "",
-});
+const normalizeMeme = (m) => {
+  const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+
+  return {
+    ...m,
+    // Fix brackets in category/mood and handle array types from DB
+    category: Array.isArray(m.category) 
+      ? m.category[0] 
+      : (typeof m.category === 'string' ? m.category.replace(/[\[\]"']/g, '').trim() : m.category),
+    mood: Array.isArray(m.mood) 
+      ? m.mood[0] 
+      : (typeof m.mood === 'string' ? m.mood.replace(/[\[\]"']/g, '').trim() : m.mood),
+    // Ensure keywords is always a clean array
+    keywords: Array.isArray(m.keywords) 
+      ? m.keywords 
+      : (typeof m.keywords === 'string' ? m.keywords.replace(/[\[\]"']/g, '').split(/[\s,]+/).filter(Boolean) : []),
+    username: m.user_id ? (profile?.username || m.username || "User") : "Owner",
+    image: m.image_url || m.image || "",
+  };
+};
 
 export default function App() {
   const [search, setSearch] = useState("");
@@ -54,6 +61,12 @@ export default function App() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState("all");
   const [dbMemes, setDbMemes] = useState([]);
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
+  const [notification, setNotification] = useState(null); // { type: 'success' | 'error', message: string }
+  const [resetStatus, setResetStatus] = useState(null); // { type: 'success' | 'error', message: string }
+  const [isResetLoading, setIsResetLoading] = useState(false);
+const path = window.location.pathname;
   const SidebarLink = ({ icon, label, onClick }) => (
     <button
       onClick={onClick}
@@ -68,16 +81,17 @@ export default function App() {
     localStorage.setItem("favorite-memes", JSON.stringify(favorites));
   }, [favorites]);
 
-useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-    (_event, session) => {
-      setUser(session?.user ?? null);
+  // Lock body scroll when mobile sidebar is open
+  useEffect(() => {
+    if (isSidebarOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
     }
-  );
     return () => {
-      subscription.unsubscribe();
+      document.body.style.overflow = "unset";
     };
-}, []);
+  }, [isSidebarOpen]);
 
   const allMemesNormalized = useMemo(() => {
     return [...dbMemes, ...memes].map(normalizeMeme);
@@ -102,7 +116,26 @@ useEffect(() => {
         : [...current, id]
     );
   }
+useEffect(() => {
+  // Handle initial session check
+  supabase.auth.getUser().then(({ data }) => {
+    setUser(data.user);
+  });
 
+  // Listen for auth state changes (login, logout, magic link success)
+  const { data: listener } = supabase.auth.onAuthStateChange(
+    (event, session) => {
+      setUser(session?.user ?? null);
+      if (event === "SIGNED_IN") {
+        setIsLoginModalOpen(false);
+      }
+    }
+  );
+
+  return () => {
+    listener.subscription.unsubscribe();
+  };
+}, []);
   const openMeme = (meme) => {
     setActiveMeme(meme);
     const url = new URL(window.location);
@@ -118,56 +151,74 @@ useEffect(() => {
   };
 
   const handleRandomMeme = () => {
-    const allAvailableMemes = [...dbMemes, ...memes];
-    const randomIndex = Math.floor(Math.random() * allAvailableMemes.length);
-    openMeme(allAvailableMemes[randomIndex]);
-  };
-
-  const handleLogin = (user) => {
-    // Supabase session listener handles state update
-    setIsLoginModalOpen(false);
+    if (allMemesNormalized.length === 0) return;
+    const randomIndex = Math.floor(Math.random() * allMemesNormalized.length);
+    openMeme(allMemesNormalized[randomIndex]);
   };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    setViewMode("all");
+  };
+
+  const handlePasswordResetRequest = async () => {
+    if (!user?.email) return;
+    setIsResetLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+      redirectTo: window.location.origin + "/reset-password",
+    });
+    setIsResetLoading(false);
+    setIsResetConfirmOpen(false);
+    if (error) setResetStatus({ type: 'error', message: error.message });
+    else setResetStatus({ type: 'success', message: "A password reset link has been sent to your email! Please check your inbox. 📧" });
   };
 
   const handleUploadMeme = (meme) => {
     setDbMemes((prev) => [normalizeMeme(meme), ...prev]);
   };
-
+if (path === "/reset-password") {
+  return <ResetPassword />;
+}
   useEffect(() => {
     fetchMemes();
   }, []);
 
   const fetchMemes = async () => {
-    const { data, error } = await supabase
+    // Try fetching with profile join first
+    let { data, error } = await supabase
       .from("meme-table")
-      .select("*")
+      .select("*, profiles(username)")
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error(error);
-    } else {
-      const formatted = data.map(normalizeMeme);
-      setDbMemes(formatted);
+      console.warn("Could not fetch with profiles join, falling back to simple select:", error.message);
+      // Fallback: Fetch without join if relationship is missing
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from("meme-table")
+        .select("*")
+        .order("created_at", { ascending: false });
+      
+      if (fallbackError) return console.error("Error fetching memes:", fallbackError);
+      data = fallbackData;
     }
+
+    const formatted = data.map(normalizeMeme);
+    setDbMemes(formatted);
   };
   const SidebarContent = () => (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between mb-10">
+    <div className="flex flex-col h-full max-h-screen overflow-hidden">
+      <div className="flex items-center justify-between mb-6 sm:mb-10 flex-shrink-0">
         <div className="font-black text-xl tracking-tighter bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
-          MEME HUB
+          RoastRiot.meme
         </div>
         <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-2 hover:bg-white/5 rounded-full text-zinc-500">
           <X size={20} />
         </button>
       </div>
 
-      <nav className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-1">
+      <nav className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-1 min-h-0">
         <SidebarLink icon={<Home size={20}/>} label="Memes" onClick={() => { setViewMode("all"); setIsSidebarOpen(false); window.scrollTo({top: 0, behavior: 'smooth'}); }} />
-        <SidebarLink icon={<Search size={20}/>} label="Search" onClick={() => { setIsSidebarOpen(false); document.querySelector('input')?.focus(); }} />
-        <SidebarLink icon={<Dices size={20}/>} label="Random Meme" onClick={() => { setIsSidebarOpen(false); handleRandomMeme(); }} />
+        <SidebarLink icon={<Search size={20}/>} label="Search" onClick={() => { setIsSidebarOpen(false); document.querySelector('input[type="text"]')?.focus(); }} />
         {user && (
           <>
             <SidebarLink 
@@ -201,23 +252,30 @@ useEffect(() => {
         />
       </nav>
 
-      <div className="pt-6 border-t border-white/10 mt-6">
+      <div className="pt-4 sm:pt-6 border-t border-white/10 mt-4 sm:mt-6 flex-shrink-0">
         {user ? (
-          <div className="space-y-4">
-            <div className="flex items-center gap-3 p-2">
+          <div className="space-y-2 sm:space-y-4">
+            <button 
+              onClick={() => { 
+                setViewMode("profile");
+                setIsSidebarOpen(false);
+                window.scrollTo({top: 0, behavior: 'smooth'});
+              }}
+              className="flex items-center gap-3 p-2 w-full text-left hover:bg-white/5 rounded-xl transition-colors group"
+            >
               <img 
                 src={user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`} 
-                alt="avatar" 
-                className="w-10 h-10 rounded-full border border-violet-500/50" 
+                alt="avatar"
+                className="w-10 h-10 rounded-full border border-violet-500/50 group-hover:scale-105 transition-transform" 
               />
               <div className="overflow-hidden">
-                <p className="font-bold truncate">
+                <p className="font-bold truncate group-hover:text-violet-400 transition-colors">
                   {user.user_metadata?.username || user.email.split('@')[0]}
                 </p>
                 <p className="text-xs text-zinc-500 truncate">{user.email}</p>
               </div>
-            </div>
-            <SidebarLink icon={<LogOut size={20}/>} label="Log Out" onClick={() => { setIsSidebarOpen(false); handleLogout(); }} />
+            </button>
+            <SidebarLink icon={<LogOut size={20}/>} label="Log Out" onClick={() => { setIsSidebarOpen(false); setIsLogoutConfirmOpen(true); }} />
           </div>
         ) : (
           <SidebarLink icon={<LogIn size={20}/>} label="Sign In" onClick={() => { setIsSidebarOpen(false); setIsLoginModalOpen(true); }} />
@@ -268,7 +326,7 @@ useEffect(() => {
               >
                 <Menu size={24} />
               </button>
-              <img src={logo} alt="Meme Hub Logo" className="w-8 h-8 sm:w-10 sm:h-10 object-contain" />
+              <img src={logo} alt="RoastRiot Logo" className="w-8 h-8 sm:w-10 sm:h-10 object-contain" />
               <div className="hidden xs:block">
                 <p className="text-xs uppercase tracking-[0.35em] text-zinc-400">Meme Finder</p>
                 <h1 className="text-lg font-semibold sm:text-xl">Discover & Create</h1>
@@ -277,9 +335,11 @@ useEffect(() => {
 
             <div className="flex items-center gap-3">
               {!user && (
-                <button onClick={() => setIsLoginModalOpen(true)} className="hidden sm:flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-400 hover:text-white transition-colors">
-                  <LogIn size={18} />
-                  Sign In
+                <button
+                  onClick={() => setIsLoginModalOpen(true)}
+                  className="px-4 py-2 bg-purple-600 rounded"
+                >
+                  Login
                 </button>
               )}
               <button
@@ -305,51 +365,84 @@ useEffect(() => {
           </div>
         </header>
 
-        <Hero />
-
         <main className="relative z-10 mx-auto max-w-6xl px-4 pb-16 sm:px-6">
-          <section className="rounded-[2rem] border border-white/10 bg-white/5 p-5 shadow-2xl shadow-black/20 backdrop-blur-xl sm:p-8">
-            <SearchBar
-              search={search}
-              setSearch={setSearch}
-            />
-            <CategoryFilter
-              categories={categories}
-              selectedCategory={selectedCategory}
-              setSelectedCategory={setSelectedCategory}
-            />
-          </section>
-
-          <section className="mt-10">
-            <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <h2 className="text-2xl font-bold sm:text-3xl">
-                  {viewMode === "uploads" ? "My Uploaded Memes" : viewMode === "favorites" ? "My Favorite Memes" : "Meme Results"}
-                </h2>
-                <p className="text-zinc-400">
-                  {filteredMemes.length} meme
-                  {filteredMemes.length === 1 ? "" : "s"} found
-                </p>
+          {viewMode === "profile" && user ? (
+            <motion.section 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-10 max-w-2xl mx-auto p-6 sm:p-10 bg-[#0d1220] border border-white/10 rounded-[2.5rem] shadow-2xl"
+            >
+              <div className="flex items-center gap-4 mb-8">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-violet-500 to-fuchsia-500 p-1">
+                  <img 
+                    src={user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`} 
+                    alt="Profile" 
+                    className="w-full h-full rounded-full bg-[#0d1220] object-cover"
+                  />
+                </div>
+                <div>
+                  <h2 className="text-2xl sm:text-3xl font-bold">{user.user_metadata?.username || 'Meme Creator'}</h2>
+                  <p className="text-zinc-500">{user.email}</p>
+                </div>
               </div>
 
-              {search ? (
-                <button
-                  onClick={() => setSearch("")}
-                  className="h-11 rounded-2xl border border-white/10 bg-white/5 px-4 text-sm text-zinc-300 transition hover:bg-white/10"
+              <div className="space-y-4">
+                <button 
+                  onClick={() => setIsResetConfirmOpen(true)}
+                  className="w-full p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all flex items-center justify-between group"
                 >
-                  Clear search
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-violet-500/10 text-violet-400">
+                      <LogIn size={18} />
+                    </div>
+                    <span className="font-semibold">Request Password Reset Email</span>
+                  </div>
+                  <ChevronRight size={18} className="text-zinc-600 group-hover:text-white group-hover:translate-x-1 transition-all" />
                 </button>
-              ) : null}
-            </div>
 
-            <MemeGrid
-              memes={filteredMemes}
-              onOpen={openMeme}
-              toggleFavorite={toggleFavorite}
-              favorites={favorites}
-              setSearch={setSearch}
-            />
-          </section>
+                <button 
+                  onClick={() => setIsLogoutConfirmOpen(true)}
+                  className="w-full p-4 rounded-2xl bg-red-500/5 border border-red-500/10 hover:bg-red-500/10 transition-all flex items-center justify-between group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-red-500/10 text-red-400">
+                      <LogOut size={18} />
+                    </div>
+                    <span className="font-semibold text-red-400">Log Out Session</span>
+                  </div>
+                  <ChevronRight size={18} className="text-red-900 group-hover:text-red-400 group-hover:translate-x-1 transition-all" />
+                </button>
+              </div>
+            </motion.section>
+          ) : (
+            <>
+              <Hero />
+              <section className="-mt-16 relative z-20 rounded-[2rem] border border-white/10 bg-[#0d1220] p-5 shadow-2xl shadow-black/50 backdrop-blur-xl sm:p-8">
+                <SearchBar search={search} setSearch={setSearch} />
+                <CategoryFilter categories={categories} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} />
+              </section>
+
+              <section className="mt-10">
+                <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold sm:text-3xl">
+                      {viewMode === "uploads" ? "My Uploaded Memes" : viewMode === "favorites" ? "My Favorite Memes" : "Meme Results"}
+                    </h2>
+                    <p className="text-zinc-400">
+                      {filteredMemes.length} meme{filteredMemes.length === 1 ? "" : "s"} found
+                    </p>
+                  </div>
+
+                  {search ? (
+                    <button onClick={() => setSearch("")} className="h-11 rounded-2xl border border-white/10 bg-white/5 px-4 text-sm text-zinc-300 transition hover:bg-white/10">
+                      Clear search
+                    </button>
+                  ) : null}
+                </div>
+                <MemeGrid memes={filteredMemes} onOpen={openMeme} toggleFavorite={toggleFavorite} favorites={favorites} setSearch={setSearch} />
+              </section>
+            </>
+          )}
 
           {/* Default Bottom Editor */}
           <section className="mt-20 rounded-[2rem] border border-white/10 bg-white/5 p-5 shadow-2xl shadow-black/20 backdrop-blur-xl sm:p-8">
@@ -383,7 +476,7 @@ useEffect(() => {
                   <h2 className="text-2xl font-bold">Meme Editor</h2>
                   <button onClick={() => setIsEditorModalOpen(false)} className="p-2 rounded-full bg-white/5 hover:bg-white/10"><X size={20}/></button>
                 </div>
-                <MemeEditor user={user} onUpload={handleUploadMeme} />
+                <MemeEditor user={user} onUpload={handleUploadMeme} onSuccess={(msg) => { setIsEditorModalOpen(false); setNotification({ type: 'success', message: msg }); }} />
               </motion.div>
             </div>
           )}
@@ -410,20 +503,123 @@ useEffect(() => {
                   <h2 className="text-2xl font-bold">Upload Meme 📤</h2>
                   <button onClick={() => setIsUploadModalOpen(false)} className="p-2 rounded-full bg-white/5 hover:bg-white/10"><X size={20}/></button>
                 </div>
-                <UploadMeme user={user} onUpload={handleUploadMeme} onSuccess={() => setIsUploadModalOpen(false)} />
+                <UploadMeme user={user} onUpload={handleUploadMeme} onSuccess={(msg) => { setIsUploadModalOpen(false); setNotification({ type: 'success', message: msg }); }} />
               </motion.div>
             </div>
           )}
         </AnimatePresence>
 
-        <LoginModal 
-          isOpen={isLoginModalOpen} 
-          onClose={() => setIsLoginModalOpen(false)} 
-          onLogin={handleLogin} 
-        />
+        <AnimatePresence>
+          {isLoginModalOpen && (
+            <LoginModal 
+              isOpen={isLoginModalOpen} 
+              onClose={() => setIsLoginModalOpen(false)} 
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Logout Confirmation Modal */}
+        <AnimatePresence>
+          {isLogoutConfirmOpen && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsLogoutConfirmOpen(false)} className="fixed inset-0 bg-black/80 backdrop-blur-sm" />
+              <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-[#0d1220] border border-white/10 p-8 rounded-[2.5rem] max-w-sm w-full shadow-2xl text-center">
+                <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <LogOut size={32} />
+                </div>
+                <h3 className="text-xl font-bold mb-2">Logging out? 🚀</h3>
+                <p className="text-zinc-400 mb-8">Are you sure you want to end your session? We'll miss the memes!</p>
+                <div className="flex gap-3">
+                  <button onClick={() => setIsLogoutConfirmOpen(false)} className="flex-1 py-3 rounded-2xl bg-white/5 hover:bg-white/10 transition font-semibold text-zinc-300">Cancel</button>
+                  <button onClick={() => { setIsLogoutConfirmOpen(false); handleLogout(); }} className="flex-1 py-3 rounded-2xl bg-red-500 hover:bg-red-600 transition font-semibold text-white shadow-lg shadow-red-500/20">Sign Out</button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Password Reset Confirmation Modal */}
+        <AnimatePresence>
+          {isResetConfirmOpen && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsResetConfirmOpen(false)} className="fixed inset-0 bg-black/80 backdrop-blur-sm" />
+              <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-[#0d1220] border border-white/10 p-8 rounded-[2.5rem] max-w-sm w-full shadow-2xl text-center">
+                <div className="w-16 h-16 bg-violet-500/10 text-violet-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <KeyRound size={32} />
+                </div>
+                <h3 className="text-xl font-bold mb-2">Reset Password? 🔑</h3>
+                <p className="text-zinc-400 mb-8">We'll send a secure link to your email to change your password.</p>
+                <div className="flex gap-3">
+                  <button disabled={isResetLoading} onClick={() => setIsResetConfirmOpen(false)} className="flex-1 py-3 rounded-2xl bg-white/5 hover:bg-white/10 transition font-semibold text-zinc-300 disabled:opacity-50">Cancel</button>
+                  <button 
+                    disabled={isResetLoading} 
+                    onClick={handlePasswordResetRequest} 
+                    className="flex-1 py-3 rounded-2xl bg-violet-500 hover:bg-violet-600 transition font-semibold text-white shadow-lg shadow-violet-500/20 flex items-center justify-center gap-2 disabled:opacity-70"
+                  >
+                    {isResetLoading ? <Loader2 className="animate-spin" size={18} /> : null}
+                    {isResetLoading ? "Sending..." : "Send Link"}
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+      {/* Password Reset Result/Status Modal */}
+      <AnimatePresence>
+        {resetStatus && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setResetStatus(null)} className="fixed inset-0 bg-black/80 backdrop-blur-sm" />
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-[#0d1220] border border-white/10 p-8 rounded-[2.5rem] max-w-sm w-full shadow-2xl text-center z-10">
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
+                resetStatus.type === 'success' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
+              }`}>
+                {resetStatus.type === 'success' ? <CheckCircle2 size={32} /> : <X size={32} />}
+              </div>
+              <h3 className="text-xl font-bold mb-2">
+                {resetStatus.type === 'success' ? 'Email Sent! 🚀' : 'Request Failed ❌'}
+              </h3>
+              <p className="text-zinc-400 mb-8">{resetStatus.message}</p>
+              <button 
+                onClick={() => setResetStatus(null)} 
+                className="w-full py-3 rounded-2xl bg-violet-500 hover:bg-violet-600 transition font-semibold text-white shadow-lg shadow-violet-500/20"
+              >
+                Dismiss
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Success/Notification Popup Modal */}
+      <AnimatePresence>
+        {notification && (
+          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setNotification(null)} className="fixed inset-0 bg-black/80 backdrop-blur-sm" />
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-[#0d1220] border border-white/10 p-8 rounded-[2.5rem] max-w-sm w-full shadow-2xl text-center z-10">
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
+                notification.type === 'success' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
+              }`}>
+                {notification.type === 'success' ? <CheckCircle2 size={32} /> : <X size={32} />}
+              </div>
+              <h3 className="text-xl font-bold mb-2">
+                {notification.type === 'success' ? 'Success! 🚀' : 'Oops! ❌'}
+              </h3>
+              <p className="text-zinc-400 mb-8">{notification.message}</p>
+              <button 
+                onClick={() => setNotification(null)} 
+                className="w-full py-3 rounded-2xl bg-violet-500 hover:bg-violet-600 transition font-semibold text-white shadow-lg shadow-violet-500/20"
+              >
+                Awesome!
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
         <MemeModal
           meme={activeMeme}
+        user={user}
           onClose={closeModal}
           toggleFavorite={toggleFavorite}
           favorites={favorites}

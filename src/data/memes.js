@@ -1,21 +1,6 @@
-// Here we store memes dat
-// import abMaiKyaBolu from "../assets/memes/abkyabolumai.jpeg";
-// import homeworkPanic from "../assets/memes/agarwojindahote.jpg";
-// import ignoredReply from "../assets/memes/hamerayhaaisahehotahai.jpg";
-// import noWay from "../assets/memes/noway.jpeg";
-// import streetDogs from "../assets/memes/ledogs.png";
-// import overthink from "../assets/memes/overthink.jpeg";
-// import nationalPainting from "../assets/memes/nationalpainting.jpeg";
-// import mentalHealthnow from "../assets/memes/mentalhealthnow.jpeg";
-// import idontJudge from "../assets/memes/idontjudge.jpeg";
-// import iplCameraMan from "../assets/memes/iplcameraman.jpeg";
-// import forGfforFriend from '../assets/memes/forgirlfriendforfriend.jpeg';
-// import meAtmyWedding from '../assets/memes/meatmywedding.jpeg';
-// import financialCondn from '../assets/memes/financialrightnow.jpeg'
 
 import { keyframes } from "framer-motion";
 
-// import gadiNikal from '../assets/memes/gadinikal.jpg'
 
 
 export const memes = [
@@ -39,7 +24,7 @@ export const memes = [
     id: 3,
     title: "Ignored Reply",
     image: "https://res.cloudinary.com/dntclntau/image/upload/q_auto/f_auto/v1775918105/agarwojindahote_pseglg.jpg",
-    keywords: ["ignored", "seen", "crush", "late reply", "ghosted", "reply"],
+    keywords: ["ignored", "seen", "crush", "late reply", "ghosted", "reply" , 'danish' , 'zinda' , 'jinda'],
     mood: "sad",
     category: "Chat",
   },

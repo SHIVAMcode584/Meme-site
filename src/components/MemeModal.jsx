@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { X, Download, Heart, SkipForward, Link, MessageCircle, Check } from "lucide-react";
 
-export default function MemeModal({ meme, onClose, toggleFavorite, favorites, onNext }) {
+export default function MemeModal({ meme, user, onClose, toggleFavorite, favorites, onNext }) {
   const [copied, setCopied] = useState(false);
 
   if (!meme) return null;
@@ -61,6 +61,11 @@ export default function MemeModal({ meme, onClose, toggleFavorite, favorites, on
             <div>
               <p className="text-xs sm:text-sm text-violet-300 mb-1 sm:mb-2">{meme.category} • {meme.mood}</p>
               <h2 className="text-xl sm:text-3xl font-bold line-clamp-1 sm:line-clamp-none">{meme.title}</h2>
+              <p className="text-xs text-zinc-400 mt-2">
+                Uploaded by: <span className="text-zinc-300 font-medium">
+                  {meme.username}
+                </span>
+              </p>
 
               <div className="flex flex-wrap gap-1.5 mt-3 sm:mt-6">
                 {(Array.isArray(meme.keywords) ? meme.keywords : []).map((tag, i) => (

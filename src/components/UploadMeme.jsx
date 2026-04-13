@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
-import { Loader2, Upload, Tag, Smile, FolderSearch, Type } from "lucide-react"; 
+import { Loader2, Upload, Tag, Smile, FolderSearch, Type } from "lucide-react";
 
 export default function UploadMeme({ user, onUpload, onSuccess }) {
   const [file, setFile] = useState(null);
@@ -12,73 +12,78 @@ export default function UploadMeme({ user, onUpload, onSuccess }) {
 
   const handleUpload = async () => {
     if (!file) return alert("Select an image");
+    if (!title.trim()) return alert("Please add a meme title first.");
+    if (!file.type?.startsWith("image/")) return alert("Please choose a valid image file.");
 
     setLoading(true);
 
     try {
-      // 🟢 1. Upload to Cloudinary
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
+
+      const currentUser = authData?.user || user;
+      if (!currentUser?.id) {
+        throw new Error("Login session expired. Please sign in again.");
+      }
+
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("upload_preset", "meme_upload"); // your preset
+      formData.append("upload_preset", "meme_upload");
 
-      const res = await fetch(
-        "https://api.cloudinary.com/v1_1/dntclntau/image/upload",
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
+      const res = await fetch("https://api.cloudinary.com/v1_1/dntclntau/image/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const cloudData = await res.json();
 
-      const data = await res.json();
-
-      if (!data.secure_url) {
-        throw new Error("Image upload failed");
+      if (!res.ok || !cloudData.secure_url) {
+        throw new Error(cloudData?.error?.message || "Image upload failed");
       }
 
-      if (!user?.id) {
-        console.error("Auth mismatch: user object or ID is missing", user);
-        alert("Login session expired. Please sign in again.");
-        setLoading(false);
-        return;
-      }
+      const payload = {
+        title: title.trim(),
+        image_url: cloudData.secure_url,
+        category: category.trim(),
+        mood: mood.trim(),
+        keywords: keywords.split(/[\s,]+/).filter(Boolean),
+        user_id: currentUser.id,
+      };
 
-      // 🟢 3. Save to Supabase
-      console.log("Attempting Supabase insert with user_id:", user.id);
-      const { data: insertedData, error } = await supabase.from("meme-table").insert([
-        {
-          title,
-          image_url: data.secure_url,
-          category,
-          mood,
-          keywords: keywords.split(/[\s,]+/).filter(Boolean),
-          user_id: user.id,
-        },
-      ]).select();
+      const { data: insertedData, error } = await supabase
+        .from("meme-table")
+        .insert([payload])
+        .select();
 
       if (error) throw error;
 
-      alert("Meme uploaded successfully 🚀");
+      const savedMeme = insertedData?.[0];
 
-      // reset
       setFile(null);
       setTitle("");
       setCategory("");
       setMood("");
       setKeywords("");
 
-      if (onUpload && insertedData && insertedData[0]) {
+      if (onUpload && savedMeme) {
+        const profile = Array.isArray(savedMeme.profiles) ? savedMeme.profiles[0] : savedMeme.profiles;
+
         onUpload({
-          ...insertedData[0],
-          image: insertedData[0].image_url,
+          ...savedMeme,
+          username:
+            profile?.username ||
+            currentUser.user_metadata?.username ||
+            currentUser.email?.split("@")[0] ||
+            "User",
+          image: savedMeme.image_url,
         });
       }
-      if (onSuccess) onSuccess();
+
+      if (onSuccess) onSuccess("Meme uploaded to RoastRiot successfully!");
     } catch (err) {
       console.error("Upload process error:", err);
-      alert(`Upload failed: ${err.message || "Unknown error"}`);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (
@@ -90,6 +95,7 @@ export default function UploadMeme({ user, onUpload, onSuccess }) {
         <input
           id="file-upload"
           type="file"
+          accept="image/*"
           onChange={(e) => setFile(e.target.files?.[0] || null)}
           className="block w-full text-sm text-zinc-400
             file:mr-4 file:py-2 file:px-4
@@ -102,7 +108,6 @@ export default function UploadMeme({ user, onUpload, onSuccess }) {
         {file && <p className="text-xs text-zinc-500 mt-1">Selected: {file.name}</p>}
       </div>
 
-      {/* Title Input */}
       <div className="relative">
         <Type className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
         <input
@@ -113,7 +118,6 @@ export default function UploadMeme({ user, onUpload, onSuccess }) {
         />
       </div>
 
-      {/* Category Input */}
       <div className="relative">
         <FolderSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
         <input
@@ -123,8 +127,7 @@ export default function UploadMeme({ user, onUpload, onSuccess }) {
           className="w-full h-12 pl-12 pr-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-violet-500/50 transition text-white placeholder-zinc-500"
         />
       </div>
-      
-      {/* Mood Input */}
+
       <div className="relative">
         <Smile className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
         <input
@@ -135,7 +138,6 @@ export default function UploadMeme({ user, onUpload, onSuccess }) {
         />
       </div>
 
-      {/* Keywords Input */}
       <div className="relative">
         <Tag className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
         <input
@@ -146,7 +148,6 @@ export default function UploadMeme({ user, onUpload, onSuccess }) {
         />
       </div>
 
-      {/* Upload Button */}
       <button
         onClick={handleUpload}
         disabled={loading}
@@ -157,7 +158,7 @@ export default function UploadMeme({ user, onUpload, onSuccess }) {
             <Loader2 className="animate-spin" size={20} /> Uploading...
           </>
         ) : (
-         <>
+          <>
             <Upload size={20} /> Upload Meme
           </>
         )}

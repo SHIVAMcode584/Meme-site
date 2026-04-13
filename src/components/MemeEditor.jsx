@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { Download, Upload, Image as ImageIcon, Type, CloudUpload, Loader2, Palette, Tag, Smile, FolderSearch } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
-export default function MemeEditor({ user, onUpload }) {
+export default function MemeEditor({ user, onUpload, onSuccess }) {
   const [image, setImage] = useState(null);
   const [topText, setTopText] = useState("");
   const [bottomText, setBottomText] = useState("");
@@ -26,20 +26,30 @@ export default function MemeEditor({ user, onUpload }) {
   const handleUploadToHub = async () => {
     if (!user) return alert("Please sign in to upload memes!");
     if (!uploadTitle.trim()) return alert("Please give your meme a title first.");
-    
+    if (!image) return alert("Please choose an image first.");
+
     setIsUploading(true);
+
     try {
-      // 1. Prepare Canvas & Draw
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
+
+      const currentUser = authData?.user || user;
+      if (!currentUser?.id) {
+        throw new Error("Login session expired. Please sign in again.");
+      }
+
       const canvas = canvasRef.current;
       const ctx = canvas.getContext("2d");
-      const img = new Image();
-      img.src = image;
-      
-      const blob = await new Promise((resolve) => {
+
+      const blob = await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
         img.onload = () => {
           canvas.width = img.width;
           canvas.height = img.height;
           ctx.drawImage(img, 0, 0);
+
           const fontSize = canvas.width / 10;
           ctx.font = `bold ${fontSize}px Impact, sans-serif`;
           ctx.fillStyle = textColor;
@@ -47,59 +57,99 @@ export default function MemeEditor({ user, onUpload }) {
           ctx.lineWidth = fontSize / 15;
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
+
           if (topText) {
             ctx.strokeText(topText.toUpperCase(), canvas.width / 2, fontSize);
             ctx.fillText(topText.toUpperCase(), canvas.width / 2, fontSize);
           }
+
           if (bottomText) {
             ctx.strokeText(bottomText.toUpperCase(), canvas.width / 2, canvas.height - fontSize);
             ctx.fillText(bottomText.toUpperCase(), canvas.width / 2, canvas.height - fontSize);
           }
-          canvas.toBlob(resolve, "image/jpeg", 0.9);
+
+          canvas.toBlob((b) => {
+            if (b) resolve(b);
+            else reject(new Error("Canvas to Blob conversion failed"));
+          }, "image/jpeg", 0.9);
         };
+        img.onerror = () => reject(new Error("Failed to load image for processing"));
+        img.src = image;
       });
 
-      // 2. Upload to Cloudinary
       const formData = new FormData();
-      formData.append("file", blob);
+      formData.append("file", blob, "meme.jpg");
       formData.append("upload_preset", "meme_upload");
+
       const cloudRes = await fetch("https://api.cloudinary.com/v1_1/dntclntau/image/upload", {
         method: "POST",
         body: formData,
       });
       const cloudData = await cloudRes.json();
-      if (!cloudData.secure_url) throw new Error("Cloudinary upload failed");
 
-      // 3. Save to Supabase
-      const { data, error } = await supabase.from("meme-table").insert([{
-        title: uploadTitle,
-        image_url: cloudData.secure_url,
-        user_id: user.id,
-        category: category,
-        mood: mood,
-        keywords: keywords.split(/[\s,]+/).filter(Boolean),
-      }]).select();
+      if (!cloudRes.ok || !cloudData.secure_url) {
+        throw new Error(cloudData?.error?.message || "Cloudinary upload failed");
+      }
+
+      const { data, error } = await supabase
+        .from("meme-table")
+        .insert([
+          {
+            title: uploadTitle.trim(),
+            image_url: cloudData.secure_url,
+            user_id: currentUser.id,
+            category: category.trim(),
+            mood: mood.trim(),
+            keywords: keywords.split(/[\s,]+/).filter(Boolean),
+          },
+        ])
+        .select();
+
       if (error) throw error;
-      if (onUpload && data?.[0]) onUpload(data[0]);
-      alert("Meme uploaded to Hub! 🚀");
-    } catch (err) { alert("Upload failed: " + err.message); }
-    setIsUploading(false);
+
+      if (onUpload && data?.[0]) {
+        const savedMeme = data[0];
+        const profile = Array.isArray(savedMeme.profiles) ? savedMeme.profiles[0] : savedMeme.profiles;
+
+        onUpload({
+          ...savedMeme,
+          username:
+            profile?.username ||
+            currentUser.user_metadata?.username ||
+            currentUser.email?.split("@")[0] ||
+            "User",
+        });
+      }
+
+      // Reset form fields
+      setTopText("");
+      setBottomText("");
+      setImage(null);
+      setUploadTitle("");
+      setCategory("");
+      setMood("");
+      setKeywords("");
+
+      if (onSuccess) onSuccess("Meme added to RoastRiot!");
+    } catch (err) {
+      console.error("Upload failed:", err);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleDownload = () => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
+
     const img = new Image();
-    img.src = image;
-    
+    img.crossOrigin = "anonymous";
     img.onload = () => {
-      // Set canvas size to match image
       canvas.width = img.width;
       canvas.height = img.height;
-      
+
       ctx.drawImage(img, 0, 0);
 
-      // Styling the text (Impact is the classic meme font)
       const fontSize = canvas.width / 10;
       ctx.font = `bold ${fontSize}px Impact, sans-serif`;
       ctx.fillStyle = textColor;
@@ -108,13 +158,11 @@ export default function MemeEditor({ user, onUpload }) {
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
 
-      // Add Top Text
       if (topText) {
         ctx.strokeText(topText.toUpperCase(), canvas.width / 2, fontSize);
         ctx.fillText(topText.toUpperCase(), canvas.width / 2, fontSize);
       }
 
-      // Add Bottom Text
       if (bottomText) {
         ctx.strokeText(bottomText.toUpperCase(), canvas.width / 2, canvas.height - fontSize);
         ctx.fillText(bottomText.toUpperCase(), canvas.width / 2, canvas.height - fontSize);
@@ -125,6 +173,7 @@ export default function MemeEditor({ user, onUpload }) {
       link.href = canvas.toDataURL("image/png");
       link.click();
     };
+    img.src = image;
   };
 
   return (
@@ -173,17 +222,17 @@ export default function MemeEditor({ user, onUpload }) {
             <Palette className="text-zinc-500 ml-2" size={18} />
             <span className="text-sm text-zinc-400 mr-2">Color:</span>
             <div className="flex gap-2">
-              {["#ffffff", "#ffff00", "#ff0000", "#00ff00", "#00ffff"].map(color => (
-                <button 
-                  key={color} 
+              {["#ffffff", "#ffff00", "#ff0000", "#00ff00", "#00ffff"].map((color) => (
+                <button
+                  key={color}
                   onClick={() => setTextColor(color)}
-                  className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 ${textColor === color ? 'border-violet-400 scale-110' : 'border-transparent'}`}
+                  className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 ${textColor === color ? "border-violet-400 scale-110" : "border-transparent"}`}
                   style={{ backgroundColor: color }}
                 />
               ))}
-              <input 
-                type="color" 
-                value={textColor} 
+              <input
+                type="color"
+                value={textColor}
                 onChange={(e) => setTextColor(e.target.value)}
                 className="w-6 h-6 bg-transparent border-none cursor-pointer"
               />
@@ -245,7 +294,7 @@ export default function MemeEditor({ user, onUpload }) {
                 className="w-full h-14 rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white font-black flex items-center justify-center gap-2 hover:scale-[1.02] transition shadow-lg shadow-violet-500/20 disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed"
               >
                 {isUploading ? <Loader2 className="animate-spin" /> : <CloudUpload size={20} />}
-                {user ? "Upload to Meme Hub" : "Sign In to Upload"}
+                {user ? "Upload to RoastRiot.meme" : "Sign In to Upload"}
               </button>
               {!user && <p className="text-[10px] text-zinc-500 text-center mt-2">Sign in to share your creation with everyone!</p>}
             </div>
@@ -257,12 +306,16 @@ export default function MemeEditor({ user, onUpload }) {
         {image ? (
           <div className="relative w-full max-w-md shadow-2xl rounded-xl overflow-hidden">
             <img src={image} alt="preview" className="w-full h-auto" />
-            <h3 className="absolute top-2 sm:top-4 left-0 right-0 px-4 text-center font-black uppercase text-lg sm:text-2xl drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] break-words pointer-events-none"
-                style={{ color: textColor }}>
+            <h3
+              className="absolute top-2 sm:top-4 left-0 right-0 px-4 text-center font-black uppercase text-lg sm:text-2xl drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] break-words pointer-events-none"
+              style={{ color: textColor }}
+            >
               {topText}
             </h3>
-            <h3 className="absolute bottom-2 sm:bottom-4 left-0 right-0 px-4 text-center font-black uppercase text-lg sm:text-2xl drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] break-words pointer-events-none"
-                style={{ color: textColor }}>
+            <h3
+              className="absolute bottom-2 sm:bottom-4 left-0 right-0 px-4 text-center font-black uppercase text-lg sm:text-2xl drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] break-words pointer-events-none"
+              style={{ color: textColor }}
+            >
               {bottomText}
             </h3>
           </div>

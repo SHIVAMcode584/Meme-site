@@ -1,64 +1,84 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { X, User, Mail, LogIn, Loader2, Lock } from "lucide-react";
+import { X, User, Mail, LogIn, Loader2, Lock, KeyRound, ArrowLeft, Wand2, CheckCircle2 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
-export default function LoginModal({ isOpen, onClose, onLogin }) {
-  const [isSignUp, setIsSignUp] = useState(false);
+export default function LoginModal({ isOpen, onClose }) {
+  const [mode, setMode] = useState("login"); // login | signup | forgot
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [message, setMessage] = useState({ type: "", text: "" });
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email || !password) return;
+    if (!email) return;
+    
     setIsLoading(true);
-    setError("");
+    setMessage({ type: "", text: "" });
     
     try {
-      let data, authError;
-
-      if (isSignUp) {
-        const res = await supabase.auth.signUp({
+      if (mode === "signup") {
+        const { error: authError } = await supabase.auth.signInWithOtp({
           email: email.trim(),
-          password,
           options: {
-            data: { username: username.trim(), avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}` }
+            emailRedirectTo: window.location.origin,
+            data: { 
+              username: username.trim(), 
+              avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}` 
+            }
           }
         });
-        data = res.data;
-        authError = res.error;
-        if (!authError && !data.session) {
-          setError("Signup successful! Please check your email for a confirmation link.");
-          setIsLoading(false);
-          return;
-        }
-      } else {
-        const res = await supabase.auth.signInWithPassword({
+        if (authError) throw authError;
+        setMessage({ type: "success", text: "Verification email sent! Check your inbox for the magic link to verify your account. 📧" });
+      } else if (mode === "login") {
+        const { error: authError } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password,
         });
-        data = res.data;
-        authError = res.error;
         
-        if (authError?.message?.includes("Invalid login credentials")) {
-          throw new Error("Wrong email/password or account doesn't exist. Try signing up!");
+        if (authError) {
+          if (authError.message.includes("Invalid login credentials")) {
+            throw new Error("Invalid email or password. Please try again.");
+          }
+          throw authError;
         }
+        onClose();
+      } else if (mode === "forgot") {
+        const { error: authError } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.origin + "/reset-password",
+        });
+        if (authError) throw authError;
+        setMessage({ type: "success", text: "Password reset link sent to your email!" });
       }
-
-      if (authError) throw authError;
-
-      const user = data.user;
-      onLogin({ 
-        username: user.user_metadata?.username || email.split('@')[0], 
-        email: user.email, 
-        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}` 
-      });
-      onClose();
     } catch (err) {
-      setError(err.message === "Failed to fetch" ? "Network error: Check your API Key and URL" : err.message);
+      setMessage({ 
+        type: "error", 
+        text: err.message === "Failed to fetch" ? "Network error: Check your connection" : err.message 
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleMagicLink = async () => {
+    if (!email) return;
+    
+    setIsLoading(true);
+    setMessage({ type: "", text: "" });
+    
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: {
+          emailRedirectTo: window.location.origin
+        }
+      });
+      if (error) throw error;
+      setMessage({ type: "success", text: "Magic link sent! Check your email 📧" });
+    } catch (err) {
+      setMessage({ type: "error", text: err.message });
     } finally {
       setIsLoading(false);
     }
@@ -81,48 +101,102 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
         exit={{ scale: 0.9, opacity: 0, y: 20 }}
         className="relative w-full max-w-md bg-[#0d1220] border border-white/10 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8 shadow-2xl overflow-y-auto max-h-[90vh]"
       >
-        <div className="flex items-center justify-between mb-6 sm:mb-8">
-          <h2 className="text-2xl font-bold">{isSignUp ? "Create Account ✨" : "Welcome Back 🚀"}</h2>
-          <button onClick={onClose} className="p-2 rounded-full bg-white/5 hover:bg-white/10">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h2 className="text-2xl font-bold">
+              {mode === "login" && "Welcome Back 🚀"}
+              {mode === "signup" && "Create Account ✨"}
+              {mode === "forgot" && "Reset Password 🔑"}
+            </h2>
+            <p className="text-zinc-500 text-sm mt-1">
+              {mode === "login" && "Sign in to your account to continue"}
+              {mode === "signup" && "Join the community of meme creators"}
+              {mode === "forgot" && "Enter your email to receive a reset link"}
+            </p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-zinc-400 transition-colors">
             <X size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {isSignUp && (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {mode === "signup" && (
             <div className="relative">
               <User className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
-              <input type="text" placeholder="Username" required value={username} onChange={(e) => setUsername(e.target.value)} className="w-full h-12 pl-12 pr-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-violet-500/50 transition text-white" />
+              <input type="text" placeholder="Username" required value={username} onChange={(e) => setUsername(e.target.value)} className="w-full h-12 pl-12 pr-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition text-white" />
             </div>
           )}
           <div className="relative">
             <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
-            <input type="email" placeholder="Email address" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full h-12 pl-12 pr-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-violet-500/50 transition text-white" />
+            <input type="email" placeholder="Email address" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full h-12 pl-12 pr-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition text-white" />
           </div>
-          <div className="relative">
-            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
-            <input type="password" placeholder="Password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full h-12 pl-12 pr-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-violet-500/50 transition text-white" />
-          </div>
-
-          {error && (
-            <p className="text-red-400 text-sm bg-red-400/10 p-3 rounded-xl border border-red-400/20">
-              {error}
-            </p>
+          {mode === "login" && (
+            <div className="relative">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+              <input type="password" placeholder="Password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full h-12 pl-12 pr-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition text-white" />
+            </div>
           )}
 
-          <button disabled={isLoading} type="submit" className="w-full h-14 rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white font-bold flex items-center justify-center gap-2 hover:scale-[1.02] transition shadow-lg shadow-violet-500/20 disabled:opacity-70 disabled:cursor-not-allowed">
+          {mode === "login" && (
+            <div className="flex justify-end">
+              <button type="button" onClick={() => setMode("forgot")} className="text-xs text-violet-400 hover:text-violet-300 transition">
+                Forgot Password?
+              </button>
+            </div>
+          )}
+
+          {message.text && (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className={`text-sm p-4 rounded-2xl border flex flex-col gap-2 ${
+                message.type === "error" 
+                  ? "text-red-400 bg-red-400/10 border-red-400/20" 
+                  : "text-green-400 bg-green-400/10 border-green-400/20"
+              }`}
+            >
+              <div className="flex items-center gap-2 font-semibold">
+                {message.type === "success" ? <CheckCircle2 size={18} /> : <X size={18} />}
+                {message.type === "success" ? "Success!" : "Oops!"}
+              </div>
+              <p>{message.text}</p>
+            </motion.div>
+          )}
+
+          <button disabled={isLoading} type="submit" className="w-full h-14 rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white font-bold flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition shadow-lg shadow-violet-500/20 disabled:opacity-70 disabled:cursor-not-allowed mt-2">
             {isLoading ? <Loader2 className="animate-spin" size={20} /> : <LogIn size={20} />}
-            {isLoading ? "Processing..." : (isSignUp ? "Sign Up" : "Sign In")}
+            {isLoading ? "Processing..." : (mode === "signup" ? "Send Magic Link" : mode === "login" ? "Sign In" : "Send Reset Link")}
           </button>
+
+          {mode === "login" && (
+            <button 
+              type="button"
+              onClick={handleMagicLink}
+              disabled={isLoading || !email}
+              className="w-full h-14 rounded-2xl border border-white/10 bg-white/5 text-zinc-300 font-bold flex items-center justify-center gap-2 hover:bg-white/10 hover:border-violet-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+            >
+              {isLoading ? <Loader2 className="animate-spin" size={20} /> : <Wand2 size={20} className="text-violet-400" />}
+              Login with Magic Link
+            </button>
+          )}
         </form>
 
         <div className="mt-6 text-center">
-          <button 
-            onClick={() => setIsSignUp(!isSignUp)} 
-            className="text-zinc-400 hover:text-violet-400 text-sm transition"
-          >
-            {isSignUp ? "Already have an account? Sign In" : "Don't have an account? Sign Up"}
-          </button>
+          {mode === "forgot" ? (
+            <button onClick={() => setMode("login")} className="text-zinc-400 hover:text-violet-400 text-sm transition flex items-center justify-center gap-2 mx-auto">
+              <ArrowLeft size={14} /> Back to Sign In
+            </button>
+          ) : (
+            <button 
+              onClick={() => {
+                setMode(mode === "login" ? "signup" : "login");
+                setMessage({ type: "", text: "" });
+              }} 
+              className="text-zinc-400 hover:text-violet-400 text-sm transition"
+            >
+              {mode === "login" ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
+            </button>
+          )}
         </div>
       </motion.div>
     </div>
