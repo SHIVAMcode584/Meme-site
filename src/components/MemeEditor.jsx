@@ -109,15 +109,9 @@ export default function MemeEditor({ user, onUpload, onSuccess }) {
 
       if (onUpload && data?.[0]) {
         const savedMeme = data[0];
-        const profile = Array.isArray(savedMeme.profiles) ? savedMeme.profiles[0] : savedMeme.profiles;
-
         onUpload({
           ...savedMeme,
-          username:
-            profile?.username ||
-            currentUser.user_metadata?.username ||
-            currentUser.email?.split("@")[0] ||
-            "User",
+          username: currentUser.user_metadata?.username || currentUser.email?.split("@")[0],
         });
       }
 

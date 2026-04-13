@@ -44,10 +44,10 @@ const normalizeMeme = (m) => {
     keywords: Array.isArray(m.keywords) 
       ? m.keywords 
       : (typeof m.keywords === 'string' ? m.keywords.replace(/[\[\]"']/g, '').split(/[\s,]+/).filter(Boolean) : []),
-    username: m.user_id ? (profile?.username || m.username || "User") : "Owner",
+    username: m.user_id ? (profile?.username || m.username) : "Owner",
     image: m.image_url || m.image || "",
   };
-};
+};  
 
 export default function App() {
   const [search, setSearch] = useState("");
@@ -252,7 +252,7 @@ if (path === "/reset-password") {
         />
       </nav>
 
-      <div className="pt-4 sm:pt-6 border-t border-white/10 mt-4 sm:mt-6 flex-shrink-0">
+      <div className="pt-3 sm:pt-6 border-t border-white/10 mt-2 sm:mt-6 flex-shrink-0">
         {user ? (
           <div className="space-y-2 sm:space-y-4">
             <button 
@@ -307,7 +307,7 @@ if (path === "/reset-password") {
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed top-0 left-0 z-[51] h-screen w-[80%] bg-[#0d1220] border-r border-white/10 p-6 shadow-2xl sm:w-64 lg:hidden"
+              className="fixed top-0 left-0 z-[51] h-[100dvh] w-[80%] bg-[#0d1220] border-r border-white/10 p-4 sm:p-6 shadow-2xl sm:w-64 lg:hidden"
             >
               <SidebarContent />
             </motion.div>

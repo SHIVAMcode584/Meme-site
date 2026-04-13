@@ -72,8 +72,7 @@ export default function UploadMeme({ user, onUpload, onSuccess }) {
           username:
             profile?.username ||
             currentUser.user_metadata?.username ||
-            currentUser.email?.split("@")[0] ||
-            "User",
+            currentUser.email?.split("@")[0],
           image: savedMeme.image_url,
         });
       }
