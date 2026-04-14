@@ -11,6 +11,10 @@ export default function LoginModal({ isOpen, onClose }) {
   const [message, setMessage] = useState({ type: "", text: "" });
   const [isLoading, setIsLoading] = useState(false);
 
+  const getSiteUrl = () => {
+    return import.meta.env.VITE_SITE_URL || window.location.origin;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email) return;
@@ -47,7 +51,7 @@ export default function LoginModal({ isOpen, onClose }) {
         onClose();
       } else if (mode === "forgot") {
         const { error: authError } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: window.location.origin + "/reset-password",
+          redirectTo: `${getSiteUrl()}/reset-password`,
         });
         if (authError) throw authError;
         setMessage({ type: "success", text: "Password reset link sent to your email!" });

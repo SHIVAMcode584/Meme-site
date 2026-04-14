@@ -6,8 +6,9 @@ export default function AuthModal({ onClose }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const getRedirectUrl = () => {
-    return import.meta.env.VITE_SITE_URL || window.location.
+  const getSiteUrl = () => {
+    return import.meta.env.VITE_SITE_URL || window.location.origin;
+  };
 
   // 🔐 Signup
   const handleSignup = async () => {
@@ -32,7 +33,7 @@ export default function AuthModal({ onClose }) {
   // 🔐 Forgot password
   const handleForgot = async () => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin + "/reset-password",
+      redirectTo: `${getSiteUrl()}/reset-password`,
     });
 
     if (error) alert(error.message);
