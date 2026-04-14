@@ -24,18 +24,29 @@ export default function LoginModal({ isOpen, onClose }) {
     
     try {
       if (mode === "signup") {
-        const { error: authError } = await supabase.auth.signInWithOtp({
+        const { data: signUpData, error: authError } = await supabase.auth.signUp({
           email: email.trim(),
+          password,
           options: {
-            emailRedirectTo: window.location.origin,
             data: { 
-              username: username.trim(), 
-              avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}` 
+              username: username.trim(),
+              avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`
             }
           }
         });
+
         if (authError) throw authError;
-        setMessage({ type: "success", text: "Verification email sent! Check your inbox for the magic link to verify your account. 📧" });
+
+        if (signUpData?.user) {
+          // Use upsert to handle profile creation robustly
+          const { error: profileError } = await supabase
+            .from("profiles")
+            .upsert({ id: signUpData.user.id, username: username.trim(), points: 0 }, { onConflict: 'id' });
+          
+          if (profileError) console.error("Profile creation error:", profileError);
+        }
+
+        setMessage({ type: "success", text: "Account created! Please check your email to verify. 📧" });
       } else if (mode === "login") {
         const { error: authError } = await supabase.auth.signInWithPassword({
           email: email.trim(),
@@ -91,7 +102,7 @@ export default function LoginModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 lg:pl-64">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

@@ -31,12 +31,12 @@ export default function MemeEditor({ user, onUpload, onSuccess }) {
     setIsUploading(true);
 
     try {
-      const { data: authData, error: authError } = await supabase.auth.getUser();
-      if (authError) throw authError;
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
 
-      const currentUser = authData?.user || user;
-      if (!currentUser?.id) {
-        throw new Error("Login session expired. Please sign in again.");
+      if (!currentUser) {
+        alert("Please login first");
+        setIsUploading(false);
+        return;
       }
 
       const canvas = canvasRef.current;
@@ -91,21 +91,37 @@ export default function MemeEditor({ user, onUpload, onSuccess }) {
         throw new Error(cloudData?.error?.message || "Cloudinary upload failed");
       }
 
+      // 🛡️ Profile Guard: Ensure the profile exists before linking a meme to it
+      const { error: profileGuardError } = await supabase
+        .from("profiles")
+        .upsert(
+          { 
+            id: currentUser.id, // ✅ Matches auth.uid()
+            username: currentUser.user_metadata?.username || uploadTitle.split(' ')[0] || "User" 
+          },
+          { onConflict: 'id' }
+        );
+      if (profileGuardError) console.warn("Profile sync warning:", profileGuardError.message);
+
       const { data, error } = await supabase
         .from("meme-table")
         .insert([
           {
             title: uploadTitle.trim(),
             image_url: cloudData.secure_url,
-            user_id: currentUser.id,
+            user_id: currentUser.id, // ✅ Foreign key match
             category: category.trim(),
             mood: mood.trim(),
             keywords: keywords.split(/[\s,]+/).filter(Boolean),
           },
         ])
-        .select();
+        .select("*, profiles(username)");
 
       if (error) throw error;
+
+      // 🏆 Atomic point increment via RPC
+      const { error: pointError } = await supabase.rpc('increment_points', { amount: 10 });
+      if (pointError) console.error("Error earning points:", pointError.message);
 
       if (onUpload && data?.[0]) {
         const savedMeme = data[0];
@@ -124,7 +140,7 @@ export default function MemeEditor({ user, onUpload, onSuccess }) {
       setMood("");
       setKeywords("");
 
-      if (onSuccess) onSuccess("Meme added to RoastRiot!");
+      if (onSuccess) onSuccess("Meme added to RoastRiot! 🎉 +10 points earned!");
     } catch (err) {
       console.error("Upload failed:", err);
     } finally {

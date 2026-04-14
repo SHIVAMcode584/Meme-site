@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Download, Heart, SkipForward, Link, MessageCircle, Check } from "lucide-react";
+import { X, Download, Heart, SkipForward, Link, MessageCircle, Check, User as UserIcon } from "lucide-react";
 
 export default function MemeModal({ meme, user, onClose, toggleFavorite, favorites, onNext }) {
   const [copied, setCopied] = useState(false);
@@ -43,7 +43,7 @@ export default function MemeModal({ meme, user, onClose, toggleFavorite, favorit
   const isFavorite = favorites.includes(meme.id);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-2 sm:px-4">
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-2 sm:px-4 lg:pl-64">
       <div className="relative w-full max-w-4xl bg-[#0d1220] border border-white/10 rounded-3xl overflow-y-auto max-h-[95vh] md:max-h-none shadow-2xl md:overflow-hidden scrollbar-hide">
         <button
           onClick={onClose}
@@ -61,11 +61,12 @@ export default function MemeModal({ meme, user, onClose, toggleFavorite, favorit
             <div>
               <p className="text-xs sm:text-sm text-violet-300 mb-1 sm:mb-2">{meme.category} • {meme.mood}</p>
               <h2 className="text-xl sm:text-3xl font-bold line-clamp-1 sm:line-clamp-none">{meme.title}</h2>
-              <p className="text-xs text-zinc-400 mt-2">
-                Uploaded by: <span className="text-zinc-300 font-medium">
-                  {meme.username}
-                </span>
-              </p>
+              <div className="flex items-center gap-2 mt-2">
+                <UserIcon size={14} className="text-zinc-500" />
+                <p className="text-xs text-zinc-400">
+                  Uploaded by: <span className="text-violet-400 font-medium">{meme.username}</span>
+                </p>
+              </div>
 
               <div className="flex flex-wrap gap-1.5 mt-3 sm:mt-6">
                 {(Array.isArray(meme.keywords) ? meme.keywords : []).map((tag, i) => (

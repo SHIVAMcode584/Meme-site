@@ -18,12 +18,12 @@ export default function UploadMeme({ user, onUpload, onSuccess }) {
     setLoading(true);
 
     try {
-      const { data: authData, error: authError } = await supabase.auth.getUser();
-      if (authError) throw authError;
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
 
-      const currentUser = authData?.user || user;
-      if (!currentUser?.id) {
-        throw new Error("Login session expired. Please sign in again.");
+      if (!currentUser) {
+        alert("Please login first");
+        setLoading(false);
+        return;
       }
 
       const formData = new FormData();
@@ -40,21 +40,38 @@ export default function UploadMeme({ user, onUpload, onSuccess }) {
         throw new Error(cloudData?.error?.message || "Image upload failed");
       }
 
+      // 🛡️ Profile Guard: Ensure the profile exists before linking a meme to it
+      const { error: profileGuardError } = await supabase
+        .from("profiles")
+        .upsert(
+          { 
+            id: currentUser.id, // ✅ Matches auth.uid()
+            username: currentUser.user_metadata?.username || title.split(' ')[0] || "User",
+            points: 0 // Initialize if missing
+          },
+          { onConflict: 'id' }
+        );
+      if (profileGuardError) console.warn("Profile sync warning:", profileGuardError.message);
+
       const payload = {
         title: title.trim(),
         image_url: cloudData.secure_url,
         category: category.trim(),
         mood: mood.trim(),
         keywords: keywords.split(/[\s,]+/).filter(Boolean),
-        user_id: currentUser.id,
+        user_id: currentUser.id, // ✅ Foreign key match
       };
 
       const { data: insertedData, error } = await supabase
         .from("meme-table")
         .insert([payload])
-        .select();
+        .select("*, profiles(username)");
 
       if (error) throw error;
+
+      // 🏆 Atomic point increment via RPC
+      const { error: pointError } = await supabase.rpc('increment_points', { amount: 10 });
+      if (pointError) console.error("Error earning points:", pointError.message);
 
       const savedMeme = insertedData?.[0];
 
@@ -65,19 +82,19 @@ export default function UploadMeme({ user, onUpload, onSuccess }) {
       setKeywords("");
 
       if (onUpload && savedMeme) {
-        const profile = Array.isArray(savedMeme.profiles) ? savedMeme.profiles[0] : savedMeme.profiles;
+        const profileData = Array.isArray(savedMeme.profiles) ? savedMeme.profiles[0] : savedMeme.profiles;
 
         onUpload({
           ...savedMeme,
           username:
-            profile?.username ||
+            profileData?.username ||
             currentUser.user_metadata?.username ||
             currentUser.email?.split("@")[0],
           image: savedMeme.image_url,
         });
       }
 
-      if (onSuccess) onSuccess("Meme uploaded to RoastRiot successfully!");
+      if (onSuccess) onSuccess("Meme uploaded successfully! 🎉 +10 points earned!");
     } catch (err) {
       console.error("Upload process error:", err);
     } finally {

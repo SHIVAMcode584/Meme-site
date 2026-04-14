@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import logo from "../meme-logo.png";
-import { Sparkles, Menu, X, Home, Search, Dices, Pencil, Upload, LogIn, LogOut, Image, Heart, User as UserIcon, ChevronRight, KeyRound, CheckCircle2, Loader2 } from "lucide-react";
+import { Sparkles, Menu, X, Home, Search, Dices, Pencil, Upload, LogIn, LogOut, Image, Heart, User as UserIcon, ChevronRight, KeyRound, CheckCircle2, Loader2, Trophy, Award } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import CategoryFilter from "./components/CategoryFilter";
 import Footer from "./components/Footer";
@@ -28,9 +28,9 @@ function getInitialFavorites() {
 }
 
 // Helper to ensure data from any source matches the component expectations
-const normalizeMeme = (m) => {
-  const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
-
+const normalizeMeme = (m, currentUserId) => {
+  const profileData = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+  
   return {
     ...m,
     // Fix brackets in category/mood and handle array types from DB
@@ -44,10 +44,20 @@ const normalizeMeme = (m) => {
     keywords: Array.isArray(m.keywords) 
       ? m.keywords 
       : (typeof m.keywords === 'string' ? m.keywords.replace(/[\[\]"']/g, '').split(/[\s,]+/).filter(Boolean) : []),
-    username: m.user_id ? (profile?.username || m.username) : "Owner",
+    username: m.user_id 
+      ? (currentUserId && m.user_id === currentUserId ? "You" : (profileData?.username || "User"))
+      : "Owner",
     image: m.image_url || m.image || "",
   };
 };  
+
+// Badge helper logic
+const getBadge = (pts) => {
+  if (pts >= 1000) return { name: "Legend", color: "text-amber-400", bg: "bg-amber-400/10" };
+  if (pts >= 500) return { name: "Meme Pro", color: "text-violet-400", bg: "bg-violet-400/10" };
+  if (pts >= 100) return { name: "Rookie", color: "text-emerald-400", bg: "bg-emerald-400/10" };
+  return { name: "Newcomer", color: "text-zinc-500", bg: "bg-zinc-500/10" };
+};
 
 export default function App() {
   const [search, setSearch] = useState("");
@@ -55,6 +65,7 @@ export default function App() {
   const [activeMeme, setActiveMeme] = useState(null);
   const [favorites, setFavorites] = useState(getInitialFavorites);
  const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isEditorModalOpen, setIsEditorModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -66,6 +77,7 @@ export default function App() {
   const [notification, setNotification] = useState(null); // { type: 'success' | 'error', message: string }
   const [resetStatus, setResetStatus] = useState(null); // { type: 'success' | 'error', message: string }
   const [isResetLoading, setIsResetLoading] = useState(false);
+  const [leaderboard, setLeaderboard] = useState([]);
 const path = window.location.pathname;
   const SidebarLink = ({ icon, label, onClick }) => (
     <button
@@ -94,8 +106,8 @@ const path = window.location.pathname;
   }, [isSidebarOpen]);
 
   const allMemesNormalized = useMemo(() => {
-    return [...dbMemes, ...memes].map(normalizeMeme);
-  }, [dbMemes]);
+    return [...dbMemes, ...memes].map(m => normalizeMeme(m, user?.id));
+  }, [dbMemes, user?.id]);
 
   const filteredMemes = useMemo(() => {
     let baseList = allMemesNormalized;
@@ -109,6 +121,24 @@ const path = window.location.pathname;
     return smartSearch(baseList, search, selectedCategory);
   }, [allMemesNormalized, search, selectedCategory, viewMode, user, favorites]);
 
+  const fetchProfile = async (userId) => {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, username, points")
+      .eq("id", userId)
+      .maybeSingle();
+    if (!error && data) setProfile(data);
+  };
+
+  const fetchLeaderboard = async () => {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("username, points")
+      .order("points", { ascending: false })
+      .limit(5);
+    if (!error) setLeaderboard(data);
+  };
+
   function toggleFavorite(id) {
     setFavorites((current) =>
       current.includes(id)
@@ -116,18 +146,23 @@ const path = window.location.pathname;
         : [...current, id]
     );
   }
+
 useEffect(() => {
   // Handle initial session check
-  supabase.auth.getUser().then(({ data }) => {
-    setUser(data.user);
-  });
-
   // Listen for auth state changes (login, logout, magic link success)
   const { data: listener } = supabase.auth.onAuthStateChange(
-    (event, session) => {
+    async (event, session) => {
       setUser(session?.user ?? null);
+      
+      if (event === "INITIAL_SESSION" && session?.user) {
+        fetchProfile(session.user.id);
+      }
+
       if (event === "SIGNED_IN") {
         setIsLoginModalOpen(false);
+        if (session?.user) fetchProfile(session.user.id);
+      } else if (event === "SIGNED_OUT") {
+        setProfile(null);
       }
     }
   );
@@ -174,7 +209,8 @@ useEffect(() => {
   };
 
   const handleUploadMeme = (meme) => {
-    setDbMemes((prev) => [normalizeMeme(meme), ...prev]);
+    setDbMemes((prev) => [normalizeMeme(meme, user?.id), ...prev]);
+    if (user) fetchProfile(user.id); // Refresh points immediately
   };
 if (path === "/reset-password") {
   return <ResetPassword />;
@@ -184,25 +220,14 @@ if (path === "/reset-password") {
   }, []);
 
   const fetchMemes = async () => {
-    // Try fetching with profile join first
-    let { data, error } = await supabase
+    const { data, error } = await supabase
       .from("meme-table")
       .select("*, profiles(username)")
       .order("created_at", { ascending: false });
 
-    if (error) {
-      console.warn("Could not fetch with profiles join, falling back to simple select:", error.message);
-      // Fallback: Fetch without join if relationship is missing
-      const { data: fallbackData, error: fallbackError } = await supabase
-        .from("meme-table")
-        .select("*")
-        .order("created_at", { ascending: false });
-      
-      if (fallbackError) return console.error("Error fetching memes:", fallbackError);
-      data = fallbackData;
-    }
+    if (error) return console.error("Error fetching memes:", error);
 
-    const formatted = data.map(normalizeMeme);
+    const formatted = data.map(m => normalizeMeme(m, user?.id));
     setDbMemes(formatted);
   };
   const SidebarContent = () => (
@@ -218,6 +243,7 @@ if (path === "/reset-password") {
 
       <nav className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-1 min-h-0">
         <SidebarLink icon={<Home size={20}/>} label="Memes" onClick={() => { setViewMode("all"); setIsSidebarOpen(false); window.scrollTo({top: 0, behavior: 'smooth'}); }} />
+        <SidebarLink icon={<Trophy size={20}/>} label="Leaderboard" onClick={() => { setViewMode("leaderboard"); fetchLeaderboard(); setIsSidebarOpen(false); window.scrollTo({top: 0, behavior: 'smooth'}); }} />
         <SidebarLink icon={<Search size={20}/>} label="Search" onClick={() => { setIsSidebarOpen(false); document.querySelector('input[type="text"]')?.focus(); }} />
         {user && (
           <>
@@ -270,7 +296,7 @@ if (path === "/reset-password") {
               />
               <div className="overflow-hidden">
                 <p className="font-bold truncate group-hover:text-violet-400 transition-colors">
-                  {user.user_metadata?.username || user.email.split('@')[0]}
+                  {profile?.username || user.user_metadata?.username || user.email.split('@')[0]}
                 </p>
                 <p className="text-xs text-zinc-500 truncate">{user.email}</p>
               </div>
@@ -334,6 +360,14 @@ if (path === "/reset-password") {
             </div>
 
             <div className="flex items-center gap-3">
+              {profile && (
+                <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 sm:px-4 sm:py-2 bg-white/5 border border-white/10 rounded-2xl">
+                  <Award size={14} className="text-violet-400 sm:w-4 sm:h-4" />
+                  <span className="text-[10px] sm:text-sm font-bold bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
+                    {profile.points} pts
+                  </span>
+                </div>
+              )}
               {!user && (
                 <button
                   onClick={() => setIsLoginModalOpen(true)}
@@ -366,7 +400,41 @@ if (path === "/reset-password") {
         </header>
 
         <main className="relative z-10 mx-auto max-w-6xl px-4 pb-16 sm:px-6">
-          {viewMode === "profile" && user ? (
+          {viewMode === "leaderboard" ? (
+            <motion.section 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="mt-10 max-w-2xl mx-auto p-6 sm:p-10 bg-[#0d1220] border border-white/10 rounded-[2.5rem] shadow-2xl text-center"
+            >
+              <Trophy size={48} className="mx-auto mb-4 text-amber-400" />
+              <h2 className="text-3xl font-black mb-2">Meme Hall of Fame</h2>
+              <p className="text-zinc-500 mb-8">Top contributors in the RoastRiot community</p>
+              
+              <div className="space-y-3">
+                {leaderboard.map((player, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5">
+                    <div className="flex items-center gap-4">
+                      <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                        idx === 0 ? 'bg-amber-400 text-black' : 
+                        idx === 1 ? 'bg-zinc-300 text-black' : 
+                        idx === 2 ? 'bg-amber-700 text-white' : 'text-zinc-500'
+                      }`}>
+                        {idx + 1}
+                      </span>
+                      <span className="font-bold">{player.username}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${getBadge(player.points).bg} ${getBadge(player.points).color}`}>
+                        {getBadge(player.points).name}
+                      </span>
+                    </div>
+                    <span className="font-black text-violet-400">{player.points} pts</span>
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => setViewMode("all")} className="mt-8 text-zinc-500 hover:text-white transition-colors text-sm">
+                Back to memes
+              </button>
+            </motion.section>
+          ) : viewMode === "profile" && user ? (
             <motion.section 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -381,8 +449,13 @@ if (path === "/reset-password") {
                   />
                 </div>
                 <div>
-                  <h2 className="text-2xl sm:text-3xl font-bold">{user.user_metadata?.username || 'Meme Creator'}</h2>
+                  <h2 className="text-2xl sm:text-3xl font-bold">{profile?.username || user.user_metadata?.username || 'Meme Creator'}</h2>
                   <p className="text-zinc-500">{user.email}</p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className={`text-xs font-black uppercase px-3 py-1 rounded-full ${getBadge(profile?.points || 0).bg} ${getBadge(profile?.points || 0).color}`}>
+                      {getBadge(profile?.points || 0).name} • {profile?.points || 0} pts
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -458,7 +531,7 @@ if (path === "/reset-password") {
         {/* Editor Popup Modal */}
         <AnimatePresence>
           {isEditorModalOpen && (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 lg:pl-64">
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -470,7 +543,7 @@ if (path === "/reset-password") {
                 initial={{ scale: 0.9, opacity: 0, y: 20 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                className="relative w-full max-w-5xl bg-[#0d1220] border border-white/10 rounded-[2.5rem] p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
+                className="relative w-full max-w-5xl bg-[#0d1220] border border-white/10 rounded-[2.5rem] p-6 sm:p-10 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar"
               >
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-2xl font-bold">Meme Editor</h2>
@@ -485,7 +558,7 @@ if (path === "/reset-password") {
         {/* Upload Popup Modal */}
         <AnimatePresence>
           {isUploadModalOpen && (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 lg:pl-64">
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -521,7 +594,7 @@ if (path === "/reset-password") {
         {/* Logout Confirmation Modal */}
         <AnimatePresence>
           {isLogoutConfirmOpen && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 lg:pl-64">
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsLogoutConfirmOpen(false)} className="fixed inset-0 bg-black/80 backdrop-blur-sm" />
               <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-[#0d1220] border border-white/10 p-8 rounded-[2.5rem] max-w-sm w-full shadow-2xl text-center">
                 <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -541,7 +614,7 @@ if (path === "/reset-password") {
         {/* Password Reset Confirmation Modal */}
         <AnimatePresence>
           {isResetConfirmOpen && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 lg:pl-64">
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsResetConfirmOpen(false)} className="fixed inset-0 bg-black/80 backdrop-blur-sm" />
               <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-[#0d1220] border border-white/10 p-8 rounded-[2.5rem] max-w-sm w-full shadow-2xl text-center">
                 <div className="w-16 h-16 bg-violet-500/10 text-violet-500 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -568,7 +641,7 @@ if (path === "/reset-password") {
       {/* Password Reset Result/Status Modal */}
       <AnimatePresence>
         {resetStatus && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 lg:pl-64">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setResetStatus(null)} className="fixed inset-0 bg-black/80 backdrop-blur-sm" />
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-[#0d1220] border border-white/10 p-8 rounded-[2.5rem] max-w-sm w-full shadow-2xl text-center z-10">
               <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
@@ -594,7 +667,7 @@ if (path === "/reset-password") {
       {/* Success/Notification Popup Modal */}
       <AnimatePresence>
         {notification && (
-          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 lg:pl-64">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setNotification(null)} className="fixed inset-0 bg-black/80 backdrop-blur-sm" />
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-[#0d1220] border border-white/10 p-8 rounded-[2.5rem] max-w-sm w-full shadow-2xl text-center z-10">
               <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
