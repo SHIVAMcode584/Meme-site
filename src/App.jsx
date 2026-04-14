@@ -1,7 +1,28 @@
 import { useEffect, useMemo, useState } from "react";
 
 import logo from "../meme-logo.png";
-import { Sparkles, Menu, X, Home, Search, Dices, Pencil, Upload, LogIn, LogOut, Image, Heart, User as UserIcon, ChevronRight, KeyRound, CheckCircle2, Loader2, Trophy, Award } from "lucide-react";
+import { 
+  Sparkles, 
+  Menu, 
+  X, 
+  Home, 
+  Search, 
+  Dices, 
+  Pencil, 
+  Upload, 
+  LogIn, 
+  LogOut, 
+  Image, 
+  Heart, 
+  User as UserIcon, 
+  ChevronRight, 
+  KeyRound, 
+  CheckCircle2, 
+  Loader2, 
+  Trophy, 
+  Award,
+  HelpCircle
+} from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import CategoryFilter from "./components/CategoryFilter";
 import Footer from "./components/Footer";
@@ -17,6 +38,7 @@ import LoginModal from "./components/LoginModal";
 import { supabase } from "./lib/supabase";
 import AuthModal from "./components/AuthModal";
 import ResetPassword from "./components/ResetPassword";
+import HelpModal from "./components/HelpModal";
 
 function getInitialFavorites() {
   try {
@@ -70,6 +92,7 @@ export default function App() {
   const [isEditorModalOpen, setIsEditorModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [viewMode, setViewMode] = useState("all");
   const [dbMemes, setDbMemes] = useState([]);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
@@ -293,6 +316,11 @@ if (path === "/reset-password") {
             setIsSidebarOpen(false); 
             user ? setIsUploadModalOpen(true) : setIsLoginModalOpen(true); 
           }} 
+        />
+        <SidebarLink 
+          icon={<HelpCircle size={20}/>} 
+          label="How to Use" 
+          onClick={() => { setIsSidebarOpen(false); setIsHelpOpen(true); }} 
         />
       </nav>
 
@@ -715,6 +743,12 @@ if (path === "/reset-password") {
           toggleFavorite={toggleFavorite}
           favorites={favorites}
           onNext={handleRandomMeme}
+        />
+        <HelpModal 
+          isOpen={isHelpOpen} 
+          onClose={() => setIsHelpOpen(false)} 
+          user={user}
+          onLoginClick={() => { setIsHelpOpen(false); setIsLoginModalOpen(true); }}
         />
         </div>
       </div>

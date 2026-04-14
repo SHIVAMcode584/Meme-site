@@ -81,7 +81,7 @@ export default function Footer() {
         <div className="mt-12 pt-8 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-6 text-sm text-zinc-500">
           <div className="text-center md:text-left">
             <p>© 2026 RoastRiot.meme — All Rights Reserved.</p>
-            <p className="text-xs text-zinc-600 mt-1">Developed with ❤️ by <span className="text-violet-400/80 font-semibold">Shivam Kumar</span></p>
+            <p className="text-xs text-zinc-600 mt-1">Developed with ❤️ by <span className="text-violet-400/80 font-semibold">Krishna Sharma</span></p>
           </div>
           <div className="flex gap-8 text-xs uppercase tracking-widest">
             <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
