@@ -1,65 +1,129 @@
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
 
-export default function Auth() {
+export default function AuthModal({ onClose }) {
+  const [mode, setMode] = useState("login"); // login | signup | forgot
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleSignup = async () => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
+  const getRedirectUrl = () => {
+    return import.meta.env.VITE_SITE_URL || window.location.
 
-    if (error) {
-      alert(error.message);
-    } else {
-      alert("Signup successful! Check your email.");
-    }
+  // 🔐 Signup
+  const handleSignup = async () => {
+    const { error } = await supabase.auth.signUp({ email, password });
+    if (error) alert(error.message);
+    else alert("Signup successful!");
   };
 
+  // 🔐 Login
   const handleLogin = async () => {
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-
-    if (error) {
-      alert(error.message);
-    } else {
+    if (error) alert(error.message);
+    else {
       alert("Login successful!");
+      onClose();
     }
   };
 
+  // 🔐 Forgot password
+  const handleForgot = async () => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + "/reset-password",
+    });
+
+    if (error) alert(error.message);
+    else alert("Password reset email sent!");
+  };
+
   return (
-    <div className="p-4 border border-white/10 rounded-xl">
-      <h2 className="text-xl font-bold mb-3">Login / Signup</h2>
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+      <div className="bg-[#111827] p-6 rounded-xl w-[350px] text-white">
+        <h2 className="text-xl font-bold mb-4 text-center">
+          {mode === "login" && "Login"}
+          {mode === "signup" && "Signup"}
+          {mode === "forgot" && "Reset Password"}
+        </h2>
 
-      <input
-        type="email"
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        className="block mb-2 p-2 w-full bg-black text-white"
-      />
+        <input
+          type="email"
+          placeholder="Email"
+          className="w-full mb-3 p-2 rounded bg-black"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
 
-      <input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        className="block mb-3 p-2 w-full bg-black text-white"
-      />
+        {mode !== "forgot" && (
+          <input
+            type="password"
+            placeholder="Password"
+            className="w-full mb-3 p-2 rounded bg-black"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        )}
 
-      <div className="flex gap-2">
-        <button onClick={handleSignup} className="px-4 py-2 bg-green-500 rounded">
-          Signup
-        </button>
+        {/* Buttons */}
+        {mode === "login" && (
+          <>
+            <button onClick={handleLogin} className="btn">
+              Login
+            </button>
+            <p onClick={() => setMode("forgot")} className="link">
+              Forgot Password?
+            </p>
+            <p onClick={() => setMode("signup")} className="link">
+              Create Account
+            </p>
+          </>
+        )}
 
-        <button onClick={handleLogin} className="px-4 py-2 bg-blue-500 rounded">
-          Login
+        {mode === "signup" && (
+          <>
+            <button onClick={handleSignup} className="btn">
+              Signup
+            </button>
+            <p onClick={() => setMode("login")} className="link">
+              Already have account?
+            </p>
+          </>
+        )}
+
+        {mode === "forgot" && (
+          <>
+            <button onClick={handleForgot} className="btn">
+              Send Reset Link
+            </button>
+            <p onClick={() => setMode("login")} className="link">
+              Back to Login
+            </p>
+          </>
+        )}
+
+        <button onClick={onClose} className="mt-4 text-red-400 text-sm">
+          Close
         </button>
       </div>
+
+      {/* styles */}
+      <style>{`
+        .btn {
+          width: 100%;
+          padding: 10px;
+          background: #7c3aed;
+          border-radius: 8px;
+          margin-top: 5px;
+        }
+        .link {
+          font-size: 12px;
+          color: #a78bfa;
+          margin-top: 6px;
+          cursor: pointer;
+        }
+      `}</style>
     </div>
   );
 }
