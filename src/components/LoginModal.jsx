@@ -24,29 +24,19 @@ export default function LoginModal({ isOpen, onClose }) {
     
     try {
       if (mode === "signup") {
-        const { data: signUpData, error: authError } = await supabase.auth.signUp({
+        const { error: authError } = await supabase.auth.signInWithOtp({
           email: email.trim(),
-          password,
           options: {
             data: { 
               username: username.trim(),
               avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`
-            }
+            },
+            emailRedirectTo: getSiteUrl(),
           }
         });
 
         if (authError) throw authError;
-
-        if (signUpData?.user) {
-          // Use upsert to handle profile creation robustly
-          const { error: profileError } = await supabase
-            .from("profiles")
-            .upsert({ id: signUpData.user.id, username: username.trim(), points: 0 }, { onConflict: 'id' });
-          
-          if (profileError) console.error("Profile creation error:", profileError);
-        }
-
-        setMessage({ type: "success", text: "Account created! Please check your email to verify. 📧" });
+        setMessage({ type: "success", text: "Magic link sent! Please check your email to verify and create your account. 📧" });
       } else if (mode === "login") {
         const { error: authError } = await supabase.auth.signInWithPassword({
           email: email.trim(),
@@ -87,7 +77,7 @@ export default function LoginModal({ isOpen, onClose }) {
       const { error } = await supabase.auth.signInWithOtp({
         email: email.trim(),
         options: {
-          emailRedirectTo: window.location.origin
+          emailRedirectTo: getSiteUrl()
         }
       });
       if (error) throw error;

@@ -12,9 +12,14 @@ export default function AuthModal({ onClose }) {
 
   // 🔐 Signup
   const handleSignup = async () => {
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { error } = await supabase.auth.signInWithOtp({ 
+      email,
+      options: {
+        emailRedirectTo: getSiteUrl()
+      }
+    });
     if (error) alert(error.message);
-    else alert("Signup successful!");
+    else alert("Magic link sent! Check your email to verify.");
   };
 
   // 🔐 Login
