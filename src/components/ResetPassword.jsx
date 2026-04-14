@@ -4,7 +4,7 @@ import { Lock, Loader2, CheckCircle2, ArrowLeft } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import Footer from "./Footer";
 
-export default function ResetPassword() {
+export default function ResetPassword({ user }) {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
@@ -17,6 +17,10 @@ export default function ResetPassword() {
     setMessage({ type: "", text: "" });
 
     try {
+      if (!user) {
+        throw new Error("No active recovery session found. Please ensure you clicked the link correctly or request a new one.");
+      }
+
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
       setMessage({ type: "success", text: "Password updated successfully! You can now sign in." });
@@ -69,7 +73,7 @@ export default function ResetPassword() {
                 </button>
               )}
             </motion.div>
-          ) : (
+          ) : (user ? (
             <form onSubmit={handleReset} className="space-y-4">
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
@@ -90,7 +94,12 @@ export default function ResetPassword() {
                 {isLoading ? <Loader2 className="animate-spin" size={20} /> : "Update Password"}
               </button>
             </form>
-          )}
+          ) : (
+            <div className="text-center py-10">
+              <Loader2 className="animate-spin mx-auto text-violet-500 mb-4" size={40} />
+              <p className="text-zinc-400 font-medium">Verifying recovery session...</p>
+            </div>
+          ))}
 
           <div className="mt-8 text-center border-t border-white/5 pt-6">
             <a href="/" className="text-zinc-500 hover:text-white transition text-sm flex items-center justify-center gap-2">

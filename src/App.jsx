@@ -121,13 +121,31 @@ const path = window.location.pathname;
     return smartSearch(baseList, search, selectedCategory);
   }, [allMemesNormalized, search, selectedCategory, viewMode, user, favorites]);
 
-  const fetchProfile = async (userId) => {
-    const { data, error } = await supabase
+  const fetchProfile = async (userId, userData) => {
+    // Use maybeSingle to check if profile exists
+    let { data, error } = await supabase
       .from("profiles")
       .select("id, username, points")
       .eq("id", userId)
       .maybeSingle();
-    if (!error && data) setProfile(data);
+
+    if (!error && !data) {
+      // Profile doesn't exist, create it (Profile Guard for Magic Links/New Users)
+      const username = userData?.user_metadata?.username || userData?.email?.split('@')[0] || "User";
+      const { data: newProfile, error: createError } = await supabase
+        .from("profiles")
+        .upsert({ 
+          id: userId, 
+          username: username,
+          points: 0 
+        }, { onConflict: 'id' })
+        .select()
+        .maybeSingle();
+      
+      if (!createError && newProfile) setProfile(newProfile);
+    } else if (!error && data) {
+      setProfile(data);
+    }
   };
 
   const fetchLeaderboard = async () => {
@@ -155,12 +173,12 @@ useEffect(() => {
       setUser(session?.user ?? null);
       
       if (event === "INITIAL_SESSION" && session?.user) {
-        fetchProfile(session.user.id);
+        fetchProfile(session.user.id, session.user);
       }
 
-      if (event === "SIGNED_IN") {
+      if (event === "SIGNED_IN" || event === "PASSWORD_RECOVERY") {
         setIsLoginModalOpen(false);
-        if (session?.user) fetchProfile(session.user.id);
+        if (session?.user) fetchProfile(session.user.id, session.user);
       } else if (event === "SIGNED_OUT") {
         setProfile(null);
       }
@@ -210,10 +228,10 @@ useEffect(() => {
 
   const handleUploadMeme = (meme) => {
     setDbMemes((prev) => [normalizeMeme(meme, user?.id), ...prev]);
-    if (user) fetchProfile(user.id); // Refresh points immediately
+    if (user) fetchProfile(user.id, user); // Refresh points immediately
   };
 if (path === "/reset-password") {
-  return <ResetPassword />;
+  return <ResetPassword user={user} />;
 }
   useEffect(() => {
     fetchMemes();
