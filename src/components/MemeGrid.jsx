@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion as Motion } from "framer-motion";
-import { ImageIcon, ChevronDown } from "lucide-react";
+import { Image as ImageIcon, ChevronDown } from "lucide-react";
 import MemeCard from "./MemeCard";
 
 export default function MemeGrid({

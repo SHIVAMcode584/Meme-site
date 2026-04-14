@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Download, Upload, Image as ImageIcon, Type, CloudUpload, Loader2, Palette, Tag, Smile, FolderSearch } from "lucide-react";
+import { Download, Upload, Image as ImageIcon, Type, CloudUpload, Loader2, Palette, Tag, Smile, Search } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
 export default function MemeEditor({ user, onUpload, onSuccess }) {
@@ -256,7 +256,7 @@ export default function MemeEditor({ user, onUpload, onSuccess }) {
                 />
               </div>
               <div className="relative">
-                <FolderSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
                 <input
                   placeholder="Category (e.g. Reply, Funny)"
                   value={category}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { X, User, Mail, LogIn, Loader2, Lock, KeyRound, ArrowLeft, Wand2, CheckCircle2 } from "lucide-react";
+import { X, User, Mail, LogIn, Loader2, Lock, ArrowLeft, Wand2, CheckCircle2 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
 export default function LoginModal({ isOpen, onClose }) {

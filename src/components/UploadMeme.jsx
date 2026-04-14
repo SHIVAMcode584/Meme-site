@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
-import { Loader2, Upload, Tag, Smile, FolderSearch, Type } from "lucide-react";
+import { Loader2, Upload, Tag, Smile, Search, Type } from "lucide-react";
 
 export default function UploadMeme({ user, onUpload, onSuccess }) {
   const [file, setFile] = useState(null);
@@ -118,7 +118,7 @@ export default function UploadMeme({ user, onUpload, onSuccess }) {
       </div>
 
       <div className="relative">
-        <FolderSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
         <input
           placeholder="Category (e.g. Reply, Funny)"
           value={category}
