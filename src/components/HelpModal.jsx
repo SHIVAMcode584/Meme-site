@@ -48,7 +48,7 @@ export default function HelpModal({ isOpen, onClose, user, onLoginClick }) {
         initial={{ scale: 0.9, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.9, opacity: 0, y: 20 }}
-        className="relative w-full max-w-2xl bg-[#0d1220] border border-white/10 rounded-[2.5rem] p-6 sm:p-10 shadow-2xl overflow-y-auto max-h-[85vh] custom-scrollbar scrollbar-thin scrollbar-thumb-violet-500/20 scrollbar-track-transparent hover:scrollbar-thumb-violet-500/40 transition-all"
+        className="relative w-full max-w-2xl bg-[#0d1220] border border-white/10 rounded-[2.5rem] p-6 sm:p-10 shadow-2xl overflow-y-auto max-h-[85vh] custom-scrollbar transition-all"
       > 
         <div className="flex items-center justify-between mb-10">
           <div className="flex items-center gap-4">
@@ -62,7 +62,7 @@ export default function HelpModal({ isOpen, onClose, user, onLoginClick }) {
           </div>
           <button 
             onClick={onClose} 
-            className="p-2.5 rounded-full bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition-all border border-white/5"
+            className="cursor-pointer p-2.5 rounded-full bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition-all border border-white/5"
           >
             <X size={20} />
           </button>

@@ -14,6 +14,7 @@ https://meme-site-lovat.vercel.app/
 - Password reset flow
 - Meme uploads with title, image, category, mood, and keywords
 - Like and unlike support with duplicate protection
+- Meme comments with optimistic posting and delete permissions
 - User profiles with points
 - Keyword search and semantic search fallback
 - Trending memes based on engagement
@@ -73,6 +74,14 @@ Constraint:
 
 - Unique (`user_id`, `meme_id`)
 
+### `comments`
+
+- `id`
+- `user_id`
+- `meme_id`
+- `text`
+- `created_at`
+
 ## Security
 
 - Users can only modify their own data
@@ -104,13 +113,18 @@ Set these in your local `.env` file and in Vercel project settings:
 - `OPENAI_API_KEY`
 - `OPENAI_EMBEDDING_MODEL` (optional, default: `text-embedding-3-small`)
 
-### 4. Run the semantic search migration
+### 4. Run the database migrations
 
 Apply:
 
 `supabase/migrations/20260415_semantic_search.sql`
 
+and
+
+`supabase/migrations/20260415_comments_system.sql`
+
 This enables `pgvector`, adds the `embedding` column, and creates the `match_memes(...)` RPC.
+The comments migration creates the `comments` table, enables RLS, and adds comment policies.
 
 ### 5. Backfill meme embeddings
 

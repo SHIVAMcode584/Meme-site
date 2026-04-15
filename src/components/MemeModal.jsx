@@ -1,19 +1,31 @@
-import { useState, useEffect } from "react";
-import { X, Download, Heart, SkipForward, Link, MessageCircle, Check, User as UserIcon, Bookmark } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  X,
+  Download,
+  Heart,
+  SkipForward,
+  Link,
+  MessageCircle,
+  Check,
+  User as UserIcon,
+  Bookmark,
+  Sparkles,
+} from "lucide-react";
 import { motion } from "framer-motion";
 import { supabase } from "../lib/supabase";
 import { getOwnerMemeLikeSnapshot, setOwnerMemeLike } from "../utils/likes";
+import CommentsSection from "./CommentsSection";
 
-export default function MemeModal({ 
-  meme, 
-  user, 
-  onClose, 
-  toggleFavorite, 
-  favorites, 
+export default function MemeModal({
+  meme,
+  user,
+  onClose,
+  toggleFavorite,
+  favorites,
   onNext,
   likeCounts = {},
   onLikeCountChange,
-  onLikeStateChange
+  onLikeStateChange,
 }) {
   const [copied, setCopied] = useState(false);
   const [liked, setLiked] = useState(false);
@@ -26,9 +38,12 @@ export default function MemeModal({
   useEffect(() => {
     if (!meme) return;
     setLocalLikeCount(likeCounts[String(meme.id)] || 0);
-    
+
     const fetchLikedState = async () => {
-      if (!user) return setLiked(false);
+      if (!user) {
+        setLiked(false);
+        return;
+      }
 
       if (isStaticMeme) {
         const snapshot = getOwnerMemeLikeSnapshot(meme.id, user.id);
@@ -49,6 +64,17 @@ export default function MemeModal({
     fetchLikedState();
   }, [meme, user, likeCounts, isStaticMeme]);
 
+  useEffect(() => {
+    if (!meme) return undefined;
+
+    const handleEscape = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [meme, onClose]);
+
   if (!meme) return null;
 
   const handleDownload = async () => {
@@ -68,10 +94,7 @@ export default function MemeModal({
     }
   };
 
-  const getShareUrl = () => {
-    const siteUrl = window.location.origin + window.location.pathname;
-    return `${window.location.origin}/meme/${meme.slug}`;
-  };
+  const getShareUrl = () => `${window.location.origin}/meme/${meme.slug}`;
 
   const handleLike = async () => {
     if (!user) return alert("Please sign in to like memes!");
@@ -127,99 +150,176 @@ export default function MemeModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-2 sm:px-4 lg:pl-64">
-      <div className="relative w-full max-w-4xl bg-[#0d1220] border border-white/10 rounded-3xl overflow-y-auto max-h-[95vh] md:max-h-none shadow-2xl md:overflow-hidden scrollbar-hide">
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4 lg:pl-64">
+      <motion.button
+        type="button"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-black/80 backdrop-blur-md"
+        aria-label="Close meme popup"
+      />
+
+      <motion.div
+        initial={{ opacity: 0, y: 24, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 24, scale: 0.98 }}
+        transition={{ duration: 0.22, ease: "easeOut" }}
+        className="relative z-10 flex h-[92dvh] w-full max-w-6xl flex-col overflow-hidden border border-white/10 bg-[#0d1220] shadow-2xl shadow-black/50 sm:h-auto sm:max-h-[92vh] sm:rounded-[2rem]"
+      >
+        <div className="absolute inset-x-0 top-0 z-10 flex justify-center pt-3 sm:hidden">
+          <div className="h-1.5 w-14 rounded-full bg-white/15" />
+        </div>
+
         <button
           onClick={onClose}
-          className="absolute top-2 right-2 sm:top-4 sm:right-4 z-10 p-2 rounded-full bg-black/40 border border-white/20 text-white hover:bg-black/60"
+          className="absolute right-3 top-3 z-20 cursor-pointer rounded-full border border-white/15 bg-black/40 p-2 text-white transition hover:bg-black/60 sm:right-5 sm:top-5"
         >
           <X size={20} />
         </button>
 
-        <div className="grid md:grid-cols-2">
-          <div className="bg-black/50 flex items-center justify-center min-h-[150px] md:min-h-0">
-            <img src={meme.image} alt={meme.title} className="w-full h-full object-contain max-h-[35vh] md:max-h-[80vh]" />
+        <div className="grid h-full min-h-0 lg:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
+          <div className="relative flex min-h-[34vh] items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top,#312e81_0%,#0b1020_55%,#05070d_100%)] px-4 pb-4 pt-10 sm:min-h-[44vh] sm:px-6 sm:pb-6 sm:pt-14 lg:min-h-0 lg:px-8 lg:py-8">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,rgba(236,72,153,0.18),transparent_45%)]" />
+            <div className="relative flex max-h-full w-full items-center justify-center overflow-hidden rounded-[1.75rem] border border-white/10 bg-black/35 p-2 shadow-[0_24px_80px_rgba(0,0,0,0.45)] sm:p-3">
+              <img
+                src={meme.image}
+                alt={meme.title}
+                className="max-h-[28vh] w-auto max-w-full rounded-[1.25rem] object-contain sm:max-h-[38vh] lg:max-h-[76vh]"
+              />
+            </div>
           </div>
 
-          <div className="p-4 sm:p-8 flex flex-col justify-between h-full">
-            <div>
-              <p className="text-xs sm:text-sm text-violet-300 mb-1 sm:mb-2">{meme.category} • {meme.mood}</p>
-              <h2 className="text-xl sm:text-3xl font-bold line-clamp-1 sm:line-clamp-none">{meme.title}</h2>
-              <div className="flex items-center gap-2 mt-2">
-                <UserIcon size={14} className="text-zinc-500" />
-                <p className="text-xs text-zinc-400">
-                  Uploaded by: <span className="text-violet-400 font-medium">{meme.username}</span>
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-1.5 mt-3 sm:mt-6">
-                {(Array.isArray(meme.keywords) ? meme.keywords : []).map((tag, i) => (
-                  <span
-                    key={i}
-                    className="text-[10px] sm:text-sm px-2 py-1 sm:px-3 sm:py-2 rounded-full bg-white/10 border border-white/10 text-zinc-300"
-                  >
-                    {tag}
+          <div className="flex min-h-0 flex-col overflow-hidden">
+            <div className="flex-1 overflow-y-auto px-4 pb-5 pt-4 sm:px-6 sm:pb-6 sm:pt-5 lg:px-7 lg:pb-7 custom-scrollbar">
+              <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-4 shadow-lg shadow-black/20 sm:p-5">
+                <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-violet-200/90">
+                  <span className="rounded-full border border-violet-400/20 bg-violet-500/10 px-3 py-1">
+                    {meme.category || "Meme"}
                   </span>
-                ))}
+                  <span className="rounded-full border border-fuchsia-400/20 bg-fuchsia-500/10 px-3 py-1 text-fuchsia-200">
+                    {meme.mood || "Reaction"}
+                  </span>
+                </div>
+
+                <h2 className="mt-4 text-2xl font-black tracking-tight text-white sm:text-3xl">
+                  {meme.title}
+                </h2>
+
+                <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-zinc-400">
+                  <div className="flex items-center gap-2">
+                    <UserIcon size={14} className="text-zinc-500" />
+                    <span>
+                      Uploaded by <span className="font-semibold text-violet-300">{meme.username}</span>
+                    </span>
+                  </div>
+                  <div className="inline-flex items-center gap-2 rounded-full border border-pink-400/20 bg-pink-500/10 px-3 py-1 text-xs font-semibold text-pink-200">
+                    <Heart size={14} className={liked ? "fill-current" : ""} />
+                    {localLikeCount} likes
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {(Array.isArray(meme.keywords) ? meme.keywords : []).map((tag, index) => (
+                    <span
+                      key={index}
+                      className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-medium text-zinc-300 sm:text-xs"
+                    >
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <button
+                    onClick={handleLike}
+                    disabled={isLiking}
+                    className={`flex min-h-12 items-center justify-center gap-2 rounded-2xl border text-sm font-semibold transition ${
+                      liked
+                        ? "border-pink-400/40 bg-pink-500/15 text-pink-100"
+                        : "border-white/10 bg-white/5 text-white hover:bg-white/10"
+                    } ${isLiking ? "cursor-not-allowed opacity-70" : ""}`}
+                  >
+                    <Heart size={18} className={liked ? "fill-current" : ""} />
+                    {liked ? "Liked" : "Like"}
+                  </button>
+
+                  <button
+                    onClick={() => toggleFavorite(meme.id)}
+                    className={`flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-2xl border text-sm font-semibold transition ${
+                      isFavorite
+                        ? "border-violet-400/40 bg-violet-500/15 text-violet-100"
+                        : "border-white/10 bg-white/5 text-white hover:bg-white/10"
+                    }`}
+                  >
+                    <Bookmark size={18} className={isFavorite ? "fill-current" : ""} />
+                    {isFavorite ? "Saved" : "Save"}
+                  </button>
+
+                  <button
+                    onClick={handleDownload}
+                    className="col-span-2 flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-sm font-bold text-white shadow-lg shadow-violet-500/20 transition hover:opacity-90 sm:col-span-1"
+                  >
+                    <Download size={18} />
+                    Download
+                  </button>
+                </div>
               </div>
-            </div>
 
-            <div className="mt-4 sm:mt-8 space-y-3 sm:space-y-4">
-              {onNext && (
-                <button
-                  onClick={onNext}
-                  className="w-full py-2.5 sm:py-3.5 rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:opacity-90 transition flex items-center justify-center gap-2 font-bold text-white shadow-lg shadow-violet-500/20 text-sm sm:text-base"
-                >
-                  <SkipForward size={20} />
-                  Next Random Meme
-                </button>
-              )}
+              <div className="mt-4 rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-4 shadow-lg shadow-black/20 sm:p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                      Share
+                    </p>
+                    <p className="mt-1 text-sm text-zinc-400">
+                      Send this meme fast without leaving the popup.
+                    </p>
+                  </div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-300">
+                    <Sparkles size={18} />
+                  </div>
+                </div>
 
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                <button
-                  onClick={() => toggleFavorite(meme.id)}
-                  className={`py-2 sm:py-3 rounded-2xl border transition flex items-center justify-center gap-2 text-sm sm:text-base ${
-                    isFavorite
-                      ? "bg-pink-500/80 border-pink-400 text-white"
-                      : "bg-white/10 border-white/10 text-white hover:bg-white/15"
-                  }`}
-                >
-                  <Heart size={18} fill={isFavorite ? "currentColor" : "none"} />
-                  {isFavorite ? "Saved" : "Save"}
-                </button>
-
-                <button
-                  onClick={handleDownload}
-                  className="py-2 sm:py-3 rounded-2xl bg-white/10 border border-white/10 text-white hover:bg-white/15 transition flex items-center justify-center gap-2 font-medium text-sm sm:text-base"
-                >
-                  <Download size={18} />
-                  Download
-                </button>
-              </div>
-
-              <div className="pt-4 sm:pt-6 border-t border-white/5 space-y-2 sm:space-y-3">
-                <p className="text-[10px] sm:text-xs uppercase tracking-[0.2em] text-zinc-500 font-bold">Share Meme</p>
-                <div className="flex gap-3">
+                <div className="mt-4 grid grid-cols-[minmax(0,1fr)_52px] gap-3 sm:grid-cols-[minmax(0,1fr)_56px]">
                   <button
                     onClick={handleCopyLink}
-                    className="flex-1 h-10 sm:h-12 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold"
+                    className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white transition hover:bg-white/10"
                   >
                     {copied ? <Check size={18} className="text-green-400" /> : <Link size={18} />}
                     {copied ? "Copied Link" : "Copy Link"}
                   </button>
                   <button
                     onClick={shareWhatsApp}
-                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center justify-center text-green-500"
+                    className="flex h-12 w-full items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-green-400 transition hover:bg-white/10"
                     title="Share on WhatsApp"
                   >
                     <MessageCircle size={20} />
                   </button>
                 </div>
               </div>
+
+              {onNext ? (
+                <button
+                  onClick={onNext}
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-[1.5rem] border border-white/10 bg-white/5 px-4 py-3.5 text-sm font-bold text-white transition hover:border-violet-400/30 hover:bg-white/10"
+                >
+                  <SkipForward size={18} />
+                  Next Random Meme
+                </button>
+              ) : null}
+
+              <CommentsSection
+                memeId={meme.id}
+                user={user}
+                isDatabaseMeme={meme.isDatabaseMeme}
+                variant="modal"
+              />
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

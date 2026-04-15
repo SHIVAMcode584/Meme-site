@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { Download, Heart, Bookmark } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Download, Heart, Bookmark, MessageCircle, ChevronDown } from "lucide-react";
+import { motion as Motion, AnimatePresence } from "framer-motion";
 import { supabase } from "../lib/supabase";
-import { getOwnerMemeLikeSnapshot, isOwnerMeme, setOwnerMemeLike } from "../utils/likes";
+import { getOwnerMemeLikeSnapshot, setOwnerMemeLike } from "../utils/likes";
+import CommentsSection from "./CommentsSection";
 
 export default function MemeCard({
   meme,
@@ -19,10 +20,15 @@ export default function MemeCard({
   const [liked, setLiked] = useState(false);
   const [localLikeCount, setLocalLikeCount] = useState(likeCount || 0);
   const [isLiking, setIsLiking] = useState(false);
+  const [showComments, setShowComments] = useState(false);
 
   useEffect(() => {
     setLocalLikeCount(likeCount || 0);
   }, [likeCount]);
+
+  useEffect(() => {
+    setShowComments(false);
+  }, [meme.id]);
 
   useEffect(() => {
     let isMounted = true;
@@ -159,27 +165,6 @@ export default function MemeCard({
     }
   };
 
-  const handleReplyWithMeme = async (e) => {
-    e.stopPropagation();
-    const message = `Reply with this meme: ${meme.title}\n${meme.image}`;
-
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: meme.title,
-          text: "Reply with this meme",
-          url: meme.image,
-        });
-        return;
-      }
-
-      await navigator.clipboard.writeText(message);
-      alert("Meme reply text copied. Paste it in chat!");
-    } catch (error) {
-      console.error("Reply action failed:", error);
-    }
-  };
-
   return (
     <div className="group bg-[#101624] border border-white/10 rounded-3xl overflow-hidden hover:border-violet-400/30 transition shadow-lg">
       <div className="relative cursor-pointer" onClick={() => onOpen(meme)}>
@@ -202,7 +187,7 @@ export default function MemeCard({
           className={`absolute top-2 right-2 sm:top-4 sm:right-4 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center border border-white/20 hover:scale-110 transition active:scale-90 ${liked ? 'border-pink-500/50' : ''}`}
         >
           <div className="flex flex-col items-center justify-center">
-            <motion.div
+            <Motion.div
               animate={{ scale: liked ? [1, 1.4, 1] : 1 }}
               transition={{ duration: 0.3 }}
             >
@@ -211,7 +196,7 @@ export default function MemeCard({
                   liked ? "fill-pink-500 text-pink-500" : "text-white"
                 }`}
               />
-            </motion.div>
+            </Motion.div>
             <span className="text-[8px] sm:text-[10px] font-black text-white mt-0.5">{localLikeCount}</span>
           </div>
         </button>
@@ -257,6 +242,40 @@ export default function MemeCard({
             <span>Download Meme</span>
           </button>
         </div>
+
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={() => setShowComments((currentValue) => !currentValue)}
+            className="flex h-10 w-full items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 text-xs font-semibold text-zinc-200 transition hover:border-violet-400/30 hover:bg-white/10 sm:h-11 sm:rounded-2xl sm:text-sm"
+          >
+            <span className="flex items-center gap-2">
+              <MessageCircle className="h-4 w-4 text-violet-300" />
+              {showComments ? "Hide Comments" : "Open Comments"}
+            </span>
+            <ChevronDown
+              className={`h-4 w-4 text-zinc-400 transition-transform ${showComments ? "rotate-180" : ""}`}
+            />
+          </button>
+        </div>
+
+        <AnimatePresence initial={false}>
+          {showComments ? (
+            <Motion.div
+              initial={{ opacity: 0, height: 0, marginTop: 0 }}
+              animate={{ opacity: 1, height: "auto", marginTop: 12 }}
+              exit={{ opacity: 0, height: 0, marginTop: 0 }}
+              transition={{ duration: 0.25 }}
+              className="overflow-hidden"
+            >
+              <CommentsSection
+                memeId={meme.id}
+                user={user}
+                isDatabaseMeme={meme.isDatabaseMeme}
+              />
+            </Motion.div>
+          ) : null}
+        </AnimatePresence>
       </div>
     </div>
   );

@@ -21,6 +21,38 @@ body {
   overscroll-behavior-y: none;
 }
 
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139, 92, 246, 0.75) rgba(255, 255, 255, 0.06);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(139, 92, 246, 0.95), rgba(217, 70, 239, 0.85));
+  border: 2px solid rgba(13, 18, 32, 0.95);
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(167, 139, 250, 1), rgba(232, 121, 249, 0.95));
+}
+
 @media (display-mode: standalone) {
   html,
   body,

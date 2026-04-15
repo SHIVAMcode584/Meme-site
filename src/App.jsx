@@ -74,6 +74,7 @@ const normalizeMeme = (m, currentUserId) => {
       ? (currentUserId && m.user_id === currentUserId ? "You" : (profileData?.username || "User"))
       : "Owner",
     image: m.image_url || m.image || "",
+    isDatabaseMeme: Boolean(m.image_url || m.created_at || m.user_id),
   };
 };  
 
@@ -123,6 +124,19 @@ export default function App() {
   const [dismissInstallBanner, setDismissInstallBanner] = useState(false);
   const [showIosInstallModal, setShowIosInstallModal] = useState(false);
 const path = window.location.pathname;
+  const isOverlayOpen = Boolean(
+    isSidebarOpen ||
+      activeMeme ||
+      isEditorModalOpen ||
+      isUploadModalOpen ||
+      isLoginModalOpen ||
+      isHelpOpen ||
+      isLogoutConfirmOpen ||
+      isResetConfirmOpen ||
+      notification ||
+      resetStatus ||
+      showIosInstallModal
+  );
   const SidebarLink = ({ icon, label, onClick }) => (
     <button
       onClick={onClick}
@@ -137,17 +151,16 @@ const path = window.location.pathname;
     localStorage.setItem("favorite-memes", JSON.stringify(favorites));
   }, [favorites]);
 
-  // Lock body scroll when mobile sidebar is open
+  // Lock page scroll whenever any overlay is open
   useEffect(() => {
-    if (isSidebarOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-    }
+    document.body.style.overflow = isOverlayOpen ? "hidden" : "unset";
+    document.documentElement.style.overflow = isOverlayOpen ? "hidden" : "unset";
+
     return () => {
       document.body.style.overflow = "unset";
+      document.documentElement.style.overflow = "unset";
     };
-  }, [isSidebarOpen]);
+  }, [isOverlayOpen]);
 
   useEffect(() => {
     const media = window.matchMedia("(display-mode: standalone)");
