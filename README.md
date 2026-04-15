@@ -1,16 +1,132 @@
-# React + Vite
+# 🚀 MemeHub – AI Powered Meme Platform
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+MemeHub is a modern full-stack web application where users can **discover, upload, like, and search memes** based on real-life situations, moods, and reactions.
 
-Currently, two official plugins are available:
+It combines **Supabase backend + React frontend** with features like authentication, meme uploads, likes system, and AI-based search.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## 🌐 Live Demo
+👉 https://meme-site-lovat.vercel.app/
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## ✨ Features
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### 🔐 Authentication
+- Email/Password login & signup
+- Magic link login
+- Password reset via email
+
+---
+
+### 🖼️ Meme Upload System
+- Upload memes with:
+  - Title
+  - Image URL
+  - Category
+  - Mood
+  - Keywords
+- Stored in Supabase database
+
+---
+
+### ❤️ Like / Upvote System
+- Like & unlike memes
+- Prevent duplicate likes
+- Real-time like count
+
+---
+
+### 👤 User Profiles
+- Username-based identity
+- Points system for engagement
+- Profile linked with uploads
+
+---
+
+### 🔍 Smart Search (AI Ready)
+- Search memes by:
+  - Mood
+  - Situation
+  - Keywords
+- Future-ready for AI semantic search
+
+---
+
+### 🔥 Trending System
+- Most liked memes
+- Engagement-based ranking
+
+---
+
+### 📱 PWA Support
+- Installable as app on mobile & desktop
+- Custom icon + standalone mode
+
+---
+
+## 🛠️ Tech Stack
+
+### Frontend
+- React (Vite)
+- Tailwind CSS
+- Lucide Icons
+
+### Backend
+- Supabase (Auth + Database + Storage)
+
+### Database
+- PostgreSQL (via Supabase)
+- RLS (Row Level Security)
+
+---
+
+## 🧩 Database Structure
+
+### Tables:
+
+#### `meme-table`
+- id
+- title
+- image_url
+- category
+- mood
+- keywords
+- user_id
+- created_at
+
+---
+
+#### `profiles`
+- id (auth.users)
+- username
+- points
+
+---
+
+#### `likes`
+- id
+- user_id
+- meme_id
+- created_at
+
+Constraints:
+- Unique (user_id, meme_id)
+
+---
+
+## 🔐 Security (RLS)
+
+- Users can only modify their own data
+- Likes are protected via RLS policies
+- Profiles are safely managed
+
+---
+
+## ⚙️ Setup Instructions
+
+### 1. Clone Repo
+```bash
+git clone https://github.com/SHIVAMcode584/memehub.git
+cd memehub
