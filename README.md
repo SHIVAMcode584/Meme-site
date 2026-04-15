@@ -1,132 +1,169 @@
-# 🚀 MemeHub – AI Powered Meme Platform
+# RoastRiot.meme
 
-MemeHub is a modern full-stack web application where users can **discover, upload, like, and search memes** based on real-life situations, moods, and reactions.
+RoastRiot.meme is a full-stack meme platform where users can discover, upload, like, and search memes based on moods, reactions, and real-life situations.
 
-It combines **Supabase backend + React frontend** with features like authentication, meme uploads, likes system, and AI-based search.
+It combines a React frontend with a Supabase backend and includes authentication, meme uploads, likes, PWA support, and AI-assisted semantic search.
 
----
+## Live Demo
 
-## 🌐 Live Demo
-👉 https://meme-site-lovat.vercel.app/
+https://meme-site-lovat.vercel.app/
 
----
+## Features
 
-## ✨ Features
+- Email/password and magic link authentication
+- Password reset flow
+- Meme uploads with title, image, category, mood, and keywords
+- Like and unlike support with duplicate protection
+- User profiles with points
+- Keyword search and semantic search fallback
+- Trending memes based on engagement
+- Installable PWA experience
 
-### 🔐 Authentication
-- Email/Password login & signup
-- Magic link login
-- Password reset via email
-
----
-
-### 🖼️ Meme Upload System
-- Upload memes with:
-  - Title
-  - Image URL
-  - Category
-  - Mood
-  - Keywords
-- Stored in Supabase database
-
----
-
-### ❤️ Like / Upvote System
-- Like & unlike memes
-- Prevent duplicate likes
-- Real-time like count
-
----
-
-### 👤 User Profiles
-- Username-based identity
-- Points system for engagement
-- Profile linked with uploads
-
----
-
-### 🔍 Smart Search (AI Ready)
-- Search memes by:
-  - Mood
-  - Situation
-  - Keywords
-- Future-ready for AI semantic search
-
----
-
-### 🔥 Trending System
-- Most liked memes
-- Engagement-based ranking
-
----
-
-### 📱 PWA Support
-- Installable as app on mobile & desktop
-- Custom icon + standalone mode
-
----
-
-## 🛠️ Tech Stack
+## Tech Stack
 
 ### Frontend
-- React (Vite)
+
+- React
+- Vite
 - Tailwind CSS
-- Lucide Icons
+- Framer Motion
+- Lucide React
 
 ### Backend
-- Supabase (Auth + Database + Storage)
+
+- Supabase Auth
+- Supabase Postgres
+- Supabase Storage
+- Vercel serverless functions
 
 ### Database
-- PostgreSQL (via Supabase)
-- RLS (Row Level Security)
 
----
+- PostgreSQL
+- pgvector
+- Row Level Security (RLS)
 
-## 🧩 Database Structure
+## Database Structure
 
-### Tables:
+### `meme-table`
 
-#### `meme-table`
-- id
-- title
-- image_url
-- category
-- mood
-- keywords
-- user_id
-- created_at
+- `id`
+- `title`
+- `image_url`
+- `category`
+- `mood`
+- `keywords`
+- `user_id`
+- `created_at`
+- `embedding`
 
----
+### `profiles`
 
-#### `profiles`
-- id (auth.users)
-- username
-- points
+- `id`
+- `username`
+- `points`
 
----
+### `likes`
 
-#### `likes`
-- id
-- user_id
-- meme_id
-- created_at
+- `id`
+- `user_id`
+- `meme_id`
+- `created_at`
 
-Constraints:
-- Unique (user_id, meme_id)
+Constraint:
 
----
+- Unique (`user_id`, `meme_id`)
 
-## 🔐 Security (RLS)
+## Security
 
 - Users can only modify their own data
-- Likes are protected via RLS policies
+- Likes are protected with RLS policies
 - Profiles are safely managed
 
----
+## Setup
 
-## ⚙️ Setup Instructions
+### 1. Clone the repo
 
-### 1. Clone Repo
 ```bash
-git clone https://github.com/SHIVAMcode584/memehub.git
-cd memehub
+git clone https://github.com/SHIVAMcode584/Meme-site.git
+cd Meme-site
+```
+
+### 2. Install dependencies
+
+```bash
+npm install
+```
+
+### 3. Add environment variables
+
+Set these in your local `.env` file and in Vercel project settings:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `OPENAI_API_KEY`
+- `OPENAI_EMBEDDING_MODEL` (optional, default: `text-embedding-3-small`)
+
+### 4. Run the semantic search migration
+
+Apply:
+
+`supabase/migrations/20260415_semantic_search.sql`
+
+This enables `pgvector`, adds the `embedding` column, and creates the `match_memes(...)` RPC.
+
+### 5. Backfill meme embeddings
+
+Run once, or use `--force` to regenerate all embeddings:
+
+```bash
+npm run embeddings:backfill
+# npm run embeddings:backfill -- --force
+```
+
+### 6. Run the app
+
+For the normal frontend:
+
+```bash
+npm run dev
+```
+
+For local testing with the API route:
+
+```bash
+vercel dev
+```
+
+## Semantic Search API
+
+Endpoint:
+
+`POST /api/semantic-search`
+
+Payload example:
+
+```json
+{
+  "query": "friend ignored me",
+  "limit": 24,
+  "category": "All"
+}
+```
+
+If AI search fails, the endpoint automatically falls back to keyword filtering.
+
+## Troubleshooting
+
+If you see "AI search unavailable", usually one of these is missing:
+
+1. `OPENAI_API_KEY` in Vercel environment variables.
+2. `SUPABASE_SERVICE_ROLE_KEY` in Vercel environment variables.
+3. The SQL migration was not applied, so `match_memes` does not exist.
+4. Embeddings have not been backfilled yet.
+5. You are running only `vite dev`, which does not serve the `api/` functions.
+
+For local testing, either:
+
+- Use `vercel dev`, or
+- Set `VITE_SEMANTIC_API_URL` to your deployed endpoint.

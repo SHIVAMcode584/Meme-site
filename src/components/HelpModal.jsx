@@ -77,7 +77,7 @@ export default function HelpModal({ isOpen, onClose, user, onLoginClick }) {
               "Sign up/Login instantly with Magic Links sent to your email.",
               "Build your identity with a unique username and auto-generated avatar.",
               "Access your profile from the sidebar to manage your account.",
-              "Stay logged in to save your favorite memes across devices."
+              "Stay logged in to save your bookmarked memes across devices."
             ]}
             action={!user ? { label: "Create Account Now", onClick: onLoginClick } : null}
           />
@@ -137,7 +137,7 @@ export default function HelpModal({ isOpen, onClose, user, onLoginClick }) {
             title="Sharing & Community"
             description="Humor is better when shared. Connect with others instantly."
             steps={[
-              "Save memes to your personal 'Favorites' list for quick access.",
+              "Save memes to your personal 'Bookmarks' list for quick access.",
               "Share directly to WhatsApp or copy short-links for chat.",
               "Every meme has a unique URL—send the link to take friends to that exact meme.",
               "Check the Leaderboard to see who's ruling the Riot today."

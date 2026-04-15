@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState, lazy, Suspense } from "react";
+import { useCallback, useEffect, useMemo, useState, lazy, Suspense } from "react";
 
 import logo from "../meme-logo.png";
 import { 
   Sparkles, 
   Menu, 
   X, 
+  Download,
   Home, 
   Search, 
   Dices, 
@@ -13,6 +14,7 @@ import {
   LogIn, 
   LogOut, 
   Image, 
+  Bookmark,
   Heart, 
   User as UserIcon, 
   ChevronRight, 
@@ -31,6 +33,7 @@ import MemeGrid from "./components/MemeGrid";
 import SearchBar from "./components/SearchBar";
 import { memes } from "./data/memes";
 import { categories, smartSearch, suggestions } from "./utils/helpers";
+import { getAllOwnerLikeCounts, getOwnerLikedMemeIdsForUser } from "./utils/likes";
 import { supabase } from "./lib/supabase";
 
 // Lazy load heavy components
@@ -82,8 +85,13 @@ const getBadge = (pts) => {
   return { name: "Newcomer", color: "text-zinc-500", bg: "bg-zinc-500/10" };
 };
 
+const SEMANTIC_MIN_QUERY_LENGTH = 2;
+const SEMANTIC_DEBOUNCE_MS = 450;
+const SEMANTIC_API_URL = import.meta.env.VITE_SEMANTIC_API_URL || "/api/semantic-search";
+
 export default function App() {
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [activeMeme, setActiveMeme] = useState(null);
   const [favorites, setFavorites] = useState(getInitialFavorites);
@@ -102,6 +110,18 @@ export default function App() {
   const [resetStatus, setResetStatus] = useState(null); // { type: 'success' | 'error', message: string }
   const [isResetLoading, setIsResetLoading] = useState(false);
   const [leaderboard, setLeaderboard] = useState([]);
+  const [dbLikeCounts, setDbLikeCounts] = useState({});
+  const [ownerLikeCounts, setOwnerLikeCounts] = useState(getAllOwnerLikeCounts);
+  const [likedMemeIds, setLikedMemeIds] = useState([]);
+  const [semanticMemes, setSemanticMemes] = useState([]);
+  const [semanticStatus, setSemanticStatus] = useState("idle");
+  const [semanticError, setSemanticError] = useState("");
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState(null);
+  const [isInstallable, setIsInstallable] = useState(false);
+  const [isStandaloneMode, setIsStandaloneMode] = useState(false);
+  const [showIosInstallHint, setShowIosInstallHint] = useState(false);
+  const [dismissInstallBanner, setDismissInstallBanner] = useState(false);
+  const [showIosInstallModal, setShowIosInstallModal] = useState(false);
 const path = window.location.pathname;
   const SidebarLink = ({ icon, label, onClick }) => (
     <button
@@ -129,9 +149,249 @@ const path = window.location.pathname;
     };
   }, [isSidebarOpen]);
 
+  useEffect(() => {
+    const media = window.matchMedia("(display-mode: standalone)");
+    const detectStandalone = () => media.matches || window.navigator.standalone === true;
+    const updateStandaloneMode = () => setIsStandaloneMode(detectStandalone());
+
+    updateStandaloneMode();
+
+    const userAgent = window.navigator.userAgent || "";
+    const isIos = /iphone|ipad|ipod/i.test(userAgent);
+    const isSafari = /safari/i.test(userAgent) && !/crios|fxios|edgios|opr\//i.test(userAgent);
+    setShowIosInstallHint(isIos && isSafari && !detectStandalone());
+
+    const onBeforeInstallPrompt = (event) => {
+      event.preventDefault();
+      setDeferredInstallPrompt(event);
+      setIsInstallable(true);
+    };
+
+    const onAppInstalled = () => {
+      setDeferredInstallPrompt(null);
+      setIsInstallable(false);
+      setDismissInstallBanner(true);
+      setIsStandaloneMode(true);
+    };
+
+    if (media.addEventListener) media.addEventListener("change", updateStandaloneMode);
+    else media.addListener(updateStandaloneMode);
+
+    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    window.addEventListener("appinstalled", onAppInstalled);
+
+    return () => {
+      if (media.removeEventListener) media.removeEventListener("change", updateStandaloneMode);
+      else media.removeListener(updateStandaloneMode);
+
+      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", onAppInstalled);
+    };
+  }, []);
+
+  useEffect(() => {
+    const fetchLikeCounts = async () => {
+      const { data, error } = await supabase.from("likes").select("meme_id");
+
+      if (error) {
+        console.error("Error fetching likes:", error);
+        return;
+      }
+
+      const counts = data.reduce((acc, row) => {
+        const key = String(row.meme_id);
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      }, {});
+
+      setDbLikeCounts(counts);
+      setOwnerLikeCounts(getAllOwnerLikeCounts());
+    };
+
+    fetchLikeCounts();
+
+    const channel = supabase
+      .channel("global-like-counts")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "likes",
+        },
+        fetchLikeCounts
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setLikedMemeIds([]);
+      return;
+    }
+
+    const fetchUserLikedMemeIds = async () => {
+      const { data, error } = await supabase
+        .from("likes")
+        .select("meme_id")
+        .eq("user_id", user.id);
+
+      if (error) {
+        console.error("Error fetching user likes:", error);
+        setLikedMemeIds(getOwnerLikedMemeIdsForUser(user.id));
+        return;
+      }
+
+      const dbIds = (data || []).map((row) => String(row.meme_id));
+      const ownerIds = getOwnerLikedMemeIdsForUser(user.id);
+      setLikedMemeIds([...new Set([...dbIds, ...ownerIds])]);
+    };
+
+    fetchUserLikedMemeIds();
+
+    const channel = supabase
+      .channel(`user-liked-memes-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "likes",
+          filter: `user_id=eq.${user.id}`,
+        },
+        fetchUserLikedMemeIds
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, SEMANTIC_DEBOUNCE_MS);
+
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    if (viewMode !== "all" || debouncedSearch.length < SEMANTIC_MIN_QUERY_LENGTH) {
+      setSemanticMemes([]);
+      setSemanticStatus("idle");
+      setSemanticError("");
+      return;
+    }
+
+    let isCancelled = false;
+    setSemanticStatus("searching");
+    setSemanticError("");
+
+    const runSemanticSearch = async () => {
+      try {
+        const res = await fetch(SEMANTIC_API_URL, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            query: debouncedSearch,
+            limit: 24,
+            category: selectedCategory,
+          }),
+        });
+
+        const contentType = res.headers.get("content-type") || "";
+        const payload = contentType.includes("application/json") ? await res.json() : {};
+        if (!res.ok) {
+          throw new Error(
+            payload?.error || `Semantic endpoint returned ${res.status}. Check API deployment/env.`
+          );
+        }
+
+        if (isCancelled) return;
+
+        const normalized = (payload?.results || []).map((meme) =>
+          normalizeMeme(
+            {
+              ...meme,
+              profiles: meme?.profiles || (meme?.username ? { username: meme.username } : null),
+            },
+            user?.id
+          )
+        );
+
+        setSemanticMemes(normalized);
+        setSemanticStatus(payload?.source === "semantic" ? "semantic" : "fallback");
+        setSemanticError(payload?.source === "fallback" ? payload?.reason || "" : "");
+      } catch (error) {
+        if (isCancelled) return;
+        setSemanticMemes([]);
+        setSemanticStatus("fallback");
+        setSemanticError(error.message || "AI search unavailable, using keyword fallback.");
+      }
+    };
+
+    runSemanticSearch();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [debouncedSearch, selectedCategory, user?.id, viewMode]);
+
   const allMemesNormalized = useMemo(() => {
     return [...dbMemes, ...memes].map(m => normalizeMeme(m, user?.id));
   }, [dbMemes, user?.id]);
+
+  const searchPlaceholderTitles = useMemo(() => {
+    const seen = new Set();
+
+    return allMemesNormalized
+      .map((meme) => (typeof meme.title === "string" ? meme.title.trim() : ""))
+      .filter((title) => {
+        if (!title) return false;
+
+        const normalizedTitle = title.toLowerCase();
+        if (seen.has(normalizedTitle)) return false;
+
+        seen.add(normalizedTitle);
+        return true;
+      });
+  }, [allMemesNormalized]);
+
+  const allLikeCounts = useMemo(
+    () => ({ ...dbLikeCounts, ...ownerLikeCounts }),
+    [dbLikeCounts, ownerLikeCounts]
+  );
+  const likedMemeIdSet = useMemo(
+    () => new Set((likedMemeIds || []).map((id) => String(id))),
+    [likedMemeIds]
+  );
+
+  const handleLikeCountChange = useCallback((memeId, count, isOwnerUpload = false) => {
+    const key = String(memeId);
+    const safeCount = Math.max(0, Number(count) || 0);
+
+    if (isOwnerUpload) {
+      setOwnerLikeCounts((prev) => ({ ...prev, [key]: safeCount }));
+      return;
+    }
+
+    setDbLikeCounts((prev) => ({ ...prev, [key]: safeCount }));
+  }, []);
+
+  const handleLikeStateChange = useCallback((memeId, isLiked) => {
+    const key = String(memeId);
+    setLikedMemeIds((prev) => {
+      const next = new Set((prev || []).map((id) => String(id)));
+      if (isLiked) next.add(key);
+      else next.delete(key);
+      return [...next];
+    });
+  }, []);
 
   const filteredMemes = useMemo(() => {
     let baseList = allMemesNormalized;
@@ -140,10 +400,68 @@ const path = window.location.pathname;
       baseList = baseList.filter(m => m.user_id === user.id);
     } else if (viewMode === "favorites") {
       baseList = baseList.filter(m => favorites.includes(m.id));
+    } else if (viewMode === "liked") {
+      baseList = baseList.filter((m) => likedMemeIdSet.has(String(m.id)));
     }
-    
-    return smartSearch(baseList, search, selectedCategory);
-  }, [allMemesNormalized, search, selectedCategory, viewMode, user, favorites]);
+
+    const searchedMemes = smartSearch(baseList, search, selectedCategory);
+
+    const shouldUseSemanticSearch =
+      viewMode === "all" && debouncedSearch.length >= SEMANTIC_MIN_QUERY_LENGTH;
+
+    let mergedResults = searchedMemes;
+
+    if (shouldUseSemanticSearch && semanticMemes.length > 0) {
+      const localOwnerMatches = smartSearch(
+        baseList.filter((meme) => !meme.user_id),
+        search,
+        selectedCategory
+      );
+
+      const seenIds = new Set();
+      mergedResults = [...semanticMemes, ...localOwnerMatches].filter((meme) => {
+        const key = String(meme.id);
+        if (seenIds.has(key)) return false;
+        seenIds.add(key);
+        return true;
+      });
+    }
+
+    if (shouldUseSemanticSearch && semanticMemes.length > 0) {
+      return [...mergedResults].sort((a, b) => {
+        const similarityA = typeof a.similarity === "number" ? a.similarity : -1;
+        const similarityB = typeof b.similarity === "number" ? b.similarity : -1;
+        if (similarityB !== similarityA) return similarityB - similarityA;
+
+        return (allLikeCounts[String(b.id)] || 0) - (allLikeCounts[String(a.id)] || 0) || (new Date(b.created_at || 0) - new Date(a.created_at || 0));
+      });
+    }
+
+    // Optimized Sorting: Most Liked Memes always on top
+    const sorted = [...mergedResults].sort((a, b) => {
+      const likeDiff = (allLikeCounts[String(b.id)] || 0) - (allLikeCounts[String(a.id)] || 0);
+      if (likeDiff !== 0) return likeDiff;
+
+      const createdDiff =
+        (new Date(b.created_at || 0).getTime() || 0) -
+        (new Date(a.created_at || 0).getTime() || 0);
+      if (createdDiff !== 0) return createdDiff;
+
+      return 0;
+    });
+    return sorted;
+  }, [
+    allMemesNormalized,
+    search,
+    debouncedSearch,
+    selectedCategory,
+    viewMode,
+    user,
+    favorites,
+    allLikeCounts,
+    likedMemeIdSet,
+    semanticMemes,
+  ]);
 
   const fetchProfile = async (userId, userData) => {
     // Use maybeSingle to check if profile exists
@@ -233,6 +551,23 @@ useEffect(() => {
     openMeme(allMemesNormalized[randomIndex]);
   };
 
+  const handleInstallApp = async () => {
+    if (isInstallable && deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      const choice = await deferredInstallPrompt.userChoice;
+      if (choice?.outcome === "accepted") {
+        setDismissInstallBanner(true);
+      }
+      setDeferredInstallPrompt(null);
+      setIsInstallable(false);
+      return;
+    }
+
+    if (showIosInstallHint) {
+      setShowIosInstallModal(true);
+    }
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setViewMode("all");
@@ -252,6 +587,9 @@ useEffect(() => {
 
   const handleUploadMeme = (meme) => {
     setDbMemes((prev) => [normalizeMeme(meme, user?.id), ...prev]);
+    if (meme?.id !== undefined && meme?.id !== null) {
+      setDbLikeCounts((prev) => ({ ...prev, [String(meme.id)]: prev[String(meme.id)] || 0 }));
+    }
     if (user) fetchProfile(user.id, user); // Refresh points immediately
   };
 if (path === "/reset-password") {
@@ -299,8 +637,8 @@ if (path === "/reset-password") {
               }} 
             />
             <SidebarLink 
-              icon={<Heart size={20}/>} 
-              label="Favorites" 
+              icon={<Bookmark size={20}/>} 
+              label="Bookmarks" 
               onClick={() => { 
                 setViewMode("favorites");
                 setIsSidebarOpen(false);
@@ -391,59 +729,70 @@ if (path === "/reset-password") {
       <div className="flex-1 lg:pl-64 min-w-0">
         <div className="relative isolate overflow-x-clip">
           <header className="sticky top-0 z-40 border-b border-white/10 bg-[#070B14]/95 backdrop-blur-xl transition-all">
-          <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={() => setIsSidebarOpen(true)}
-                className="p-2 hover:bg-white/5 rounded-xl transition-colors border border-white/5 lg:hidden"
-              >
-                <Menu size={24} />
-              </button>
-              <img src={logo} alt="RoastRiot Logo" className="w-8 h-8 sm:w-10 sm:h-10 object-contain" />
-              <div className="hidden xs:block">
-                <p className="text-xs uppercase tracking-[0.35em] text-zinc-400">Meme Finder</p>
-                <h1 className="text-lg font-semibold sm:text-xl">Discover & Create</h1>
+            <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6 lg:flex lg:items-center lg:justify-between">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+                  <button 
+                    onClick={() => setIsSidebarOpen(true)}
+                    className="p-2 hover:bg-white/5 rounded-xl transition-colors border border-white/5 lg:hidden"
+                  >
+                    <Menu size={24} />
+                  </button>
+                  <img src={logo} alt="RoastRiot Logo" className="w-8 h-8 sm:w-10 sm:h-10 object-contain shrink-0" />
+                  <div className="hidden xs:block min-w-0">
+                    <p className="text-xs uppercase tracking-[0.35em] text-zinc-400">Meme Finder</p>
+                    <h1 className="text-base font-semibold sm:text-xl truncate">Discover & Create</h1>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1 lg:mt-0 lg:overflow-visible lg:pb-0">
+                {profile && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 bg-white/5 border border-white/10 rounded-2xl shrink-0">
+                    <Award size={14} className="text-violet-400 sm:w-4 sm:h-4" />
+                    <span className="text-[10px] sm:text-sm font-bold bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
+                      {profile.points} pts
+                    </span>
+                  </div>
+                )}
+                {!user && (
+                  <button
+                    onClick={() => setIsLoginModalOpen(true)}
+                    className="shrink-0 px-3 py-1.5 sm:px-4 sm:py-2 bg-purple-600 rounded-full text-xs sm:text-sm font-semibold"
+                  >
+                    Login
+                  </button>
+                )}
+                <button
+                  onClick={handleRandomMeme}
+                  className="shrink-0 flex items-center gap-2 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-white shadow-lg shadow-fuchsia-500/20 transition hover:scale-105 active:scale-95"
+                >
+                  <Sparkles size={16} />
+                  <span className="hidden sm:inline">Get Random Meme</span>
+                  <span className="sm:hidden">Random</span>
+                </button>
+                {!isStandaloneMode && (isInstallable || showIosInstallHint) && (
+                  <button
+                    onClick={handleInstallApp}
+                    className="shrink-0 flex items-center gap-1.5 rounded-full border border-violet-400/40 bg-violet-500/10 px-2.5 py-1.5 sm:gap-2 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-violet-300 transition hover:bg-violet-500/20"
+                  >
+                    <Download size={16} />
+                    <span className="hidden sm:inline">Install App</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => { setViewMode(viewMode === "favorites" ? "all" : "favorites"); window.scrollTo({top: 0, behavior: 'smooth'}); }}
+                  className={`shrink-0 flex items-center gap-2 rounded-full border px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm transition-all ${
+                    viewMode === "favorites" 
+                      ? "border-violet-500/50 bg-violet-500/10 text-violet-300" 
+                      : "border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10"
+                  }`}
+                >
+                  <Bookmark size={16} className={viewMode === "favorites" ? "fill-violet-400" : ""} />
+                  <span className="hidden xs:inline">Bookmarks: </span>{favorites.length}
+                </button>
               </div>
             </div>
-
-            <div className="flex items-center gap-3">
-              {profile && (
-                <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 sm:px-4 sm:py-2 bg-white/5 border border-white/10 rounded-2xl">
-                  <Award size={14} className="text-violet-400 sm:w-4 sm:h-4" />
-                  <span className="text-[10px] sm:text-sm font-bold bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
-                    {profile.points} pts
-                  </span>
-                </div>
-              )}
-              {!user && (
-                <button
-                  onClick={() => setIsLoginModalOpen(true)}
-                  className="px-4 py-2 bg-purple-600 rounded"
-                >
-                  Login
-                </button>
-              )}
-              <button
-                onClick={handleRandomMeme}
-                className="flex items-center gap-2 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-fuchsia-500/20 transition hover:scale-105 active:scale-95"
-              >
-                <Sparkles size={16} />
-                <span className="hidden sm:inline">Get Random Meme</span>
-                <span className="sm:hidden">Random</span>
-              </button>
-              <button
-                onClick={() => { setViewMode(viewMode === "favorites" ? "all" : "favorites"); window.scrollTo({top: 0, behavior: 'smooth'}); }}
-                className={`flex items-center gap-2 rounded-full border px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm transition-all ${
-                  viewMode === "favorites" 
-                    ? "border-pink-500/50 bg-pink-500/10 text-pink-400" 
-                    : "border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10"
-                }`}
-              >
-                <Heart size={16} className={viewMode === "favorites" ? "fill-pink-500" : ""} />
-                <span className="hidden xs:inline">Favorites: </span>{favorites.length}
-              </button>
-            </div>
-          </div>
         </header>
 
         <main className="relative z-10 mx-auto max-w-6xl px-4 pb-16 sm:px-6">
@@ -507,6 +856,42 @@ if (path === "/reset-password") {
               </div>
 
               <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    onClick={() => {
+                      setViewMode("liked");
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                    className="w-full p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-left"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <Heart size={18} className="text-pink-400" />
+                        <span className="font-semibold">Liked Memes</span>
+                      </div>
+                      <span className="text-sm font-bold text-pink-400">{likedMemeIds.length}</span>
+                    </div>
+                    <p className="text-xs text-zinc-500 mt-2">See all memes you liked</p>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setViewMode("favorites");
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                    className="w-full p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-left"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <Bookmark size={18} className="text-violet-400" />
+                        <span className="font-semibold">Bookmarked Memes</span>
+                      </div>
+                      <span className="text-sm font-bold text-violet-400">{favorites.length}</span>
+                    </div>
+                    <p className="text-xs text-zinc-500 mt-2">Open your saved bookmarks</p>
+                  </button>
+                </div>
+
                 <button 
                   onClick={() => setIsResetConfirmOpen(true)}
                   className="w-full p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all flex items-center justify-between group"
@@ -538,7 +923,11 @@ if (path === "/reset-password") {
             <>
               <Hero />
               <section className="-mt-16 relative z-20 rounded-[2rem] border border-white/10 bg-[#0d1220] p-5 shadow-2xl shadow-black/50 backdrop-blur-xl sm:p-8">
-                <SearchBar search={search} setSearch={setSearch} />
+                <SearchBar
+                  search={search}
+                  setSearch={setSearch}
+                  placeholderTitles={searchPlaceholderTitles}
+                />
                 <CategoryFilter categories={categories} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} />
               </section>
 
@@ -546,11 +935,33 @@ if (path === "/reset-password") {
                 <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                   <div>
                     <h2 className="text-2xl font-bold sm:text-3xl">
-                      {viewMode === "uploads" ? "My Uploaded Memes" : viewMode === "favorites" ? "My Favorite Memes" : "Meme Results"}
+                      {viewMode === "uploads"
+                        ? "My Uploaded Memes"
+                        : viewMode === "favorites"
+                        ? "My Bookmarked Memes"
+                        : viewMode === "liked"
+                        ? "My Liked Memes"
+                        : "Meme Results"}
                     </h2>
                     <p className="text-zinc-400">
                       {filteredMemes.length} meme{filteredMemes.length === 1 ? "" : "s"} found
                     </p>
+                    {viewMode === "all" && debouncedSearch.length >= SEMANTIC_MIN_QUERY_LENGTH ? (
+                      <p className="mt-1 text-xs text-zinc-500">
+                        {semanticStatus === "searching"
+                          ? "Understanding your intent..."
+                          : semanticStatus === "semantic"
+                          ? "AI semantic search active"
+                          : semanticStatus === "fallback"
+                          ? "Keyword fallback active"
+                          : semanticStatus === "failed"
+                          ? "AI search unavailable, showing keyword results"
+                          : null}
+                      </p>
+                    ) : null}
+                    {semanticError && semanticStatus !== "searching" ? (
+                      <p className="mt-1 text-[11px] text-amber-300/80">{semanticError}</p>
+                    ) : null}
                   </div>
 
                   {search ? (
@@ -566,6 +977,9 @@ if (path === "/reset-password") {
                   favorites={favorites} 
                   setSearch={setSearch}
                   user={user}
+                  likeCounts={allLikeCounts}
+                  onLikeCountChange={handleLikeCountChange}
+                  onLikeStateChange={handleLikeStateChange}
                 />
               </section>
             </>
@@ -750,6 +1164,82 @@ if (path === "/reset-password") {
         )}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {!isStandaloneMode && !dismissInstallBanner && (isInstallable || showIosInstallHint) && (
+          <motion.div
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            className="fixed bottom-4 left-4 right-4 z-[140] rounded-3xl border border-violet-500/30 bg-[#0d1220]/95 p-4 shadow-2xl backdrop-blur-xl lg:left-auto lg:right-6 lg:w-[420px]"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.25em] text-violet-300">Install RoastRiot</p>
+                <p className="mt-1 text-sm text-zinc-300">
+                  {isInstallable
+                    ? "Install this app for a faster, standalone meme experience."
+                    : "On iPhone: tap Share, then Add to Home Screen."}
+                </p>
+              </div>
+              <button
+                onClick={() => setDismissInstallBanner(true)}
+                className="rounded-full p-1 text-zinc-400 transition hover:bg-white/10 hover:text-white"
+                aria-label="Dismiss install banner"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={handleInstallApp}
+                className="rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 px-4 py-2 text-xs font-bold text-white transition hover:scale-[1.02]"
+              >
+                {isInstallable ? "Install now" : "Show steps"}
+              </button>
+              <button
+                onClick={() => setDismissInstallBanner(true)}
+                className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold text-zinc-300 transition hover:bg-white/10"
+              >
+                Later
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showIosInstallModal && (
+          <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 lg:pl-64">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowIosInstallModal(false)}
+              className="fixed inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              className="relative w-full max-w-md rounded-[2rem] border border-white/10 bg-[#0d1220] p-6 shadow-2xl"
+            >
+              <h3 className="text-xl font-bold">Install on iPhone</h3>
+              <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-zinc-300">
+                <li>Tap the Share button in Safari.</li>
+                <li>Select Add to Home Screen.</li>
+                <li>Tap Add to install RoastRiot.</li>
+              </ol>
+              <button
+                onClick={() => setShowIosInstallModal(false)}
+                className="mt-6 w-full rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 py-3 text-sm font-bold text-white"
+              >
+                Got it
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
         <Suspense fallback={null}>
           <MemeModal
             meme={activeMeme}
@@ -758,6 +1248,9 @@ if (path === "/reset-password") {
             toggleFavorite={toggleFavorite}
             favorites={favorites}
             onNext={handleRandomMeme}
+            likeCounts={allLikeCounts}
+            onLikeCountChange={handleLikeCountChange}
+            onLikeStateChange={handleLikeStateChange}
           />
         </Suspense>
         <Suspense fallback={null}>

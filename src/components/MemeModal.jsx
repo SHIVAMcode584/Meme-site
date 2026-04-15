@@ -1,8 +1,53 @@
-import { useState } from "react";
-import { X, Download, Heart, SkipForward, Link, MessageCircle, Check, User as UserIcon } from "lucide-react";
+import { useState, useEffect } from "react";
+import { X, Download, Heart, SkipForward, Link, MessageCircle, Check, User as UserIcon, Bookmark } from "lucide-react";
+import { motion } from "framer-motion";
+import { supabase } from "../lib/supabase";
+import { getOwnerMemeLikeSnapshot, setOwnerMemeLike } from "../utils/likes";
 
-export default function MemeModal({ meme, user, onClose, toggleFavorite, favorites, onNext }) {
+export default function MemeModal({ 
+  meme, 
+  user, 
+  onClose, 
+  toggleFavorite, 
+  favorites, 
+  onNext,
+  likeCounts = {},
+  onLikeCountChange,
+  onLikeStateChange
+}) {
   const [copied, setCopied] = useState(false);
+  const [liked, setLiked] = useState(false);
+  const [localLikeCount, setLocalLikeCount] = useState(0);
+  const [isLiking, setIsLiking] = useState(false);
+
+  const isFavorite = favorites.includes(meme?.id);
+  const isStaticMeme = meme && !meme.user_id;
+
+  useEffect(() => {
+    if (!meme) return;
+    setLocalLikeCount(likeCounts[String(meme.id)] || 0);
+    
+    const fetchLikedState = async () => {
+      if (!user) return setLiked(false);
+
+      if (isStaticMeme) {
+        const snapshot = getOwnerMemeLikeSnapshot(meme.id, user.id);
+        setLiked(snapshot.liked);
+        return;
+      }
+
+      const { data } = await supabase
+        .from("likes")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("meme_id", meme.id)
+        .maybeSingle();
+
+      setLiked(Boolean(data));
+    };
+
+    fetchLikedState();
+  }, [meme, user, likeCounts, isStaticMeme]);
 
   if (!meme) return null;
 
@@ -28,6 +73,47 @@ export default function MemeModal({ meme, user, onClose, toggleFavorite, favorit
     return `${window.location.origin}/meme/${meme.slug}`;
   };
 
+  const handleLike = async () => {
+    if (!user) return alert("Please sign in to like memes!");
+    if (isLiking) return;
+
+    const previousLiked = liked;
+    const previousCount = localLikeCount;
+    const nextLiked = !previousLiked;
+    const nextCount = nextLiked ? previousCount + 1 : Math.max(0, previousCount - 1);
+
+    setLiked(nextLiked);
+    setLocalLikeCount(nextCount);
+    onLikeCountChange?.(meme.id, nextCount, isStaticMeme);
+    onLikeStateChange?.(meme.id, nextLiked);
+    setIsLiking(true);
+
+    try {
+      if (isStaticMeme) {
+        const snapshot = setOwnerMemeLike(meme.id, user.id, nextLiked);
+        setLiked(snapshot.liked);
+        setLocalLikeCount(snapshot.count);
+        onLikeCountChange?.(meme.id, snapshot.count, true);
+        onLikeStateChange?.(meme.id, snapshot.liked);
+        return;
+      }
+
+      if (previousLiked) {
+        await supabase.from("likes").delete().eq("user_id", user.id).eq("meme_id", meme.id);
+      } else {
+        await supabase.from("likes").insert({ user_id: user.id, meme_id: meme.id });
+      }
+    } catch (error) {
+      console.error("Like error:", error);
+      setLiked(previousLiked);
+      setLocalLikeCount(previousCount);
+      onLikeCountChange?.(meme.id, previousCount, isStaticMeme);
+      onLikeStateChange?.(meme.id, previousLiked);
+    } finally {
+      setIsLiking(false);
+    }
+  };
+
   const handleCopyLink = () => {
     navigator.clipboard.writeText(getShareUrl());
     setCopied(true);
@@ -39,8 +125,6 @@ export default function MemeModal({ meme, user, onClose, toggleFavorite, favorit
     const text = encodeURIComponent(`Check out this meme: ${meme.title} - ${shareUrl}`);
     window.open(`https://wa.me/?text=${text}`, "_blank");
   };
-
-  const isFavorite = favorites.includes(meme.id);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-2 sm:px-4 lg:pl-64">
