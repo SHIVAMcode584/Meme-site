@@ -134,6 +134,10 @@ export default function App() {
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
   const [selectedAvatarId, setSelectedAvatarId] = useState(DEFAULT_AVATAR_ID);
   const [isSavingAvatar, setIsSavingAvatar] = useState(false);
+  const [isUsernameModalOpen, setIsUsernameModalOpen] = useState(false);
+  const [isUsernameConfirmOpen, setIsUsernameConfirmOpen] = useState(false);
+  const [usernameDraft, setUsernameDraft] = useState("");
+  const [isSavingUsername, setIsSavingUsername] = useState(false);
   const path = window.location.pathname;
   const isOverlayOpen = Boolean(
     isSidebarOpen ||
@@ -145,6 +149,8 @@ export default function App() {
       isLogoutConfirmOpen ||
       isResetConfirmOpen ||
       isAvatarModalOpen ||
+      isUsernameModalOpen ||
+      isUsernameConfirmOpen ||
       notification ||
       resetStatus ||
       showIosInstallModal
@@ -490,7 +496,12 @@ export default function App() {
 
   const currentAvatarId = getAvatarChoiceFromMetadata(user?.user_metadata);
   const currentAvatarUrl = resolveUserAvatar(user);
+  const displayUsername =
+    profile?.username || user?.user_metadata?.username || user?.email?.split("@")[0] || "Meme Creator";
+  const normalizedUsernameDraft = usernameDraft.trim();
   const hasPendingAvatarChange = selectedAvatarId !== currentAvatarId;
+  const hasPendingUsernameChange =
+    Boolean(normalizedUsernameDraft) && normalizedUsernameDraft !== displayUsername;
 
   const openAvatarModal = () => {
     if (!user) {
@@ -506,6 +517,48 @@ export default function App() {
     setSelectedAvatarId(currentAvatarId);
     setIsAvatarModalOpen(false);
   };
+
+  const openUsernameModal = () => {
+    if (!user) {
+      setIsLoginModalOpen(true);
+      return;
+    }
+
+    setUsernameDraft(displayUsername);
+    setIsUsernameConfirmOpen(false);
+    setIsUsernameModalOpen(true);
+  };
+
+  const closeUsernameModal = () => {
+    if (isSavingUsername) return;
+    setUsernameDraft(displayUsername);
+    setIsUsernameConfirmOpen(false);
+    setIsUsernameModalOpen(false);
+  };
+
+  const openUsernameConfirm = () => {
+    if (!normalizedUsernameDraft) {
+      setNotification({ type: "error", message: "Please enter a username." });
+      return;
+    }
+
+    if (!hasPendingUsernameChange) {
+      setNotification({ type: "error", message: "Please enter a different username." });
+      return;
+    }
+
+    setIsUsernameModalOpen(false);
+    setIsUsernameConfirmOpen(true);
+  };
+
+  useEffect(() => {
+    if (!user) {
+      setUsernameDraft("");
+      return;
+    }
+
+    setUsernameDraft(displayUsername);
+  }, [user, displayUsername]);
 
   const fetchProfile = async (userId, userData) => {
     // Use maybeSingle to check if profile exists
@@ -572,6 +625,8 @@ export default function App() {
         } else if (event === "SIGNED_OUT") {
           setProfile(null);
           setIsAvatarModalOpen(false);
+          setIsUsernameModalOpen(false);
+          setIsUsernameConfirmOpen(false);
         }
       }
     );
@@ -680,6 +735,107 @@ export default function App() {
     setIsSavingAvatar(false);
   };
 
+  const handleUsernameSave = async () => {
+    if (!user) return;
+
+    if (!normalizedUsernameDraft) {
+      setNotification({ type: "error", message: "Please enter a username." });
+      setIsUsernameConfirmOpen(false);
+      setIsUsernameModalOpen(true);
+      return;
+    }
+
+    if (!hasPendingUsernameChange) {
+      setNotification({ type: "error", message: "Please enter a different username." });
+      setIsUsernameConfirmOpen(false);
+      setIsUsernameModalOpen(true);
+      return;
+    }
+
+    setIsSavingUsername(true);
+    try {
+      let nextProfile = null;
+
+      const { data: updatedProfile, error: profileError } = await supabase
+        .from("profiles")
+        .update({ username: normalizedUsernameDraft })
+        .eq("id", user.id)
+        .select("id, username, points")
+        .maybeSingle();
+
+      if (profileError) {
+        const isTaken = profileError.code === "23505";
+        setNotification({
+          type: "error",
+          message: isTaken
+            ? "That username is already taken. Please choose another one."
+            : profileError.message,
+        });
+        setIsUsernameConfirmOpen(false);
+        setIsUsernameModalOpen(true);
+        return;
+      }
+
+      if (updatedProfile) {
+        nextProfile = updatedProfile;
+      } else {
+        const { data: insertedProfile, error: insertError } = await supabase
+          .from("profiles")
+          .insert({ id: user.id, username: normalizedUsernameDraft, points: 0 })
+          .select("id, username, points")
+          .maybeSingle();
+
+        if (insertError) {
+          const isTaken = insertError.code === "23505";
+          setNotification({
+            type: "error",
+            message: isTaken
+              ? "That username is already taken. Please choose another one."
+              : insertError.message || "Could not update username right now.",
+          });
+          setIsUsernameConfirmOpen(false);
+          setIsUsernameModalOpen(true);
+          return;
+        }
+
+        nextProfile = insertedProfile;
+      }
+
+      const nextMetadata = {
+        ...user.user_metadata,
+        username: normalizedUsernameDraft,
+      };
+
+      const { error: authError } = await supabase.auth.updateUser({
+        data: nextMetadata,
+      });
+
+      if (authError) {
+        console.warn("Auth metadata sync warning:", authError.message);
+      }
+
+      setProfile(nextProfile || profile);
+      setUser((currentUser) =>
+        currentUser
+          ? {
+              ...currentUser,
+              user_metadata: nextMetadata,
+            }
+          : currentUser
+      );
+      setNotification({
+        type: "success",
+        message: authError
+          ? "Username updated, but metadata sync needs a refresh. Please re-open your profile."
+          : "Username updated successfully.",
+      });
+      setIsUsernameConfirmOpen(false);
+      setIsUsernameModalOpen(false);
+    } finally {
+      setIsSavingUsername(false);
+    }
+  };
+
   const handleUploadMeme = (meme) => {
     setDbMemes((prev) => [normalizeMeme(meme, user?.id), ...prev]);
     if (meme?.id !== undefined && meme?.id !== null) {
@@ -780,7 +936,7 @@ export default function App() {
               />
               <div className="overflow-hidden">
                 <p className="font-bold truncate group-hover:text-violet-400 transition-colors">
-                  {profile?.username || user.user_metadata?.username || user.email.split('@')[0]}
+                  {displayUsername}
                 </p>
                 <p className="text-xs text-zinc-500 truncate">{user.email}</p>
               </div>
@@ -959,7 +1115,7 @@ export default function App() {
                   />
                 </div>
                 <div>
-                  <h2 className="text-2xl sm:text-3xl font-bold">{profile?.username || user.user_metadata?.username || 'Meme Creator'}</h2>
+                  <h2 className="text-2xl sm:text-3xl font-bold">{displayUsername}</h2>
                   <p className="text-zinc-500">{user.email}</p>
                   <div className="mt-2 flex items-center gap-2">
                     <span className={`text-xs font-black uppercase px-3 py-1 rounded-full ${getBadge(profile?.points || 0).bg} ${getBadge(profile?.points || 0).color}`}>
@@ -1004,6 +1160,28 @@ export default function App() {
                     </div>
                     <p className="text-xs text-zinc-500 mt-2">Open your saved bookmarks</p>
                   </button>
+                </div>
+
+                <div className="rounded-[2rem] border border-white/10 bg-white/5 p-4 sm:p-5">
+                  <div className="flex items-center gap-2">
+                    <UserIcon size={18} className="text-violet-400" />
+                    <h3 className="font-semibold">Profile Username</h3>
+                  </div>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    Update the name shown on your profile, uploads, and leaderboard.
+                  </p>
+                  <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#111827]/60 p-3">
+                    <div>
+                      <p className="text-xs text-zinc-500">Current username</p>
+                      <p className="font-semibold text-white">{displayUsername}</p>
+                    </div>
+                    <button
+                      onClick={openUsernameModal}
+                      className="rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 px-4 py-2.5 text-sm font-bold text-white transition hover:scale-[1.02]"
+                    >
+                      Change Username
+                    </button>
+                  </div>
                 </div>
 
                 <div className="rounded-[2rem] border border-white/10 bg-white/5 p-4 sm:p-5">
@@ -1269,6 +1447,123 @@ export default function App() {
                     className="rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 px-4 py-3 text-sm font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {isSavingAvatar ? "Saving..." : hasPendingAvatarChange ? "Save Avatar" : "Avatar Saved"}
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {isUsernameModalOpen && user && (
+            <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 lg:pl-64">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={closeUsernameModal}
+                className="fixed inset-0 bg-black/80 backdrop-blur-md"
+              />
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                className="relative w-full max-w-md rounded-[2.5rem] border border-white/10 bg-[#0d1220] p-6 shadow-2xl sm:p-8"
+              >
+                <div className="mb-5 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold">Change Username</h2>
+                    <p className="mt-1 text-xs text-zinc-500">Choose a new public username.</p>
+                  </div>
+                  <button onClick={closeUsernameModal} className="rounded-full bg-white/5 p-2 hover:bg-white/10">
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    openUsernameConfirm();
+                  }}
+                  className="space-y-4"
+                >
+                  <input
+                    type="text"
+                    value={usernameDraft}
+                    onChange={(event) => setUsernameDraft(event.target.value)}
+                    maxLength={40}
+                    autoFocus
+                    placeholder="Enter new username"
+                    className="h-12 w-full rounded-2xl border border-white/10 bg-[#111827]/60 px-4 text-white outline-none transition focus:border-violet-500/50"
+                  />
+                  <p className="text-xs text-zinc-500">Current: {displayUsername}</p>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={closeUsernameModal}
+                      className="flex-1 rounded-2xl border border-white/10 bg-white/5 py-3 font-semibold text-zinc-300 transition hover:bg-white/10"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 py-3 font-bold text-white transition hover:opacity-90"
+                    >
+                      Continue
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {isUsernameConfirmOpen && user && (
+            <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 lg:pl-64">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => {
+                  if (isSavingUsername) return;
+                  setIsUsernameConfirmOpen(false);
+                  setIsUsernameModalOpen(true);
+                }}
+                className="fixed inset-0 bg-black/80 backdrop-blur-sm"
+              />
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="relative w-full max-w-sm rounded-[2.5rem] border border-white/10 bg-[#0d1220] p-8 text-center shadow-2xl"
+              >
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-violet-500/10 text-violet-400">
+                  <UserIcon size={30} />
+                </div>
+                <h3 className="text-xl font-bold">Confirm Username Change</h3>
+                <p className="mt-2 text-zinc-400">
+                  Change your username to <span className="font-semibold text-white">{normalizedUsernameDraft}</span>?
+                </p>
+                <div className="mt-8 flex gap-3">
+                  <button
+                    type="button"
+                    disabled={isSavingUsername}
+                    onClick={() => {
+                      setIsUsernameConfirmOpen(false);
+                      setIsUsernameModalOpen(true);
+                    }}
+                    className="flex-1 rounded-2xl bg-white/5 py-3 font-semibold text-zinc-300 transition hover:bg-white/10 disabled:opacity-60"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSavingUsername}
+                    onClick={handleUsernameSave}
+                    className="flex-1 rounded-2xl bg-violet-500 py-3 font-semibold text-white shadow-lg shadow-violet-500/20 transition hover:bg-violet-600 disabled:opacity-60"
+                  >
+                    {isSavingUsername ? "Saving..." : "Confirm"}
                   </button>
                 </div>
               </motion.div>
