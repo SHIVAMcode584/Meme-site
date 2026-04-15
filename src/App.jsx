@@ -559,7 +559,14 @@ if (path === "/reset-password") {
                     </button>
                   ) : null}
                 </div>
-                <MemeGrid memes={filteredMemes} onOpen={openMeme} toggleFavorite={toggleFavorite} favorites={favorites} setSearch={setSearch} />
+                <MemeGrid 
+                  memes={filteredMemes} 
+                  onOpen={openMeme} 
+                  toggleFavorite={toggleFavorite} 
+                  favorites={favorites} 
+                  setSearch={setSearch}
+                  user={user}
+                />
               </section>
             </>
           )}
