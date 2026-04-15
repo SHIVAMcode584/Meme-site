@@ -14,6 +14,16 @@ export default function MemeEditor({ user, onUpload, onSuccess }) {
   const [isUploading, setIsUploading] = useState(false);
   const canvasRef = useRef(null);
 
+  const generateSlug = (text) => {
+    return text
+      .toString()
+      .toLowerCase()
+      .trim()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/[\s_-]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  };
+
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -103,11 +113,14 @@ export default function MemeEditor({ user, onUpload, onSuccess }) {
         );
       if (profileGuardError) console.warn("Profile sync warning:", profileGuardError.message);
 
+      const slug = `${generateSlug(uploadTitle)}-${Math.random().toString(36).substring(2, 7)}`;
+
       const { data, error } = await supabase
         .from("meme-table")
         .insert([
           {
             title: uploadTitle.trim(),
+            slug,
             image_url: cloudData.secure_url,
             user_id: currentUser.id, // ✅ Foreign key match
             category: category.trim(),

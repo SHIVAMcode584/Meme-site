@@ -25,7 +25,7 @@ export default function MemeModal({ meme, user, onClose, toggleFavorite, favorit
 
   const getShareUrl = () => {
     const siteUrl = window.location.origin + window.location.pathname;
-    return `${siteUrl}?meme=${meme.id}`;
+    return `${window.location.origin}/meme/${meme.slug}`;
   };
 
   const handleCopyLink = () => {

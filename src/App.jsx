@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 
 import logo from "../meme-logo.png";
 import { 
@@ -28,17 +28,18 @@ import CategoryFilter from "./components/CategoryFilter";
 import Footer from "./components/Footer";
 import Hero from "./components/Hero";
 import MemeGrid from "./components/MemeGrid";
-import MemeModal from "./components/MemeModal";
 import SearchBar from "./components/SearchBar";
 import { memes } from "./data/memes";
-import UploadMeme from "./components/UploadMeme";
-import MemeEditor from "./components/MemeEditor";
 import { categories, smartSearch, suggestions } from "./utils/helpers";
-import LoginModal from "./components/LoginModal";
 import { supabase } from "./lib/supabase";
-import AuthModal from "./components/AuthModal";
-import ResetPassword from "./components/ResetPassword";
-import HelpModal from "./components/HelpModal";
+
+// Lazy load heavy components
+const MemeModal = lazy(() => import("./components/MemeModal"));
+const UploadMeme = lazy(() => import("./components/UploadMeme"));
+const MemeEditor = lazy(() => import("./components/MemeEditor"));
+const LoginModal = lazy(() => import("./components/LoginModal"));
+const ResetPassword = lazy(() => import("./components/ResetPassword"));
+const HelpModal = lazy(() => import("./components/HelpModal"));
 
 function getInitialFavorites() {
   try {
@@ -595,7 +596,9 @@ if (path === "/reset-password") {
                   <h2 className="text-2xl font-bold">Meme Editor</h2>
                   <button onClick={() => setIsEditorModalOpen(false)} className="p-2 rounded-full bg-white/5 hover:bg-white/10"><X size={20}/></button>
                 </div>
-                <MemeEditor user={user} onUpload={handleUploadMeme} onSuccess={(msg) => { setIsEditorModalOpen(false); setNotification({ type: 'success', message: msg }); }} />
+                <Suspense fallback={<div className="flex justify-center p-10"><Loader2 className="animate-spin text-violet-500" /></div>}>
+                  <MemeEditor user={user} onUpload={handleUploadMeme} onSuccess={(msg) => { setIsEditorModalOpen(false); setNotification({ type: 'success', message: msg }); }} />
+                </Suspense>
               </motion.div>
             </div>
           )}
@@ -622,7 +625,9 @@ if (path === "/reset-password") {
                   <h2 className="text-2xl font-bold">Upload Meme 📤</h2>
                   <button onClick={() => setIsUploadModalOpen(false)} className="p-2 rounded-full bg-white/5 hover:bg-white/10"><X size={20}/></button>
                 </div>
-                <UploadMeme user={user} onUpload={handleUploadMeme} onSuccess={(msg) => { setIsUploadModalOpen(false); setNotification({ type: 'success', message: msg }); }} />
+                <Suspense fallback={<div className="flex justify-center p-10"><Loader2 className="animate-spin text-violet-500" /></div>}>
+                  <UploadMeme user={user} onUpload={handleUploadMeme} onSuccess={(msg) => { setIsUploadModalOpen(false); setNotification({ type: 'success', message: msg }); }} />
+                </Suspense>
               </motion.div>
             </div>
           )}
@@ -630,10 +635,12 @@ if (path === "/reset-password") {
 
         <AnimatePresence>
           {isLoginModalOpen && (
-            <LoginModal 
-              isOpen={isLoginModalOpen} 
-              onClose={() => setIsLoginModalOpen(false)} 
-            />
+            <Suspense fallback={null}>
+              <LoginModal 
+                isOpen={isLoginModalOpen} 
+                onClose={() => setIsLoginModalOpen(false)} 
+              />
+            </Suspense>
           )}
         </AnimatePresence>
 
@@ -736,20 +743,24 @@ if (path === "/reset-password") {
         )}
       </AnimatePresence>
 
-        <MemeModal
-          meme={activeMeme}
-        user={user}
-          onClose={closeModal}
-          toggleFavorite={toggleFavorite}
-          favorites={favorites}
-          onNext={handleRandomMeme}
-        />
-        <HelpModal 
-          isOpen={isHelpOpen} 
-          onClose={() => setIsHelpOpen(false)} 
-          user={user}
-          onLoginClick={() => { setIsHelpOpen(false); setIsLoginModalOpen(true); }}
-        />
+        <Suspense fallback={null}>
+          <MemeModal
+            meme={activeMeme}
+            user={user}
+            onClose={closeModal}
+            toggleFavorite={toggleFavorite}
+            favorites={favorites}
+            onNext={handleRandomMeme}
+          />
+        </Suspense>
+        <Suspense fallback={null}>
+          <HelpModal 
+            isOpen={isHelpOpen} 
+            onClose={() => setIsHelpOpen(false)} 
+            user={user}
+            onLoginClick={() => { setIsHelpOpen(false); setIsLoginModalOpen(true); }}
+          />
+        </Suspense>
         </div>
       </div>
     </div>

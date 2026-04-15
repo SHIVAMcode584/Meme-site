@@ -3,6 +3,13 @@ import { Download, Heart } from "lucide-react";
 export default function MemeCard({ meme, onOpen, toggleFavorite, favorites }) {
   const isFavorite = favorites.includes(meme.id);
 
+  // Transform Cloudinary URL for performance
+  const getOptimizedUrl = (url) => {
+    if (!url || !url.includes("cloudinary.com")) return url;
+    // Inject f_auto (auto format), q_auto (auto quality), w_500 (resize)
+    return url.replace("/upload/", "/upload/f_auto,q_auto,w_500,c_scale/");
+  };
+
   const handleDownload = async () => {
     try {
       const response = await fetch(meme.image);
@@ -24,9 +31,13 @@ export default function MemeCard({ meme, onOpen, toggleFavorite, favorites }) {
     <div className="group bg-[#101624] border border-white/10 rounded-3xl overflow-hidden hover:border-violet-400/30 transition shadow-lg">
       <div className="relative cursor-pointer" onClick={() => onOpen(meme)}>
         <img
-          src={meme.image}
+          src={getOptimizedUrl(meme.image)}
           alt={meme.title}
-          className="w-full aspect-[4/5] object-cover group-hover:scale-105 transition duration-500"
+          className="w-full aspect-[4/5] object-cover group-hover:scale-105 transition duration-500 bg-zinc-900"
+          loading="lazy"
+          decoding="async"
+          width="500"
+          height="625"
         />
 
         <button

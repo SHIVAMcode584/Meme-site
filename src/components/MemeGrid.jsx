@@ -64,6 +64,8 @@ export default function MemeGrid({
               onOpen={onOpen}
               toggleFavorite={toggleFavorite}
               favorites={favorites}
+              // Give high priority to the first 2 images for LCP
+              priority={index < 2}
             />
           </Motion.div>
         ))}

@@ -10,6 +10,16 @@ export default function UploadMeme({ user, onUpload, onSuccess }) {
   const [keywords, setKeywords] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const generateSlug = (text) => {
+    return text
+      .toString()
+      .toLowerCase()
+      .trim()
+      .replace(/[^\w\s-]/g, '') // Remove special characters
+      .replace(/[\s_-]+/g, '-')  // Replace spaces/underscores with -
+      .replace(/^-+|-+$/g, '');  // Remove leading/trailing hyphens
+  };
+
   const handleUpload = async () => {
     if (!file) return alert("Select an image");
     if (!title.trim()) return alert("Please add a meme title first.");
@@ -53,8 +63,11 @@ export default function UploadMeme({ user, onUpload, onSuccess }) {
         );
       if (profileGuardError) console.warn("Profile sync warning:", profileGuardError.message);
 
+      const slug = `${generateSlug(title)}-${Math.random().toString(36).substring(2, 7)}`;
+
       const payload = {
         title: title.trim(),
+        slug,
         image_url: cloudData.secure_url,
         category: category.trim(),
         mood: mood.trim(),
