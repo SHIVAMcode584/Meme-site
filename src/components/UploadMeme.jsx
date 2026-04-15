@@ -67,7 +67,7 @@ export default function UploadMeme({ user, onUpload, onSuccess }) {
 
       const payload = {
         title: title.trim(),
-        slug,
+        
         image_url: cloudData.secure_url,
         category: category.trim(),
         mood: mood.trim(),
@@ -75,18 +75,17 @@ export default function UploadMeme({ user, onUpload, onSuccess }) {
         user_id: currentUser.id, // ✅ Foreign key match
       };
 
-      const { data: insertedData, error } = await supabase
+      const { data: savedMeme, error } = await supabase
         .from("meme-table")
         .insert([payload])
-        .select("*, profiles(username)");
+        .select("*")
+        .single();
 
       if (error) throw error;
 
       // 🏆 Atomic point increment via RPC
       const { error: pointError } = await supabase.rpc('increment_points', { amount: 10 });
       if (pointError) console.error("Error earning points:", pointError.message);
-
-      const savedMeme = insertedData?.[0];
 
       setFile(null);
       setTitle("");
@@ -95,14 +94,12 @@ export default function UploadMeme({ user, onUpload, onSuccess }) {
       setKeywords("");
 
       if (onUpload && savedMeme) {
-        const profileData = Array.isArray(savedMeme.profiles) ? savedMeme.profiles[0] : savedMeme.profiles;
-
         onUpload({
           ...savedMeme,
           username:
-            profileData?.username ||
             currentUser.user_metadata?.username ||
-            currentUser.email?.split("@")[0],
+            currentUser.email?.split("@")[0] ||
+            "User",
           image: savedMeme.image_url,
         });
       }
@@ -110,6 +107,7 @@ export default function UploadMeme({ user, onUpload, onSuccess }) {
       if (onSuccess) onSuccess("Meme uploaded successfully! 🎉 +10 points earned!");
     } catch (err) {
       console.error("Upload process error:", err);
+      alert(`Upload failed: ${err.message || "Something went wrong"}`);
     } finally {
       setLoading(false);
     }

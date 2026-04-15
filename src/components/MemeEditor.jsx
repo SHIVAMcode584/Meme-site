@@ -115,7 +115,7 @@ export default function MemeEditor({ user, onUpload, onSuccess }) {
 
       const slug = `${generateSlug(uploadTitle)}-${Math.random().toString(36).substring(2, 7)}`;
 
-      const { data, error } = await supabase
+      const { data: savedMeme, error } = await supabase
         .from("meme-table")
         .insert([
           {
@@ -128,7 +128,8 @@ export default function MemeEditor({ user, onUpload, onSuccess }) {
             keywords: keywords.split(/[\s,]+/).filter(Boolean),
           },
         ])
-        .select("*, profiles(username)");
+        .select("*")
+        .single();
 
       if (error) throw error;
 
@@ -136,11 +137,14 @@ export default function MemeEditor({ user, onUpload, onSuccess }) {
       const { error: pointError } = await supabase.rpc('increment_points', { amount: 10 });
       if (pointError) console.error("Error earning points:", pointError.message);
 
-      if (onUpload && data?.[0]) {
-        const savedMeme = data[0];
+      if (onUpload && savedMeme) {
         onUpload({
           ...savedMeme,
-          username: currentUser.user_metadata?.username || currentUser.email?.split("@")[0],
+          username:
+            currentUser.user_metadata?.username ||
+            currentUser.email?.split("@")[0] ||
+            "User",
+          image: savedMeme.image_url,
         });
       }
 
@@ -156,6 +160,7 @@ export default function MemeEditor({ user, onUpload, onSuccess }) {
       if (onSuccess) onSuccess("Meme added to RoastRiot! 🎉 +10 points earned!");
     } catch (err) {
       console.error("Upload failed:", err);
+      alert(`Upload failed: ${err.message || "Something went wrong"}`);
     } finally {
       setIsUploading(false);
     }

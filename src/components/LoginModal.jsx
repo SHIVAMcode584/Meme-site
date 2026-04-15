@@ -2,12 +2,15 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { X, User, Mail, LogIn, Loader2, Lock, ArrowLeft, Wand2, CheckCircle2 } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import AvatarPicker from "./AvatarPicker";
+import { DEFAULT_AVATAR_ID, getAvatarUrlById } from "../utils/avatarOptions";
 
 export default function LoginModal({ isOpen, onClose }) {
   const [mode, setMode] = useState("login"); // login | signup | forgot
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [selectedAvatarId, setSelectedAvatarId] = useState(DEFAULT_AVATAR_ID);
   const [message, setMessage] = useState({ type: "", text: "" });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -24,12 +27,19 @@ export default function LoginModal({ isOpen, onClose }) {
     
     try {
       if (mode === "signup") {
+        const trimmedUsername = username.trim();
+
+        if (!trimmedUsername) {
+          throw new Error("Please choose a username before continuing.");
+        }
+
         const { error: authError } = await supabase.auth.signInWithOtp({
           email: email.trim(),
           options: {
             data: { 
-              username: username.trim(),
-              avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`
+              username: trimmedUsername,
+              avatar_choice: selectedAvatarId,
+              avatar_url: getAvatarUrlById(selectedAvatarId),
             },
             emailRedirectTo: getSiteUrl(),
           }
@@ -126,10 +136,32 @@ export default function LoginModal({ isOpen, onClose }) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === "signup" && (
-            <div className="relative">
-              <User className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
-              <input type="text" placeholder="Username" required value={username} onChange={(e) => setUsername(e.target.value)} className="w-full h-12 pl-12 pr-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition text-white" />
-            </div>
+            <>
+              <div className="relative">
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+                <input type="text" placeholder="Username" required value={username} onChange={(e) => setUsername(e.target.value)} className="w-full h-12 pl-12 pr-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition text-white" />
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="mb-4 flex items-center gap-3">
+                  <img
+                    src={getAvatarUrlById(selectedAvatarId)}
+                    alt="Selected avatar"
+                    className="h-14 w-14 rounded-full border border-violet-400/40 bg-[#0d1220] object-cover"
+                  />
+                  <div>
+                    <p className="font-semibold text-white">Choose your avatar</p>
+                    <p className="text-xs text-zinc-500">You can change this later from your profile page.</p>
+                  </div>
+                </div>
+
+                <AvatarPicker
+                  selectedAvatarId={selectedAvatarId}
+                  onSelect={setSelectedAvatarId}
+                  disabled={isLoading}
+                />
+              </div>
+            </>
           )}
           <div className="relative">
             <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />

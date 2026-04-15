@@ -1,6 +1,6 @@
 {
-  "name": "RoastRiot Meme Hub",
-  "short_name": "RoastRiot",
+  "name": "RoastRiot.meme",
+  "short_name": "RoastRiot.meme",
   "description": "Discover, create, and share the funniest memes for every mood.",
   "id": "/",
   "start_url": "/",

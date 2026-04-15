@@ -18,6 +18,7 @@ import {
   Heart, 
   User as UserIcon, 
   ChevronRight, 
+  ArrowLeft,
   KeyRound, 
   CheckCircle2, 
   Loader2, 
@@ -27,6 +28,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import CategoryFilter from "./components/CategoryFilter";
+import AvatarPicker from "./components/AvatarPicker";
 import Footer from "./components/Footer";
 import Hero from "./components/Hero";
 import MemeGrid from "./components/MemeGrid";
@@ -34,6 +36,12 @@ import SearchBar from "./components/SearchBar";
 import { memes } from "./data/memes";
 import { categories, smartSearch, suggestions } from "./utils/helpers";
 import { getAllOwnerLikeCounts, getOwnerLikedMemeIdsForUser } from "./utils/likes";
+import {
+  DEFAULT_AVATAR_ID,
+  getAvatarChoiceFromMetadata,
+  getAvatarUrlById,
+  resolveUserAvatar,
+} from "./utils/avatarOptions";
 import { supabase } from "./lib/supabase";
 
 // Lazy load heavy components
@@ -96,7 +104,7 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [activeMeme, setActiveMeme] = useState(null);
   const [favorites, setFavorites] = useState(getInitialFavorites);
- const [user, setUser] = useState(null);
+  const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isEditorModalOpen, setIsEditorModalOpen] = useState(false);
@@ -123,7 +131,10 @@ export default function App() {
   const [showIosInstallHint, setShowIosInstallHint] = useState(false);
   const [dismissInstallBanner, setDismissInstallBanner] = useState(false);
   const [showIosInstallModal, setShowIosInstallModal] = useState(false);
-const path = window.location.pathname;
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
+  const [selectedAvatarId, setSelectedAvatarId] = useState(DEFAULT_AVATAR_ID);
+  const [isSavingAvatar, setIsSavingAvatar] = useState(false);
+  const path = window.location.pathname;
   const isOverlayOpen = Boolean(
     isSidebarOpen ||
       activeMeme ||
@@ -133,6 +144,7 @@ const path = window.location.pathname;
       isHelpOpen ||
       isLogoutConfirmOpen ||
       isResetConfirmOpen ||
+      isAvatarModalOpen ||
       notification ||
       resetStatus ||
       showIosInstallModal
@@ -476,6 +488,25 @@ const path = window.location.pathname;
     semanticMemes,
   ]);
 
+  const currentAvatarId = getAvatarChoiceFromMetadata(user?.user_metadata);
+  const currentAvatarUrl = resolveUserAvatar(user);
+  const hasPendingAvatarChange = selectedAvatarId !== currentAvatarId;
+
+  const openAvatarModal = () => {
+    if (!user) {
+      setIsLoginModalOpen(true);
+      return;
+    }
+
+    setSelectedAvatarId(currentAvatarId);
+    setIsAvatarModalOpen(true);
+  };
+
+  const closeAvatarModal = () => {
+    setSelectedAvatarId(currentAvatarId);
+    setIsAvatarModalOpen(false);
+  };
+
   const fetchProfile = async (userId, userData) => {
     // Use maybeSingle to check if profile exists
     let { data, error } = await supabase
@@ -520,30 +551,35 @@ const path = window.location.pathname;
     );
   }
 
-useEffect(() => {
-  // Handle initial session check
-  // Listen for auth state changes (login, logout, magic link success)
-  const { data: listener } = supabase.auth.onAuthStateChange(
-    async (event, session) => {
-      setUser(session?.user ?? null);
-      
-      if (event === "INITIAL_SESSION" && session?.user) {
-        fetchProfile(session.user.id, session.user);
-      }
+  useEffect(() => {
+    setSelectedAvatarId(getAvatarChoiceFromMetadata(user?.user_metadata));
+  }, [user]);
 
-      if (event === "SIGNED_IN" || event === "PASSWORD_RECOVERY") {
-        setIsLoginModalOpen(false);
-        if (session?.user) fetchProfile(session.user.id, session.user);
-      } else if (event === "SIGNED_OUT") {
-        setProfile(null);
-      }
-    }
-  );
+  useEffect(() => {
+    // Handle initial session check
+    // Listen for auth state changes (login, logout, magic link success)
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setUser(session?.user ?? null);
 
-  return () => {
-    listener.subscription.unsubscribe();
-  };
-}, []);
+        if (event === "INITIAL_SESSION" && session?.user) {
+          fetchProfile(session.user.id, session.user);
+        }
+
+        if (event === "SIGNED_IN" || event === "PASSWORD_RECOVERY" || event === "USER_UPDATED") {
+          setIsLoginModalOpen(false);
+          if (session?.user) fetchProfile(session.user.id, session.user);
+        } else if (event === "SIGNED_OUT") {
+          setProfile(null);
+          setIsAvatarModalOpen(false);
+        }
+      }
+    );
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
+  }, []);
   const openMeme = (meme) => {
     setActiveMeme(meme);
     const url = new URL(window.location);
@@ -583,6 +619,7 @@ useEffect(() => {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    setIsAvatarModalOpen(false);
     setViewMode("all");
   };
 
@@ -598,6 +635,51 @@ useEffect(() => {
     else setResetStatus({ type: 'success', message: "A password reset link has been sent to your email! Please check your inbox. 📧" });
   };
 
+  const handleAvatarSave = async () => {
+    if (!user || !hasPendingAvatarChange) return;
+
+    setIsSavingAvatar(true);
+
+    const nextAvatarUrl = getAvatarUrlById(selectedAvatarId);
+    const nextMetadata = {
+      ...user.user_metadata,
+      avatar_choice: selectedAvatarId,
+      avatar_url: nextAvatarUrl,
+    };
+
+    const { error } = await supabase.auth.updateUser({
+      data: nextMetadata,
+    });
+
+    if (error) {
+      setNotification({
+        type: "error",
+        message: error.message || "We could not update your avatar right now.",
+      });
+      setIsSavingAvatar(false);
+      return;
+    }
+
+    const { data: userData, error: refreshError } = await supabase.auth.getUser();
+
+    if (refreshError) {
+      console.warn("Could not refresh user after avatar update:", refreshError.message);
+    }
+
+    setUser(
+      userData?.user || {
+        ...user,
+        user_metadata: nextMetadata,
+      }
+    );
+    setNotification({
+      type: "success",
+      message: "Your avatar has been updated.",
+    });
+    setIsAvatarModalOpen(false);
+    setIsSavingAvatar(false);
+  };
+
   const handleUploadMeme = (meme) => {
     setDbMemes((prev) => [normalizeMeme(meme, user?.id), ...prev]);
     if (meme?.id !== undefined && meme?.id !== null) {
@@ -605,24 +687,27 @@ useEffect(() => {
     }
     if (user) fetchProfile(user.id, user); // Refresh points immediately
   };
-if (path === "/reset-password") {
-  return <ResetPassword user={user} />;
-}
+
   useEffect(() => {
+    const fetchMemes = async () => {
+      const { data, error } = await supabase
+        .from("meme-table")
+        .select("*, profiles(username)")
+        .order("created_at", { ascending: false });
+
+      if (error) return console.error("Error fetching memes:", error);
+
+      const formatted = data.map((m) => normalizeMeme(m));
+      setDbMemes(formatted);
+    };
+
     fetchMemes();
   }, []);
 
-  const fetchMemes = async () => {
-    const { data, error } = await supabase
-      .from("meme-table")
-      .select("*, profiles(username)")
-      .order("created_at", { ascending: false });
+  if (path === "/reset-password") {
+    return <ResetPassword user={user} />;
+  }
 
-    if (error) return console.error("Error fetching memes:", error);
-
-    const formatted = data.map(m => normalizeMeme(m, user?.id));
-    setDbMemes(formatted);
-  };
   const SidebarContent = () => (
     <div className="flex flex-col h-full max-h-screen overflow-hidden">
       <div className="flex items-center justify-between mb-6 sm:mb-10 flex-shrink-0">
@@ -669,6 +754,7 @@ if (path === "/reset-password") {
             user ? setIsUploadModalOpen(true) : setIsLoginModalOpen(true); 
           }} 
         />
+        <div className="my-2 border-t border-white/10" />
         <SidebarLink 
           icon={<HelpCircle size={20}/>} 
           label="How to Use" 
@@ -688,7 +774,7 @@ if (path === "/reset-password") {
               className="flex items-center gap-3 p-2 w-full text-left hover:bg-white/5 rounded-xl transition-colors group"
             >
               <img 
-                src={user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`} 
+                src={currentAvatarUrl} 
                 alt="avatar"
                 className="w-10 h-10 rounded-full border border-violet-500/50 group-hover:scale-105 transition-transform" 
               />
@@ -815,6 +901,15 @@ if (path === "/reset-password") {
               animate={{ opacity: 1, scale: 1 }}
               className="mt-10 max-w-2xl mx-auto p-6 sm:p-10 bg-[#0d1220] border border-white/10 rounded-[2.5rem] shadow-2xl text-center"
             >
+              <div className="mb-6 text-left">
+                <button
+                  onClick={() => setViewMode("all")}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-zinc-300 transition hover:bg-white/10 hover:text-white"
+                >
+                  <ArrowLeft size={16} />
+                  Back
+                </button>
+              </div>
               <Trophy size={48} className="mx-auto mb-4 text-amber-400" />
               <h2 className="text-3xl font-black mb-2">Meme Hall of Fame</h2>
               <p className="text-zinc-500 mb-8">Top contributors in the RoastRiot community</p>
@@ -839,9 +934,6 @@ if (path === "/reset-password") {
                   </div>
                 ))}
               </div>
-              <button onClick={() => setViewMode("all")} className="mt-8 text-zinc-500 hover:text-white transition-colors text-sm">
-                Back to memes
-              </button>
             </motion.section>
           ) : viewMode === "profile" && user ? (
             <motion.section 
@@ -849,10 +941,19 @@ if (path === "/reset-password") {
               animate={{ opacity: 1, y: 0 }}
               className="mt-10 max-w-2xl mx-auto p-6 sm:p-10 bg-[#0d1220] border border-white/10 rounded-[2.5rem] shadow-2xl"
             >
+              <div className="mb-6">
+                <button
+                  onClick={() => setViewMode("all")}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-zinc-300 transition hover:bg-white/10 hover:text-white"
+                >
+                  <ArrowLeft size={16} />
+                  Back
+                </button>
+              </div>
               <div className="flex items-center gap-4 mb-8">
                 <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-violet-500 to-fuchsia-500 p-1">
                   <img 
-                    src={user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`} 
+                    src={currentAvatarUrl} 
                     alt="Profile" 
                     className="w-full h-full rounded-full bg-[#0d1220] object-cover"
                   />
@@ -903,6 +1004,38 @@ if (path === "/reset-password") {
                     </div>
                     <p className="text-xs text-zinc-500 mt-2">Open your saved bookmarks</p>
                   </button>
+                </div>
+
+                <div className="rounded-[2rem] border border-white/10 bg-white/5 p-4 sm:p-5">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Image size={18} className="text-violet-400" />
+                        <h3 className="font-semibold">Profile Avatar</h3>
+                      </div>
+                      <p className="mt-1 text-xs text-zinc-500">
+                        Pick the avatar shown in your profile, sidebar, and future sessions.
+                      </p>
+                    </div>
+                    <button
+                      onClick={openAvatarModal}
+                      className="rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 px-4 py-3 text-sm font-bold text-white transition hover:scale-[1.02]"
+                    >
+                      Change Avatar
+                    </button>
+                  </div>
+
+                  <div className="mt-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-[#111827]/60 p-3">
+                    <img
+                      src={currentAvatarUrl}
+                      alt="Current avatar preview"
+                      className="h-14 w-14 rounded-full border border-violet-400/30 bg-[#0d1220] object-cover"
+                    />
+                    <div>
+                      <p className="font-semibold text-white">Current avatar</p>
+                      <p className="text-xs text-zinc-500">Click Change Avatar to view all avatar styles.</p>
+                    </div>
+                  </div>
                 </div>
 
                 <button 
@@ -1026,8 +1159,17 @@ if (path === "/reset-password") {
                 exit={{ scale: 0.9, opacity: 0, y: 20 }}
                 className="relative w-full max-w-5xl bg-[#0d1220] border border-white/10 rounded-[2.5rem] p-6 sm:p-10 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar"
               >
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold">Meme Editor</h2>
+                <div className="flex items-center justify-between mb-6 gap-3">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setIsEditorModalOpen(false)}
+                      className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-zinc-300 transition hover:bg-white/10 hover:text-white"
+                    >
+                      <ArrowLeft size={16} />
+                      Back
+                    </button>
+                    <h2 className="text-2xl font-bold">Meme Editor</h2>
+                  </div>
                   <button onClick={() => setIsEditorModalOpen(false)} className="p-2 rounded-full bg-white/5 hover:bg-white/10"><X size={20}/></button>
                 </div>
                 <Suspense fallback={<div className="flex justify-center p-10"><Loader2 className="animate-spin text-violet-500" /></div>}>
@@ -1062,6 +1204,73 @@ if (path === "/reset-password") {
                 <Suspense fallback={<div className="flex justify-center p-10"><Loader2 className="animate-spin text-violet-500" /></div>}>
                   <UploadMeme user={user} onUpload={handleUploadMeme} onSuccess={(msg) => { setIsUploadModalOpen(false); setNotification({ type: 'success', message: msg }); }} />
                 </Suspense>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Avatar Picker Modal */}
+        <AnimatePresence>
+          {isAvatarModalOpen && user && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 lg:pl-64">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={closeAvatarModal}
+                className="fixed inset-0 bg-black/80 backdrop-blur-md"
+              />
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                className="relative w-full max-w-3xl rounded-[2.5rem] border border-white/10 bg-[#0d1220] p-6 shadow-2xl sm:p-8"
+              >
+                <div className="mb-6 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold">Change Avatar</h2>
+                    <p className="mt-1 text-xs text-zinc-500">Select your look, then save it.</p>
+                  </div>
+                  <button onClick={closeAvatarModal} className="rounded-full bg-white/5 p-2 hover:bg-white/10">
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <div className="mb-5 flex items-center gap-3 rounded-2xl border border-white/10 bg-[#111827]/60 p-3">
+                  <img
+                    src={getAvatarUrlById(selectedAvatarId)}
+                    alt="Selected avatar preview"
+                    className="h-14 w-14 rounded-full border border-violet-400/30 bg-[#0d1220] object-cover"
+                  />
+                  <div>
+                    <p className="font-semibold text-white">Selected avatar preview</p>
+                    <p className="text-xs text-zinc-500">This avatar will appear across your account.</p>
+                  </div>
+                </div>
+
+                <AvatarPicker
+                  selectedAvatarId={selectedAvatarId}
+                  onSelect={setSelectedAvatarId}
+                  disabled={isSavingAvatar}
+                  className="max-h-[48vh] overflow-y-auto pr-1 custom-scrollbar"
+                />
+
+                <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                  <button
+                    onClick={closeAvatarModal}
+                    disabled={isSavingAvatar}
+                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-zinc-300 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleAvatarSave}
+                    disabled={isSavingAvatar || !hasPendingAvatarChange}
+                    className="rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 px-4 py-3 text-sm font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isSavingAvatar ? "Saving..." : hasPendingAvatarChange ? "Save Avatar" : "Avatar Saved"}
+                  </button>
+                </div>
               </motion.div>
             </div>
           )}
@@ -1187,7 +1396,7 @@ if (path === "/reset-password") {
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs uppercase tracking-[0.25em] text-violet-300">Install RoastRiot</p>
+                <p className="text-xs uppercase tracking-[0.25em] text-violet-300">Install RoastRiot.meme</p>
                 <p className="mt-1 text-sm text-zinc-300">
                   {isInstallable
                     ? "Install this app for a faster, standalone meme experience."
@@ -1240,7 +1449,7 @@ if (path === "/reset-password") {
               <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-zinc-300">
                 <li>Tap the Share button in Safari.</li>
                 <li>Select Add to Home Screen.</li>
-                <li>Tap Add to install RoastRiot.</li>
+                <li>Tap Add to install RoastRiot.meme.</li>
               </ol>
               <button
                 onClick={() => setShowIosInstallModal(false)}
