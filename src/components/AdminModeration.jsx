@@ -12,6 +12,7 @@ import {
   UserRound,
 } from "lucide-react";
 import Toast from "./Toast";
+import Footer from "./Footer";
 
 function formatDate(value) {
   if (!value) return "Unknown date";
@@ -556,6 +557,10 @@ export default function AdminModeration({ user, onBack }) {
             )}
           </div>
         </aside>
+      </div>
+
+      <div className="mt-16">
+        <Footer />
       </div>
 
       <div className="fixed right-4 top-4 z-[120] w-[calc(100vw-2rem)] sm:w-auto">

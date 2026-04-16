@@ -34,6 +34,7 @@ import AdminModeration from "./components/AdminModeration";
 import Footer from "./components/Footer";
 import Hero from "./components/Hero";
 import MemeGrid from "./components/MemeGrid";
+import NotificationBell from "./components/NotificationBell";
 import SearchBar from "./components/SearchBar";
 import { memes } from "./data/memes";
 import { categories, smartSearch, suggestions } from "./utils/helpers";
@@ -1040,6 +1041,7 @@ export default function App() {
                     </span>
                   </div>
                 )}
+                <NotificationBell user={user} />
                 {!user && (
                   <button
                     onClick={() => setIsLoginModalOpen(true)}

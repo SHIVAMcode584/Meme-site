@@ -8,6 +8,7 @@ const REPORT_REASONS = ["Spam", "Offensive", "Copyright", "Other"];
 
 export default function ReportModal({ isOpen, onClose, memeId, user, memeOwnerId = null, isAdminUser = false }) {
   const [reason, setReason] = useState("");
+  const [otherIssue, setOtherIssue] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
@@ -18,11 +19,27 @@ export default function ReportModal({ isOpen, onClose, memeId, user, memeOwnerId
     if (!isOpen) return;
 
     setReason("");
+    setOtherIssue("");
     setError("");
     setSubmitted(false);
     setToast(null);
     setOwnerId(memeOwnerId);
   }, [isOpen, memeId, memeOwnerId]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,7 +73,14 @@ export default function ReportModal({ isOpen, onClose, memeId, user, memeOwnerId
   }, [isOpen, memeId, memeOwnerId]);
 
   const canSubmitOwnMeme = Boolean(ownerId && user?.id && ownerId === user.id);
-  const canReport = Boolean(user && !isAdminUser && !canSubmitOwnMeme);
+  const hasOtherDetails = Boolean(otherIssue.trim());
+  const canReport = Boolean(
+    user &&
+      !isAdminUser &&
+      !canSubmitOwnMeme &&
+      reason &&
+      (reason !== "Other" || hasOtherDetails)
+  );
 
   const clearToast = () => setToast(null);
 
@@ -86,10 +110,17 @@ export default function ReportModal({ isOpen, onClose, memeId, user, memeOwnerId
       return;
     }
 
+    if (reason === "Other" && !hasOtherDetails) {
+      setError("Please describe the issue.");
+      return;
+    }
+
     if (canSubmitOwnMeme) {
       setError("You cannot report your own meme.");
       return;
     }
+
+    const finalReason = reason === "Other" ? `Other: ${otherIssue.trim()}` : reason;
 
     setLoading(true);
     setError("");
@@ -99,7 +130,7 @@ export default function ReportModal({ isOpen, onClose, memeId, user, memeOwnerId
       const { error: insertError } = await supabase.from("reports").insert({
         user_id: user.id,
         meme_id: memeId,
-        reason,
+        reason: finalReason,
       });
 
       if (insertError) {
@@ -141,7 +172,7 @@ export default function ReportModal({ isOpen, onClose, memeId, user, memeOwnerId
   return (
     <AnimatePresence>
       {isOpen ? (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 lg:pl-64">
           <motion.button
             type="button"
             initial={{ opacity: 0 }}
@@ -214,6 +245,7 @@ export default function ReportModal({ isOpen, onClose, memeId, user, memeOwnerId
                         type="button"
                         onClick={() => {
                           setReason(option);
+                          if (option !== "Other") setOtherIssue("");
                           if (error) setError("");
                         }}
                         className={`rounded-2xl border px-4 py-3 text-left text-sm transition ${
@@ -226,6 +258,37 @@ export default function ReportModal({ isOpen, onClose, memeId, user, memeOwnerId
                       </button>
                     ))}
                   </div>
+
+                  <AnimatePresence initial={false}>
+                    {reason === "Other" ? (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0, y: -6 }}
+                        animate={{ opacity: 1, height: "auto", y: 0 }}
+                        exit={{ opacity: 0, height: 0, y: -6 }}
+                        transition={{ duration: 0.2, ease: "easeOut" }}
+                        className="overflow-hidden rounded-[1.35rem] border border-white/10 bg-white/[0.04] p-4"
+                      >
+                        <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                          Tell us what is wrong
+                        </label>
+                        <textarea
+                          value={otherIssue}
+                          onChange={(event) => {
+                            setOtherIssue(event.target.value);
+                            if (error) setError("");
+                          }}
+                          rows={4}
+                          maxLength={240}
+                          placeholder="Describe the issue so admins can review it..."
+                          className="w-full resize-none rounded-2xl border border-white/10 bg-[#070B14] px-4 py-3 text-sm text-white outline-none transition placeholder:text-zinc-500 focus:border-violet-500/40"
+                        />
+                        <div className="mt-2 flex items-center justify-between text-[11px] text-zinc-500">
+                          <span>Be specific. This helps admins understand the problem faster.</span>
+                          <span>{otherIssue.trim().length}/240</span>
+                        </div>
+                      </motion.div>
+                    ) : null}
+                  </AnimatePresence>
 
                   {error ? (
                     <p className="rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-100">
