@@ -159,18 +159,20 @@ export default function UploadMeme({ user, onUpload, onSuccess }) {
         {file && <p className="text-xs text-zinc-500 mt-1">Selected: {file.name}</p>}
       </div>
 
-      <div className="relative">
-        <div className="pointer-events-none absolute inset-y-0 left-4 flex items-center justify-center text-zinc-500">
-          <Link2 size={18} className="block shrink-0 leading-none" />
+      <div className="space-y-2">
+        <div className="relative">
+          <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">
+            <Link2 size={18} className="block shrink-0 leading-none" />
+          </div>
+          <input
+            type="url"
+            placeholder="Paste direct image URL here"
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+            className="w-full h-12 pl-12 pr-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-violet-500/50 transition text-white placeholder-zinc-500"
+          />
         </div>
-        <input
-          type="url"
-          placeholder="Paste direct image URL here"
-          value={imageUrl}
-          onChange={(e) => setImageUrl(e.target.value)}
-          className="w-full h-12 pl-12 pr-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-violet-500/50 transition text-white placeholder-zinc-500"
-        />
-        <p className="mt-2 text-xs text-zinc-500">
+        <p className="text-xs text-zinc-500">
           Use a direct image link, not the Google Images results page.
         </p>
       </div>
