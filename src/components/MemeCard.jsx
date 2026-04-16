@@ -18,9 +18,11 @@ export default function MemeCard({
   onLikeStateChange,
   isCommentsOpen = false,
   onToggleComments,
+  priority = false,
 }) {
   const isFavorite = favorites.includes(meme.id);
   const isStaticMeme = !meme.user_id; // Identifies if it's a pre-loaded static meme
+  const imageSrc = meme.image || meme.image_url;
   const canReport = Boolean(user && !isAdminUser && meme?.user_id && String(meme.user_id) !== String(user.id));
   const [liked, setLiked] = useState(false);
   const [localLikeCount, setLocalLikeCount] = useState(likeCount || 0);
@@ -151,7 +153,7 @@ export default function MemeCard({
 
   const handleDownload = async () => {
     try {
-      const response = await fetch(meme.image);
+      const response = await fetch(imageSrc);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -174,10 +176,10 @@ export default function MemeCard({
     <div className="group bg-[#101624] border border-white/10 rounded-3xl overflow-hidden hover:border-violet-400/30 transition shadow-lg">
       <div className="relative cursor-pointer" onClick={() => onOpen(meme)}>
         <img
-          src={getOptimizedUrl(meme.image)}
+          src={getOptimizedUrl(imageSrc)}
           alt={meme.title}
           className={`w-full object-cover group-hover:scale-105 transition duration-500 bg-zinc-900 ${imageSizeClass}`}
-          loading="lazy"
+          loading={priority ? "eager" : "lazy"}
           decoding="async"
           width="500"
           height="625"

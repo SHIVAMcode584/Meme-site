@@ -30,7 +30,7 @@ export default function NotificationBell({ user }) {
   }, [toast, clearToast]);
 
   const hydrateNotifications = useCallback(async (rows) => {
-    const senderLookup = await resolveSenderUsernames((rows || []).map((item) => item.sender_id));
+    const senderLookup = await resolveSenderUsernames((rows || []).map((item) => item.sender_id), supabase);
 
     return (rows || []).map((notification) => ({
       ...notification,

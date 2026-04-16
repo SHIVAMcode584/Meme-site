@@ -36,6 +36,7 @@ export default function MemeModal({
   const [isLiking, setIsLiking] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
+  const imageSrc = meme?.image || meme?.image_url;
   const isFavorite = favorites.includes(meme?.id);
   const isStaticMeme = meme && !meme.user_id;
   const canReport = Boolean(user && !isAdminUser && meme?.user_id && String(meme.user_id) !== String(user.id));
@@ -84,7 +85,7 @@ export default function MemeModal({
 
   const handleDownload = async () => {
     try {
-      const response = await fetch(meme.image);
+      const response = await fetch(imageSrc);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -189,7 +190,7 @@ export default function MemeModal({
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,rgba(236,72,153,0.18),transparent_45%)]" />
             <div className="relative flex max-h-full w-full items-center justify-center overflow-hidden rounded-[1.75rem] border border-white/10 bg-black/35 p-2 shadow-[0_24px_80px_rgba(0,0,0,0.45)] sm:p-3">
               <img
-                src={meme.image}
+                src={imageSrc}
                 alt={meme.title}
                 className="max-h-[28vh] w-auto max-w-full rounded-[1.25rem] object-contain sm:max-h-[38vh] lg:max-h-[76vh]"
               />
