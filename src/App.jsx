@@ -24,11 +24,13 @@ import {
   Loader2, 
   Trophy, 
   Award,
-  HelpCircle
+  HelpCircle,
+  ShieldCheck
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import CategoryFilter from "./components/CategoryFilter";
 import AvatarPicker from "./components/AvatarPicker";
+import AdminModeration from "./components/AdminModeration";
 import Footer from "./components/Footer";
 import Hero from "./components/Hero";
 import MemeGrid from "./components/MemeGrid";
@@ -138,7 +140,8 @@ export default function App() {
   const [isUsernameConfirmOpen, setIsUsernameConfirmOpen] = useState(false);
   const [usernameDraft, setUsernameDraft] = useState("");
   const [isSavingUsername, setIsSavingUsername] = useState(false);
-  const path = window.location.pathname;
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  const path = currentPath;
   const isOverlayOpen = Boolean(
     isSidebarOpen ||
       activeMeme ||
@@ -155,6 +158,12 @@ export default function App() {
       resetStatus ||
       showIosInstallModal
   );
+  const navigateTo = useCallback((nextPath) => {
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState({}, "", nextPath);
+    }
+    setCurrentPath(nextPath);
+  }, []);
   const SidebarLink = ({ icon, label, onClick }) => (
     <button
       onClick={onClick}
@@ -168,6 +177,12 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("favorite-memes", JSON.stringify(favorites));
   }, [favorites]);
+
+  useEffect(() => {
+    const handlePopState = () => setCurrentPath(window.location.pathname);
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   // Lock page scroll whenever any overlay is open
   useEffect(() => {
@@ -498,6 +513,7 @@ export default function App() {
   const currentAvatarUrl = resolveUserAvatar(user);
   const displayUsername =
     profile?.username || user?.user_metadata?.username || user?.email?.split("@")[0] || "Meme Creator";
+  const isAdminUser = profile?.role === "admin";
   const normalizedUsernameDraft = usernameDraft.trim();
   const hasPendingAvatarChange = selectedAvatarId !== currentAvatarId;
   const hasPendingUsernameChange =
@@ -564,7 +580,7 @@ export default function App() {
     // Use maybeSingle to check if profile exists
     let { data, error } = await supabase
       .from("profiles")
-      .select("id, username, points")
+      .select("id, username, points, role")
       .eq("id", userId)
       .maybeSingle();
 
@@ -578,7 +594,7 @@ export default function App() {
           username: username,
           points: 0 
         }, { onConflict: 'id' })
-        .select()
+        .select("id, username, points, role")
         .maybeSingle();
       
       if (!createError && newProfile) setProfile(newProfile);
@@ -760,7 +776,7 @@ export default function App() {
         .from("profiles")
         .update({ username: normalizedUsernameDraft })
         .eq("id", user.id)
-        .select("id, username, points")
+        .select("id, username, points, role")
         .maybeSingle();
 
       if (profileError) {
@@ -782,7 +798,7 @@ export default function App() {
         const { data: insertedProfile, error: insertError } = await supabase
           .from("profiles")
           .insert({ id: user.id, username: normalizedUsernameDraft, points: 0 })
-          .select("id, username, points")
+          .select("id, username, points, role")
           .maybeSingle();
 
         if (insertError) {
@@ -864,6 +880,10 @@ export default function App() {
     return <ResetPassword user={user} />;
   }
 
+  if (path === "/admin") {
+    return <AdminModeration user={user} onBack={() => navigateTo("/")} />;
+  }
+
   const SidebarContent = () => (
     <div className="flex flex-col h-full max-h-screen overflow-hidden">
       <div className="flex items-center justify-between mb-6 sm:mb-10 flex-shrink-0">
@@ -916,6 +936,16 @@ export default function App() {
           label="How to Use" 
           onClick={() => { setIsSidebarOpen(false); setIsHelpOpen(true); }} 
         />
+        {isAdminUser ? (
+          <SidebarLink
+            icon={<ShieldCheck size={20} />}
+            label="Admin Panel"
+            onClick={() => {
+              setIsSidebarOpen(false);
+              navigateTo("/admin");
+            }}
+          />
+        ) : null}
       </nav>
 
       <div className="pt-3 sm:pt-6 border-t border-white/10 mt-2 sm:mt-6 flex-shrink-0">
@@ -1301,6 +1331,7 @@ export default function App() {
                   favorites={favorites} 
                   setSearch={setSearch}
                   user={user}
+                  isAdminUser={isAdminUser}
                   likeCounts={allLikeCounts}
                   onLikeCountChange={handleLikeCountChange}
                   onLikeStateChange={handleLikeStateChange}
@@ -1761,6 +1792,7 @@ export default function App() {
           <MemeModal
             meme={activeMeme}
             user={user}
+            isAdminUser={isAdminUser}
             onClose={closeModal}
             toggleFavorite={toggleFavorite}
             favorites={favorites}

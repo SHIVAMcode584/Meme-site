@@ -10,11 +10,13 @@ import {
   User as UserIcon,
   Bookmark,
   Sparkles,
+  AlertTriangle,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { supabase } from "../lib/supabase";
 import { getOwnerMemeLikeSnapshot, setOwnerMemeLike } from "../utils/likes";
 import CommentsSection from "./CommentsSection";
+import ReportModal from "./ReportModal";
 
 export default function MemeModal({
   meme,
@@ -23,6 +25,7 @@ export default function MemeModal({
   toggleFavorite,
   favorites,
   onNext,
+  isAdminUser = false,
   likeCounts = {},
   onLikeCountChange,
   onLikeStateChange,
@@ -31,9 +34,11 @@ export default function MemeModal({
   const [liked, setLiked] = useState(false);
   const [localLikeCount, setLocalLikeCount] = useState(0);
   const [isLiking, setIsLiking] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   const isFavorite = favorites.includes(meme?.id);
   const isStaticMeme = meme && !meme.user_id;
+  const canReport = Boolean(user && !isAdminUser && meme?.user_id && String(meme.user_id) !== String(user.id));
 
   useEffect(() => {
     if (!meme) return;
@@ -310,6 +315,15 @@ export default function MemeModal({
                 </button>
               ) : null}
 
+              {canReport && (
+                <button
+                  onClick={() => setIsReportModalOpen(true)}
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-[1.5rem] border border-red-400/30 bg-[#5a1111]/90 px-4 py-3 text-xs font-semibold text-red-50 shadow-lg shadow-red-950/30 transition hover:bg-[#7a1616] hover:border-red-300/70"
+                >
+                  <AlertTriangle size={14} className="text-red-100" /> Report this meme
+                </button>
+              )}
+
               <CommentsSection
                 memeId={meme.id}
                 user={user}
@@ -320,6 +334,15 @@ export default function MemeModal({
           </div>
         </div>
       </motion.div>
+
+      <ReportModal 
+        isOpen={isReportModalOpen} 
+        onClose={() => setIsReportModalOpen(false)} 
+        memeId={meme.id} 
+        user={user}
+        memeOwnerId={meme.user_id}
+        isAdminUser={isAdminUser}
+      />
     </div>
   );
 }

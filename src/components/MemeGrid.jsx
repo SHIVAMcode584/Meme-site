@@ -10,17 +10,21 @@ export default function MemeGrid({
   favorites,
   setSearch,
   user,
+  isAdminUser = false,
   likeCounts = {},
   onLikeCountChange,
   onLikeStateChange,
 }) {
   const ITEMS_PER_PAGE = 6;
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
+  const [openCommentsMemeId, setOpenCommentsMemeId] = useState(null);
+  const memesSignature = memes.map((meme) => meme.id).join("|");
 
-  // Reset visible count when the memes list changes (due to search/filter)
+  // Reset visible count only when the actual meme set changes.
   useEffect(() => {
     setVisibleCount(ITEMS_PER_PAGE);
-  }, [memes]);
+    setOpenCommentsMemeId(null);
+  }, [memesSignature]);
 
   if (memes.length === 0) {
     return (
@@ -62,6 +66,7 @@ export default function MemeGrid({
             initial={{ opacity: 0, y: 25 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: (index % ITEMS_PER_PAGE) * 0.04 }}
+            className={openCommentsMemeId === meme.id ? "col-span-2 lg:col-span-3" : ""}
           >
             <MemeCard
               meme={meme}
@@ -69,9 +74,14 @@ export default function MemeGrid({
               toggleFavorite={toggleFavorite}
               favorites={favorites}
               user={user}
+              isAdminUser={isAdminUser}
               likeCount={likeCounts[String(meme.id)] || 0}
               onLikeCountChange={onLikeCountChange}
               onLikeStateChange={onLikeStateChange}
+              isCommentsOpen={openCommentsMemeId === meme.id}
+              onToggleComments={(memeId) =>
+                setOpenCommentsMemeId((currentId) => (currentId === memeId ? null : memeId))
+              }
               // Give high priority to the first 2 images for LCP
               priority={index < 2}
             />

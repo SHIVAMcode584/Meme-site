@@ -1,0 +1,262 @@
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { AlertTriangle, CheckCircle2, Loader2, Send, ShieldAlert, X } from "lucide-react";
+import { supabase } from "../lib/supabase";
+import Toast from "./Toast";
+
+const REPORT_REASONS = ["Spam", "Offensive", "Copyright", "Other"];
+
+export default function ReportModal({ isOpen, onClose, memeId, user, memeOwnerId = null, isAdminUser = false }) {
+  const [reason, setReason] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState("");
+  const [toast, setToast] = useState(null);
+  const [ownerId, setOwnerId] = useState(memeOwnerId);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    setReason("");
+    setError("");
+    setSubmitted(false);
+    setToast(null);
+    setOwnerId(memeOwnerId);
+  }, [isOpen, memeId, memeOwnerId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadOwner = async () => {
+      if (!isOpen || !memeId) return;
+      if (memeOwnerId) return;
+
+      const { data, error: ownerError } = await supabase
+        .from("meme-table")
+        .select("user_id")
+        .eq("id", memeId)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (ownerError) {
+        console.error("Report owner lookup failed:", ownerError);
+        setOwnerId(null);
+        return;
+      }
+
+      setOwnerId(data?.user_id || null);
+    };
+
+    loadOwner();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, memeId, memeOwnerId]);
+
+  const canSubmitOwnMeme = Boolean(ownerId && user?.id && ownerId === user.id);
+  const canReport = Boolean(user && !isAdminUser && !canSubmitOwnMeme);
+
+  const clearToast = () => setToast(null);
+
+  const handleSubmit = async () => {
+    if (!user) {
+      setToast({
+        type: "error",
+        title: "Sign in required",
+        message: "Please sign in before reporting a meme.",
+        onClose: clearToast,
+      });
+      return;
+    }
+
+    if (isAdminUser) {
+      setToast({
+        type: "error",
+        title: "Admins blocked",
+        message: "Admin accounts cannot report memes.",
+        onClose: clearToast,
+      });
+      return;
+    }
+
+    if (!reason) {
+      setError("Pick a reason before submitting.");
+      return;
+    }
+
+    if (canSubmitOwnMeme) {
+      setError("You cannot report your own meme.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setToast(null);
+
+    try {
+      const { error: insertError } = await supabase.from("reports").insert({
+        user_id: user.id,
+        meme_id: memeId,
+        reason,
+      });
+
+      if (insertError) {
+        if (insertError.code === "23505") {
+          throw new Error("You have already reported this meme.");
+        }
+
+        if (insertError.code === "42501") {
+          throw new Error("You do not have permission to report memes.");
+        }
+
+        throw insertError;
+      }
+
+      setSubmitted(true);
+      setToast({
+        type: "success",
+        title: "Report sent",
+        message: "Report submitted successfully.",
+        onClose: clearToast,
+      });
+
+      window.setTimeout(() => {
+        onClose();
+      }, 1200);
+    } catch (err) {
+      setToast({
+        type: "error",
+        title: "Report failed",
+        message: err.message || "Failed to submit report.",
+        onClose: clearToast,
+      });
+      setError(err.message || "Failed to submit report.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <motion.button
+            type="button"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm"
+            aria-label="Close report modal"
+          />
+
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.96 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+            className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-white/10 bg-[#0d1220] shadow-2xl shadow-black/40"
+          >
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.12),transparent_48%)]" />
+            <div className="relative p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-2xl border border-red-400/20 bg-red-500/10 p-3 text-red-300">
+                    <AlertTriangle size={20} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-red-300">
+                      Report content
+                    </p>
+                    <h2 className="mt-1 text-2xl font-black tracking-tight text-white">Report Meme</h2>
+                    <p className="mt-1 text-sm text-zinc-400">
+                      Pick the best reason so admins can review it quickly.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={onClose}
+                  className="rounded-full border border-white/10 bg-white/5 p-2 text-zinc-400 transition hover:bg-white/10 hover:text-white"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {canSubmitOwnMeme ? (
+                <div className="mt-5 flex items-start gap-3 rounded-2xl border border-red-400/20 bg-red-500/10 p-4 text-sm text-red-100">
+                  <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                  <div>
+                    <p className="font-semibold">Self-reporting is blocked</p>
+                    <p className="mt-1 text-red-100/80">You cannot report your own meme.</p>
+                  </div>
+                </div>
+              ) : null}
+
+              {submitted ? (
+                <div className="mt-8 rounded-[1.5rem] border border-emerald-400/20 bg-emerald-500/10 p-6 text-center">
+                  <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-300">
+                    <CheckCircle2 className="h-7 w-7" />
+                  </div>
+                  <p className="text-lg font-bold text-white">Report submitted successfully</p>
+                  <p className="mt-2 text-sm text-emerald-100/80">
+                    Thanks. An admin can now review this meme.
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-6 space-y-4">
+                  <div className="grid gap-2">
+                    {REPORT_REASONS.map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => {
+                          setReason(option);
+                          if (error) setError("");
+                        }}
+                        className={`rounded-2xl border px-4 py-3 text-left text-sm transition ${
+                          reason === option
+                            ? "border-violet-500/50 bg-violet-500/15 text-white shadow-lg shadow-violet-500/10"
+                            : "border-white/10 bg-white/5 text-zinc-300 hover:border-white/20 hover:bg-white/10"
+                        }`}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+
+                  {error ? (
+                    <p className="rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+                      {error}
+                    </p>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={loading || !canReport}
+                    className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 px-4 font-bold text-white shadow-lg shadow-orange-500/20 transition hover:scale-[1.01] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    Submit Report
+                  </button>
+                </div>
+              )}
+            </div>
+          </motion.div>
+
+          <AnimatePresence>
+            {toast ? (
+              <Toast
+                toast={{ ...toast, onClose: clearToast }}
+                className="fixed bottom-5 left-1/2 z-[120] w-[calc(100vw-2rem)] -translate-x-1/2 sm:w-auto"
+              />
+            ) : null}
+          </AnimatePresence>
+        </div>
+      ) : null}
+    </AnimatePresence>
+  );
+}

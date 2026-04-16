@@ -15,22 +15,25 @@ const usernameCache = new Map();
 const timeFormatter = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
 
 function getSafeTimestamp(value) {
+  if (!value) return null;
   const timestamp = new Date(value).getTime();
-  return Number.isNaN(timestamp) ? 0 : timestamp;
+  return Number.isNaN(timestamp) ? null : timestamp;
 }
 
 function sortCommentsByNewest(comments) {
-  return [...comments].sort((a, b) => getSafeTimestamp(b.created_at) - getSafeTimestamp(a.created_at));
+  return [...comments].sort((a, b) => (getSafeTimestamp(b.created_at) || 0) - (getSafeTimestamp(a.created_at) || 0));
 }
 
 function formatRelativeTime(value, now) {
   const timestamp = getSafeTimestamp(value);
-  if (!timestamp) return "Just now";
+  if (timestamp === null) return "Just now";
 
   const diffSeconds = Math.round((timestamp - now) / 1000);
-  const absSeconds = Math.abs(diffSeconds);
+  
+  // If the comment is from the future (clock drift) or less than 15s ago, show "Just now"
+  if (diffSeconds >= -15) return "Just now";
 
-  if (absSeconds < 5) return "Just now";
+  const absSeconds = Math.abs(diffSeconds);
   if (absSeconds < 60) return timeFormatter.format(diffSeconds, "second");
 
   const diffMinutes = Math.round(diffSeconds / 60);
@@ -309,36 +312,40 @@ export default function CommentsSection({
         ) : null}
       </div>
 
-      <div className="mt-4 rounded-[1.35rem] border border-white/10 bg-black/20 p-3">
-        <textarea
-          value={newComment}
-          onChange={(event) => {
-            setNewComment(event.target.value);
-            if (feedback?.type === "error") setFeedback(null);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              if (!isSubmitting) handleSubmit();
-            }
-          }}
-          disabled={!user || isSubmitting}
-          placeholder={user ? "Write a comment..." : "Sign in to write a comment..."}
-          className="min-h-[92px] w-full resize-none bg-transparent text-sm text-white outline-none placeholder:text-zinc-500 disabled:cursor-not-allowed disabled:opacity-70"
-        />
+      <div className="group/commentbox relative mt-4 overflow-hidden rounded-[1.35rem] border border-white/10 bg-black/20 p-3 transition-colors duration-300 focus-within:border-violet-300/45">
+        <div className="pointer-events-none absolute inset-0 rounded-[1.35rem] border border-violet-400/80 opacity-0 [clip-path:inset(100%_0_0_0_round_1.35rem)] transition-[clip-path,opacity] duration-500 ease-out group-focus-within/commentbox:opacity-100 group-focus-within/commentbox:[clip-path:inset(0_0_0_0_round_1.35rem)]" />
 
-        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-zinc-500">Press Enter to post, Shift+Enter for a new line.</p>
-
-          <button
-            type="button"
-            onClick={handleSubmit}
+        <div className="relative z-10">
+          <textarea
+            value={newComment}
+            onChange={(event) => {
+              setNewComment(event.target.value);
+              if (feedback?.type === "error") setFeedback(null);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                if (!isSubmitting) handleSubmit();
+              }
+            }}
             disabled={!user || isSubmitting}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-500 via-fuchsia-500 to-pink-500 px-5 text-sm font-semibold text-white shadow-lg shadow-violet-500/20 transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            {isSubmitting ? "Posting..." : "Post"}
-          </button>
+            placeholder={user ? "Write a comment..." : "Sign in to write a comment..."}
+            className="min-h-[92px] w-full resize-none bg-transparent text-sm text-white outline-none placeholder:text-zinc-500 disabled:cursor-not-allowed disabled:opacity-70"
+          />
+
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-zinc-500">Press Enter to post, Shift+Enter for a new line.</p>
+
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={!user || isSubmitting}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-500 via-fuchsia-500 to-pink-500 px-5 text-sm font-semibold text-white shadow-lg shadow-violet-500/20 transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              {isSubmitting ? "Posting..." : "Post"}
+            </button>
+          </div>
         </div>
       </div>
 
