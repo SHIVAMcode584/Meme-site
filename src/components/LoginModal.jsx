@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { X, User, Mail, LogIn, Loader2, Lock, ArrowLeft, Wand2, CheckCircle2 } from "lucide-react";
+import { X, User, Mail, LogIn, Loader2, Lock, ArrowLeft, Wand2, CheckCircle2, Eye, EyeOff } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import AvatarPicker from "./AvatarPicker";
 import { DEFAULT_AVATAR_ID, getAvatarUrlById } from "../utils/avatarOptions";
@@ -13,6 +13,7 @@ export default function LoginModal({ isOpen, onClose }) {
   const [selectedAvatarId, setSelectedAvatarId] = useState(DEFAULT_AVATAR_ID);
   const [message, setMessage] = useState({ type: "", text: "" });
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const getSiteUrl = () => {
     return import.meta.env.VITE_SITE_URL || window.location.origin;
@@ -170,7 +171,22 @@ export default function LoginModal({ isOpen, onClose }) {
           {mode === "login" && (
             <div className="relative">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
-              <input type="password" placeholder="Password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full h-12 pl-12 pr-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition text-white" />
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full h-12 pl-12 pr-12 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition text-white"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((current) => !current)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 transition hover:text-zinc-300"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
           )}
 

@@ -861,6 +861,38 @@ export default function App() {
     if (user) fetchProfile(user.id, user); // Refresh points immediately
   };
 
+  const handleMemeDeleted = useCallback((memeId) => {
+    const targetId = String(memeId);
+
+    setDbMemes((prev) => prev.filter((meme) => String(meme.id) !== targetId));
+    setSemanticMemes((prev) => prev.filter((meme) => String(meme.id) !== targetId));
+    setFavorites((prev) => prev.filter((favoriteId) => String(favoriteId) !== targetId));
+    setLikedMemeIds((prev) => prev.filter((likedId) => String(likedId) !== targetId));
+
+    setDbLikeCounts((prev) => {
+      if (!(targetId in prev)) return prev;
+      const next = { ...prev };
+      delete next[targetId];
+      return next;
+    });
+
+    setOwnerLikeCounts((prev) => {
+      if (!(targetId in prev)) return prev;
+      const next = { ...prev };
+      delete next[targetId];
+      return next;
+    });
+
+    setActiveMeme((current) => {
+      if (!current || String(current.id) !== targetId) return current;
+
+      const url = new URL(window.location);
+      url.searchParams.delete("meme");
+      window.history.replaceState({}, "", url);
+      return null;
+    });
+  }, []);
+
   useEffect(() => {
     const fetchMemes = async () => {
       const { data, error } = await supabase
@@ -882,7 +914,7 @@ export default function App() {
   }
 
   if (path === "/admin") {
-    return <AdminModeration user={user} onBack={() => navigateTo("/")} />;
+    return <AdminModeration user={user} onBack={() => navigateTo("/")} onMemeDeleted={handleMemeDeleted} />;
   }
 
   const SidebarContent = () => (

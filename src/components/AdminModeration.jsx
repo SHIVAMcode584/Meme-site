@@ -47,12 +47,13 @@ function getStatusTone(status) {
   };
 }
 
-export default function AdminModeration({ user, onBack }) {
+export default function AdminModeration({ user, onBack, onMemeDeleted }) {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [statusFilter, setStatusFilter] = useState("pending");
   const [selectedReportId, setSelectedReportId] = useState(null);
+  const [pendingDeleteReport, setPendingDeleteReport] = useState(null);
   const [toast, setToast] = useState(null);
   const clearToast = useCallback(() => setToast(null), []);
 
@@ -195,41 +196,81 @@ export default function AdminModeration({ user, onBack }) {
 
   const handleDeleteMeme = async (report) => {
     if (!report?.meme_id) return;
-    if (!confirm("Delete this meme forever?")) return;
 
-    const { error: reportStatusError } = await supabase
+    const memeId = report.meme_id;
+
+    const { data: relatedReports, error: reportLookupError } = await supabase
       .from("reports")
-      .update({ status: "removed" })
-      .eq("meme_id", report.meme_id);
+      .select("id")
+      .eq("meme_id", memeId);
 
-    if (reportStatusError) {
-      console.error("Marking reports removed failed:", reportStatusError);
+    if (reportLookupError) {
+      console.error("Loading related reports failed:", reportLookupError);
       pushToast({
         type: "error",
         title: "Action failed",
-        message: "Could not mark linked reports as removed.",
+        message: reportLookupError.message || "Could not load related reports.",
       });
       return;
     }
 
-    const { error } = await supabase.from("meme-table").delete().eq("id", report.meme_id);
+    const reportIds = (relatedReports || []).map((item) => item.id);
+    let reportStatusFailed = false;
+
+    const { error } = await supabase.from("meme-table").delete().eq("id", memeId);
 
     if (error) {
       console.error("Delete meme failed:", error);
       pushToast({
         type: "error",
         title: "Delete failed",
-        message: "The meme could not be deleted.",
+        message: error.message || "The meme could not be deleted.",
       });
       return;
     }
 
+    if (reportIds.length > 0) {
+      const { error: reportStatusError } = await supabase
+        .from("reports")
+        .update({ status: "removed" })
+        .in("id", reportIds);
+
+      if (reportStatusError) {
+        console.error("Marking reports removed failed:", reportStatusError);
+        reportStatusFailed = true;
+        pushToast({
+          type: "error",
+          title: "Meme deleted",
+          message: "The meme was deleted, but some report statuses could not be updated.",
+        });
+      }
+    }
+
+    onMemeDeleted?.(memeId);
     await fetchReports();
-    pushToast({
-      type: "success",
-      title: "Meme removed",
-      message: "The meme was deleted and its reports were marked removed.",
-    });
+    if (!reportStatusFailed) {
+      pushToast({
+        type: "success",
+        title: "Meme removed",
+        message: "The meme was deleted and its reports were marked removed.",
+      });
+    }
+  };
+
+  const openDeleteConfirm = (report) => {
+    if (!report?.meme_id) return;
+    setPendingDeleteReport(report);
+  };
+
+  const closeDeleteConfirm = () => {
+    setPendingDeleteReport(null);
+  };
+
+  const confirmDeleteMeme = async () => {
+    const report = pendingDeleteReport;
+    setPendingDeleteReport(null);
+    if (!report) return;
+    await handleDeleteMeme(report);
   };
 
   const handleSelectReport = (reportId) => {
@@ -425,7 +466,7 @@ export default function AdminModeration({ user, onBack }) {
 
                     <button
                       type="button"
-                      onClick={() => handleDeleteMeme(report)}
+                      onClick={() => openDeleteConfirm(report)}
                       disabled={!report.meme}
                       className="inline-flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
                     >
@@ -544,7 +585,7 @@ export default function AdminModeration({ user, onBack }) {
 
                     <button
                       type="button"
-                      onClick={() => handleDeleteMeme(selectedReport)}
+                      onClick={() => openDeleteConfirm(selectedReport)}
                       disabled={!selectedReport.meme}
                       className="inline-flex items-center justify-center gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
                     >
@@ -566,6 +607,57 @@ export default function AdminModeration({ user, onBack }) {
       <div className="fixed right-4 top-4 z-[120] w-[calc(100vw-2rem)] sm:w-auto">
         <Toast toast={toast} className="ml-auto" />
       </div>
+
+      {pendingDeleteReport ? (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-[2rem] border border-white/10 bg-[#0d1220] p-6 shadow-2xl shadow-black/40">
+            <div className="flex items-start gap-4">
+              <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-3 text-red-300">
+                <Trash2 size={22} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-red-300">
+                  Confirm Delete
+                </p>
+                <h3 className="mt-1 text-2xl font-black tracking-tight text-white">
+                  Delete this meme?
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-zinc-400">
+                  This will permanently remove the meme from the site. The linked reports will stay in moderation history.
+                </p>
+                <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                  <p className="text-xs uppercase tracking-[0.22em] text-zinc-500">Meme ID</p>
+                  <p className="mt-1 break-all text-sm font-semibold text-zinc-200">
+                    {pendingDeleteReport.meme_id}
+                  </p>
+                  <p className="mt-3 text-sm text-zinc-400">
+                    <span className="font-semibold text-zinc-200">
+                      {pendingDeleteReport.meme?.title || "Deleted Meme"}
+                    </span>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={closeDeleteConfirm}
+                className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-zinc-200 transition hover:bg-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteMeme}
+                className="inline-flex items-center justify-center rounded-2xl border border-red-500/20 bg-red-500/10 px-5 py-3 text-sm font-semibold text-red-300 transition hover:bg-red-500/20"
+              >
+                Yes, delete it
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

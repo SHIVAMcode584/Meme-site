@@ -1,7 +1,7 @@
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bell, CheckCheck, Heart, Loader2, MessageCircle, RefreshCw, Sparkles, X } from "lucide-react";
+import { AlertTriangle, Bell, CheckCheck, Heart, Loader2, MessageCircle, RefreshCw, Sparkles, X } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import Toast from "./Toast";
 import { formatRelativeTime, resolveSenderUsernames } from "../utils/notifications";
@@ -12,6 +12,14 @@ function getNotificationTone(type) {
       badge: "border-cyan-500/20 bg-cyan-500/10 text-cyan-200",
       icon: MessageCircle,
       iconColor: "text-cyan-200",
+    };
+  }
+
+  if (type === "moderation") {
+    return {
+      badge: "border-amber-500/20 bg-amber-500/10 text-amber-200",
+      icon: AlertTriangle,
+      iconColor: "text-amber-200",
     };
   }
 
@@ -217,7 +225,7 @@ export default function NotificationsPage({ user, onBack }) {
                   </div>
                 <div className="min-w-0">
                   <p className="text-sm text-zinc-400">
-                    Likes and comments from Supabase, shown in a clean responsive popup.
+                    Likes and comments from any user is appear here...
                   </p>
                   <div className="mt-3 flex items-center gap-2 text-xs text-zinc-500">
                     <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 font-semibold uppercase tracking-[0.18em] text-zinc-400">
