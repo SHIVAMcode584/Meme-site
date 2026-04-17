@@ -172,7 +172,7 @@ export default function MemeModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4 lg:pl-64">
+    <div className="fixed inset-0 z-[150] flex items-end justify-center p-0 sm:items-center sm:p-4 lg:pl-64">
       <motion.button
         type="button"
         initial={{ opacity: 0 }}

@@ -103,7 +103,7 @@ export default function LoginModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 lg:pl-64">
+    <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 lg:pl-64">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

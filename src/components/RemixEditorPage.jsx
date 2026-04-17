@@ -35,12 +35,12 @@ export default function RemixEditorPage({
     : "relative min-h-screen overflow-hidden bg-[#070B14] text-white";
 
   const contentClassName = isModal
-    ? "relative flex h-full min-h-0 flex-col p-3 sm:p-4"
+    ? "relative flex h-full min-h-0 flex-col px-2 py-3 sm:p-4"
     : "relative mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8";
 
   const panelClassName = isModal
-    ? "rounded-[1.75rem] border border-white/10 bg-[linear-gradient(180deg,rgba(10,14,24,0.96),rgba(7,11,20,0.9))] px-4 py-3 shadow-xl shadow-black/30 backdrop-blur-2xl sm:px-5 sm:py-4"
-    : "rounded-[2.5rem] border border-white/10 bg-white/[0.04] p-5 shadow-2xl shadow-black/20 backdrop-blur-xl sm:p-7 lg:p-10";
+    ? "rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(10,14,24,0.96),rgba(7,11,20,0.9))] px-2.5 py-4 shadow-xl shadow-black/30 backdrop-blur-2xl sm:px-5 sm:py-4"
+    : "";
 
   const editorWrapperClassName = isModal
     ? "mt-4 flex-1 min-h-0 overflow-y-auto pr-1 custom-scrollbar"
@@ -72,15 +72,15 @@ export default function RemixEditorPage({
             <div className="flex flex-col gap-3">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-violet-400/25 bg-violet-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-violet-200">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-violet-400/25 bg-violet-500/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-violet-200">
                     <Sparkles className="h-3.5 w-3.5" />
                     Remix studio
                   </div>
-                  <div className="mt-2 flex flex-col gap-1 lg:flex-row lg:items-end lg:gap-3">
+                  <div className="mt-1.5 flex flex-col gap-0.5 lg:flex-row lg:items-end lg:gap-3">
                     <h1 className="text-xl font-black tracking-tight text-white sm:text-2xl">
                       Edit meme
                     </h1>
-                    <p className="text-sm text-zinc-400">
+                    <p className="text-[11px] leading-tight text-zinc-400">
                       Keep the original safe and jump straight into the preview and controls.
                     </p>
                   </div>

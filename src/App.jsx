@@ -1624,7 +1624,7 @@ export default function App() {
         {/* Editor Popup Modal */}
         <AnimatePresence>
           {isEditorModalOpen && (
-            <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto p-4 sm:p-5 lg:pl-72 lg:pr-6">
+        <div className="fixed inset-0 z-[150] flex items-start justify-center overflow-y-auto p-1.5 sm:p-5 lg:pl-72 lg:pr-6">
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -1636,7 +1636,7 @@ export default function App() {
                 initial={{ opacity: 0, scale: 0.97, y: 24 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.97, y: 24 }}
-                className="relative mt-2 flex h-[calc(100dvh-2rem)] w-full max-w-[1560px] flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(7,11,20,0.98),rgba(5,8,16,0.95))] shadow-2xl shadow-black/50 sm:mt-4 sm:h-[calc(100dvh-2.5rem)] sm:rounded-[2.25rem]"
+            className="relative flex h-[calc(100dvh-0.75rem)] w-full max-w-[1560px] flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(7,11,20,0.98),rgba(5,8,16,0.95))] shadow-2xl shadow-black/50 sm:mt-4 sm:h-[calc(100dvh-2.5rem)] sm:rounded-[2.25rem]"
               >
                 <Suspense
                   fallback={
@@ -1665,7 +1665,7 @@ export default function App() {
         {/* Upload Popup Modal */}
         <AnimatePresence>
           {isUploadModalOpen && (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 lg:pl-64">
+            <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 lg:pl-64">
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -1694,7 +1694,7 @@ export default function App() {
         {/* Avatar Picker Modal */}
         <AnimatePresence>
           {isAvatarModalOpen && user && (
-            <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 lg:pl-64">
+            <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 lg:pl-64">
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -1760,7 +1760,7 @@ export default function App() {
 
         <AnimatePresence>
           {isUsernameModalOpen && user && (
-            <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 lg:pl-64">
+            <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 lg:pl-64">
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -1824,7 +1824,7 @@ export default function App() {
 
         <AnimatePresence>
           {isUsernameConfirmOpen && user && (
-            <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 lg:pl-64">
+            <div className="fixed inset-0 z-[170] flex items-center justify-center p-4 lg:pl-64">
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}

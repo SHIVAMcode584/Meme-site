@@ -660,7 +660,7 @@ export default function MemeEditor({
       <div className="order-2 min-w-0 lg:order-1">
         <div
           className={`space-y-6 overflow-hidden rounded-[2.2rem] border border-white/10 bg-white/[0.03] shadow-2xl shadow-black/15 backdrop-blur-sm ${
-            isModal ? "p-5 sm:p-6 lg:p-7" : "p-5 sm:p-7 lg:p-9"
+            isModal ? "px-2 py-6 sm:px-6 lg:p-7" : "px-3 py-6 sm:p-7 lg:p-9"
           }`}
         >
           {isRemixEditor ? (
@@ -839,8 +839,8 @@ export default function MemeEditor({
           ) : null}
 
           <div
-            className={`overflow-hidden space-y-5 rounded-[2rem] border border-white/10 bg-white/[0.02] shadow-2xl shadow-black/10 ${
-              isModal ? "p-5" : "p-6"
+            className={`overflow-hidden space-y-4 rounded-[2rem] border border-white/10 bg-transparent ${
+              isModal ? "px-1.5 py-4 sm:p-5" : "p-5 sm:p-6"
             }`}
           >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -875,10 +875,10 @@ export default function MemeEditor({
               return (
                 <div
                   key={layer.id}
-                  className={`min-w-0 overflow-hidden rounded-[1.75rem] border ${isModal ? "p-5" : "p-6"} transition-all duration-300 ${
+                  className={`min-w-0 overflow-hidden rounded-[1.75rem] border transition-all duration-300 ${isModal ? "px-2 py-4 sm:p-5" : "p-4 sm:p-6"} ${
                     isActive
-                      ? "border-violet-500/60 bg-violet-500/15 shadow-xl shadow-violet-500/10"
-                      : "border-white/5 bg-black/40 hover:border-white/10"
+                      ? "border-violet-500/60 bg-violet-500/5 shadow-xl shadow-violet-500/5"
+                      : "border-transparent bg-transparent hover:border-white/10"
                   }`}
                 >
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -922,7 +922,7 @@ export default function MemeEditor({
                         placeholder={`Edit ${layer.label.toLowerCase()}`}
                         value={layer.text}
                         onChange={(event) => updateLayerText(layer.id, event.target.value)}
-                        className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3.5 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20"
+                        className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-3.5 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20"
                       />
                     </label>
 
@@ -1219,7 +1219,7 @@ export default function MemeEditor({
       >
         <div
           className={`overflow-hidden space-y-5 rounded-[2.2rem] border border-white/10 bg-white/[0.03] shadow-2xl shadow-black/10 backdrop-blur-sm ${
-            isModal ? "p-4 sm:p-5 lg:p-6" : "p-5 sm:p-7"
+            isModal ? "px-2 py-6 sm:p-5 lg:p-6" : "px-3 py-6 sm:p-7"
           }`}
         >
           <div className="flex items-start gap-3">
@@ -1237,7 +1237,7 @@ export default function MemeEditor({
                 placeholder="Meme title"
                 value={uploadTitle}
                 onChange={(event) => setUploadTitle(event.target.value)}
-                className="w-full rounded-2xl border border-white/10 bg-black/40 py-4 pl-12 pr-4 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20"
+                className="w-full rounded-2xl border border-white/10 bg-black/40 py-3.5 pl-12 pr-4 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20"
               />
               </div>
             </div>
@@ -1252,7 +1252,7 @@ export default function MemeEditor({
                 placeholder="Category (e.g. Reply, Funny)"
                 value={category}
                 onChange={(event) => setCategory(event.target.value)}
-                className="w-full rounded-2xl border border-white/10 bg-black/40 py-4 pl-12 pr-4 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20"
+                className="w-full rounded-2xl border border-white/10 bg-black/40 py-3.5 pl-12 pr-4 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20"
               />
               </div>
             </div>
@@ -1265,7 +1265,7 @@ export default function MemeEditor({
                 placeholder="Mood (e.g., Happy, Sad, Awkward)"
                 value={mood}
                 onChange={(event) => setMood(event.target.value)}
-                className="w-full rounded-2xl border border-white/10 bg-black/40 py-4 pl-12 pr-4 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20"
+                className="w-full rounded-2xl border border-white/10 bg-black/40 py-3.5 pl-12 pr-4 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20"
               />
               </div>
             </div>
@@ -1280,7 +1280,7 @@ export default function MemeEditor({
                 placeholder="Keywords (comma separated)"
                 value={keywords}
                 onChange={(event) => setKeywords(event.target.value)}
-                className="w-full rounded-2xl border border-white/10 bg-black/40 py-4 pl-12 pr-4 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20"
+                className="w-full rounded-2xl border border-white/10 bg-black/40 py-3.5 pl-12 pr-4 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20"
               />
               </div>
             </div>
