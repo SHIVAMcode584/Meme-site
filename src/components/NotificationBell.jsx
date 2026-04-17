@@ -83,8 +83,8 @@ export default function NotificationBell({ user }) {
           setBadgePulse((current) => current + 1);
 
           setToast({
-            type: "success",
-            title: "New notification",
+            type: hydrated.type === "warning" ? "warning" : "success",
+            title: hydrated.type === "warning" ? "Warning received" : "New notification",
             message: hydrated.message,
             onClose: clearToast,
           });

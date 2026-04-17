@@ -12,6 +12,11 @@ const TOAST_STYLES = {
     icon: "bg-red-500/15 text-red-300",
     iconNode: AlertTriangle,
   },
+  warning: {
+    container: "border-amber-400/20 bg-amber-500/10 text-amber-50",
+    icon: "bg-amber-500/15 text-amber-200",
+    iconNode: AlertTriangle,
+  },
   loading: {
     container: "border-violet-400/20 bg-violet-500/10 text-violet-100",
     icon: "bg-violet-500/15 text-violet-300",

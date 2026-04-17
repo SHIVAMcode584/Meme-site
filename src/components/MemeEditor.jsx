@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { Download, Upload, Image as ImageIcon, Type, CloudUpload, Loader2, Palette, Tag, Smile, Search } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
-export default function MemeEditor({ user, onUpload, onSuccess }) {
+export default function MemeEditor({ user, onUpload, onSuccess, isBlockedUser = false }) {
   const [image, setImage] = useState(null);
   const [topText, setTopText] = useState("");
   const [bottomText, setBottomText] = useState("");
@@ -35,6 +35,7 @@ export default function MemeEditor({ user, onUpload, onSuccess }) {
 
   const handleUploadToHub = async () => {
     if (!user) return alert("Please sign in to upload memes!");
+    if (isBlockedUser) return alert("Your account is blocked from uploading memes.");
     if (!uploadTitle.trim()) return alert("Please give your meme a title first.");
     if (!image) return alert("Please choose an image first.");
 
@@ -206,6 +207,12 @@ export default function MemeEditor({ user, onUpload, onSuccess }) {
 
   return (
     <div className="grid lg:grid-cols-2 gap-8 items-start">
+      {isBlockedUser ? (
+        <div className="lg:col-span-2 rounded-[1.75rem] border border-amber-400/20 bg-amber-500/10 p-5 text-sm text-amber-100">
+          Your account is blocked, so the meme editor is read-only right now.
+        </div>
+      ) : null}
+
       <div className="space-y-6">
         <div className="relative group">
           <input
@@ -318,7 +325,7 @@ export default function MemeEditor({ user, onUpload, onSuccess }) {
               </div>
               <button
                 onClick={handleUploadToHub}
-                disabled={isUploading || !user}
+                disabled={isUploading || !user || isBlockedUser}
                 className="w-full h-14 rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white font-black flex items-center justify-center gap-2 hover:scale-[1.02] transition shadow-lg shadow-violet-500/20 disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed"
               >
                 {isUploading ? <Loader2 className="animate-spin" /> : <CloudUpload size={20} />}

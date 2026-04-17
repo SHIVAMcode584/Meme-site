@@ -11,6 +11,8 @@ export default function MemeGrid({
   setSearch,
   user,
   isAdminUser = false,
+  isBlockedUser = false,
+  onDeleteMeme,
   likeCounts = {},
   onLikeCountChange,
   onLikeStateChange,
@@ -75,6 +77,8 @@ export default function MemeGrid({
               favorites={favorites}
               user={user}
               isAdminUser={isAdminUser}
+              isBlockedUser={isBlockedUser}
+              onDeleteMeme={onDeleteMeme}
               likeCount={likeCounts[String(meme.id)] || 0}
               onLikeCountChange={onLikeCountChange}
               onLikeStateChange={onLikeStateChange}

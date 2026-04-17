@@ -20,12 +20,15 @@ import {
   ChevronRight, 
   ArrowLeft,
   KeyRound, 
-  CheckCircle2, 
-  Loader2, 
-  Trophy, 
+  CheckCircle2,
+  Loader2,
+  Trophy,
   Award,
   HelpCircle,
-  ShieldCheck
+  ShieldCheck,
+  Trash2,
+  AlertTriangle,
+  Clock3,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import CategoryFilter from "./components/CategoryFilter";
@@ -118,6 +121,8 @@ export default function App() {
   const [dbMemes, setDbMemes] = useState([]);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
+  const [pendingMemeDelete, setPendingMemeDelete] = useState(null);
+  const [deleteConfirmCountdown, setDeleteConfirmCountdown] = useState(0);
   const [notification, setNotification] = useState(null); // { type: 'success' | 'error', message: string }
   const [resetStatus, setResetStatus] = useState(null); // { type: 'success' | 'error', message: string }
   const [isResetLoading, setIsResetLoading] = useState(false);
@@ -515,6 +520,7 @@ export default function App() {
   const displayUsername =
     profile?.username || user?.user_metadata?.username || user?.email?.split("@")[0] || "Meme Creator";
   const isAdminUser = profile?.role === "admin";
+  const isBlockedUser = profile?.role === "blocked";
   const normalizedUsernameDraft = usernameDraft.trim();
   const hasPendingAvatarChange = selectedAvatarId !== currentAvatarId;
   const hasPendingUsernameChange =
@@ -894,6 +900,107 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!pendingMemeDelete) {
+      setDeleteConfirmCountdown(0);
+      return undefined;
+    }
+
+    if (deleteConfirmCountdown <= 0) return undefined;
+
+    const timer = window.setTimeout(() => {
+      setDeleteConfirmCountdown((current) => Math.max(0, current - 1));
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [deleteConfirmCountdown, pendingMemeDelete]);
+
+  const executeMemeDelete = useCallback(
+    async (meme) => {
+      const memeId = typeof meme === "object" ? meme?.id : meme;
+      if (!memeId) return false;
+
+      try {
+        const { data: relatedReports, error: reportLookupError } = await supabase
+          .from("reports")
+          .select("id")
+          .eq("meme_id", memeId);
+
+        if (reportLookupError) {
+          throw reportLookupError;
+        }
+
+        const reportIds = (relatedReports || []).map((report) => report.id);
+
+        const { error } = await supabase.from("meme-table").delete().eq("id", memeId);
+        if (error) throw error;
+
+        if (reportIds.length > 0) {
+          const { error: reportStatusError } = await supabase
+            .from("reports")
+            .update({ status: "removed" })
+            .in("id", reportIds);
+
+          if (reportStatusError) {
+            console.warn("Could not mark related reports as removed:", reportStatusError);
+          }
+        }
+
+        handleMemeDeleted(memeId);
+        setNotification({
+          type: "success",
+          message: "Meme deleted successfully.",
+        });
+        return true;
+      } catch (error) {
+        console.error("Admin meme delete failed:", error);
+        setNotification({
+          type: "error",
+          message: error.message || "Could not delete that meme right now.",
+        });
+        return false;
+      }
+    },
+    [handleMemeDeleted]
+  );
+
+  const handleDeleteMeme = useCallback(
+    async (meme) => {
+      const memeId = typeof meme === "object" ? meme?.id : meme;
+      if (!memeId) return false;
+
+      if (!isAdminUser) {
+        setNotification({
+          type: "error",
+          message: "Only admins can delete memes from the home page.",
+        });
+        return false;
+      }
+
+      setPendingMemeDelete({
+        meme,
+        memeId,
+        memeTitle: typeof meme === "object" ? meme?.title || "this meme" : "this meme",
+      });
+      setDeleteConfirmCountdown(3);
+      return false;
+    },
+    [isAdminUser]
+  );
+
+  const cancelMemeDelete = useCallback(() => {
+    setPendingMemeDelete(null);
+    setDeleteConfirmCountdown(0);
+  }, []);
+
+  const confirmMemeDelete = useCallback(async () => {
+    if (!pendingMemeDelete) return false;
+    const target = pendingMemeDelete;
+    setPendingMemeDelete(null);
+    setDeleteConfirmCountdown(0);
+    return executeMemeDelete(target.meme);
+  }, [executeMemeDelete, pendingMemeDelete]);
+
+  useEffect(() => {
     const fetchMemes = async () => {
       const { data, error } = await supabase
         .from("meme-table")
@@ -954,11 +1061,33 @@ export default function App() {
             />
           </>
         )}
-        <SidebarLink icon={<Pencil size={20}/>} label="Edit Meme" onClick={() => { setIsSidebarOpen(false); setIsEditorModalOpen(true); }} />
+        <SidebarLink
+          icon={<Pencil size={20}/>}
+          label="Edit Meme"
+          onClick={() => {
+            setIsSidebarOpen(false);
+            if (isBlockedUser) {
+              setNotification({
+                type: "error",
+                message: "Your account is blocked from editing memes.",
+              });
+              return;
+            }
+            setIsEditorModalOpen(true);
+          }}
+        />
         <SidebarLink 
           icon={<Upload size={20}/>} 
           label="Upload Meme" 
           onClick={() => { 
+            if (isBlockedUser) {
+              setIsSidebarOpen(false);
+              setNotification({
+                type: "error",
+                message: "Your account is blocked from uploading memes.",
+              });
+              return;
+            }
             setIsSidebarOpen(false); 
             user ? setIsUploadModalOpen(true) : setIsLoginModalOpen(true); 
           }} 
@@ -1366,6 +1495,8 @@ export default function App() {
                   setSearch={setSearch}
                   user={user}
                   isAdminUser={isAdminUser}
+                  isBlockedUser={isBlockedUser}
+                  onDeleteMeme={handleDeleteMeme}
                   likeCounts={allLikeCounts}
                   onLikeCountChange={handleLikeCountChange}
                   onLikeStateChange={handleLikeStateChange}
@@ -1379,7 +1510,7 @@ export default function App() {
             <h2 className="mb-6 text-2xl font-bold sm:text-3xl flex items-center gap-3">
               <Pencil className="text-violet-400" /> Create Your Meme 😎
             </h2>
-            <MemeEditor user={user} onUpload={handleUploadMeme} />
+            <MemeEditor user={user} onUpload={handleUploadMeme} isBlockedUser={isBlockedUser} />
           </section>
         </main>
 
@@ -1416,7 +1547,7 @@ export default function App() {
                   <button onClick={() => setIsEditorModalOpen(false)} className="p-2 rounded-full bg-white/5 hover:bg-white/10"><X size={20}/></button>
                 </div>
                 <Suspense fallback={<div className="flex justify-center p-10"><Loader2 className="animate-spin text-violet-500" /></div>}>
-                  <MemeEditor user={user} onUpload={handleUploadMeme} onSuccess={(msg) => { setIsEditorModalOpen(false); setNotification({ type: 'success', message: msg }); }} />
+                  <MemeEditor user={user} onUpload={handleUploadMeme} onSuccess={(msg) => { setIsEditorModalOpen(false); setNotification({ type: 'success', message: msg }); }} isBlockedUser={isBlockedUser} />
                 </Suspense>
               </motion.div>
             </div>
@@ -1445,7 +1576,7 @@ export default function App() {
                   <button onClick={() => setIsUploadModalOpen(false)} className="p-2 rounded-full bg-white/5 hover:bg-white/10"><X size={20}/></button>
                 </div>
                 <Suspense fallback={<div className="flex justify-center p-10"><Loader2 className="animate-spin text-violet-500" /></div>}>
-                  <UploadMeme user={user} onUpload={handleUploadMeme} onSuccess={(msg) => { setIsUploadModalOpen(false); setNotification({ type: 'success', message: msg }); }} />
+                  <UploadMeme user={user} onUpload={handleUploadMeme} onSuccess={(msg) => { setIsUploadModalOpen(false); setNotification({ type: 'success', message: msg }); }} isBlockedUser={isBlockedUser} />
                 </Suspense>
               </motion.div>
             </div>
@@ -1822,11 +1953,240 @@ export default function App() {
         )}
       </AnimatePresence>
 
-        <Suspense fallback={null}>
-          <MemeModal
-            meme={activeMeme}
+      <AnimatePresence>
+        {pendingMemeDelete ? (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 lg:pl-64">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={cancelMemeDelete}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 18, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 18, scale: 0.96 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+              className="relative z-10 w-full max-w-xl rounded-[2rem] border border-red-500/20 bg-[#0d1220] p-6 shadow-2xl shadow-black/50"
+            >
+              <div className="flex items-start gap-4">
+                <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-3 text-red-300">
+                  <Trash2 size={22} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-red-300">
+                    Confirm delete
+                  </p>
+                  <h3 className="mt-1 text-2xl font-black tracking-tight text-white">
+                    Delete this meme?
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-zinc-400">
+                    This will permanently remove <span className="font-semibold text-zinc-200">{pendingMemeDelete.memeTitle}</span> from the site.
+                    Any related reports will be marked as removed.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                <p className="text-[10px] uppercase tracking-[0.22em] text-zinc-500">Meme ID</p>
+                <p className="mt-1 break-all text-sm font-semibold text-zinc-100">{pendingMemeDelete.memeId}</p>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-4 text-sm text-zinc-300">
+                    <motion.div
+                      animate={
+                        deleteConfirmCountdown > 0
+                          ? { rotate: [0, -10, 10, 0], scale: [1, 1.08, 1] }
+                          : { rotate: 0, scale: 1 }
+                      }
+                      transition={
+                        deleteConfirmCountdown > 0
+                          ? { duration: 1.1, repeat: Infinity, ease: "easeInOut" }
+                          : { duration: 0.2 }
+                      }
+                      className={`flex h-10 w-10 items-center justify-center rounded-full border ${
+                        deleteConfirmCountdown > 0
+                          ? "border-red-400/30 bg-red-500/10 text-red-300"
+                          : "border-emerald-400/20 bg-emerald-500/10 text-emerald-300"
+                      }`}
+                    >
+                      <Clock3 size={16} />
+                    </motion.div>
+
+                    <div className="min-w-0">
+                      <p className="text-[10px] uppercase tracking-[0.22em] text-zinc-500">
+                        Delete timer
+                      </p>
+                      <AnimatePresence mode="wait" initial={false}>
+                        {deleteConfirmCountdown > 0 ? (
+                          <motion.p
+                            key={`countdown-${deleteConfirmCountdown}`}
+                            initial={{ y: 8, opacity: 0, filter: "blur(4px)" }}
+                            animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
+                            exit={{ y: -8, opacity: 0, filter: "blur(4px)" }}
+                            transition={{ duration: 0.22, ease: "easeOut" }}
+                            className="text-sm font-semibold text-white"
+                          >
+                            Confirming in {deleteConfirmCountdown}s
+                          </motion.p>
+                        ) : (
+                          <motion.p
+                            key="countdown-ready"
+                            initial={{ y: 8, opacity: 0, filter: "blur(4px)" }}
+                            animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
+                            transition={{ duration: 0.22, ease: "easeOut" }}
+                            className="text-sm font-semibold text-emerald-300"
+                          >
+                            You can confirm now
+                          </motion.p>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.22em]">
+                    <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-zinc-400">
+                      {deleteConfirmCountdown > 0 ? "Locked" : "Ready"}
+                    </span>
+                    <span className={deleteConfirmCountdown > 0 ? "text-red-300" : "text-emerald-300"}>
+                      {deleteConfirmCountdown > 0 ? `${deleteConfirmCountdown}s` : "0s"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-5 flex justify-center">
+                  <motion.div
+                    className="relative flex h-28 w-28 items-center justify-center sm:h-32 sm:w-32"
+                    animate={
+                      deleteConfirmCountdown > 0
+                        ? { scale: [1, 1.03, 1], rotate: [0, 1.5, -1.5, 0] }
+                        : { scale: 1, rotate: 0 }
+                    }
+                    transition={
+                      deleteConfirmCountdown > 0
+                        ? { duration: 1.4, repeat: Infinity, ease: "easeInOut" }
+                        : { duration: 0.2 }
+                    }
+                  >
+                    <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
+                      <defs>
+                        <linearGradient id="deleteTimerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#ef4444" />
+                          <stop offset="55%" stopColor="#fb923c" />
+                          <stop offset="100%" stopColor="#fbbf24" />
+                        </linearGradient>
+                      </defs>
+                      <circle
+                        cx="60"
+                        cy="60"
+                        r="46"
+                        fill="none"
+                        stroke="rgba(255,255,255,0.08)"
+                        strokeWidth="10"
+                      />
+                      <motion.circle
+                        cx="60"
+                        cy="60"
+                        r="46"
+                        fill="none"
+                        stroke="url(#deleteTimerGradient)"
+                        strokeWidth="10"
+                        strokeLinecap="round"
+                        strokeDasharray={289}
+                        animate={{
+                          strokeDashoffset: 289 - 289 * Math.max(0, Math.min(1, (3 - deleteConfirmCountdown) / 3)),
+                        }}
+                        transition={{ type: "spring", stiffness: 90, damping: 18 }}
+                      />
+                    </svg>
+
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <AnimatePresence mode="wait" initial={false}>
+                        {deleteConfirmCountdown > 0 ? (
+                          <motion.span
+                            key={`ring-count-${deleteConfirmCountdown}`}
+                            initial={{ scale: 0.75, opacity: 0, filter: "blur(4px)" }}
+                            animate={{ scale: 1, opacity: 1, filter: "blur(0px)" }}
+                            exit={{ scale: 1.15, opacity: 0, filter: "blur(4px)" }}
+                            transition={{ duration: 0.22, ease: "easeOut" }}
+                            className="text-4xl font-black tracking-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]"
+                          >
+                            {deleteConfirmCountdown}
+                          </motion.span>
+                        ) : (
+                          <motion.span
+                            key="ring-ready"
+                            initial={{ scale: 0.75, opacity: 0, filter: "blur(4px)" }}
+                            animate={{ scale: 1, opacity: 1, filter: "blur(0px)" }}
+                            transition={{ duration: 0.22, ease: "easeOut" }}
+                            className="text-sm font-black uppercase tracking-[0.24em] text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]"
+                          >
+                            Ready
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
+                      <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-300/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
+                        Confirm delete
+                      </p>
+                    </div>
+                  </motion.div>
+                </div>
+              </div>
+
+              <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={cancelMemeDelete}
+                  className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-zinc-200 transition hover:bg-white/10"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmMemeDelete}
+                  disabled={deleteConfirmCountdown > 0}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 px-5 py-3 text-sm font-semibold text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Trash2 size={16} />
+                  <AnimatePresence mode="wait" initial={false}>
+                    {deleteConfirmCountdown > 0 ? (
+                      <motion.span
+                        key={`wait-${deleteConfirmCountdown}`}
+                        initial={{ y: 6, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: -6, opacity: 0 }}
+                        transition={{ duration: 0.18, ease: "easeOut" }}
+                      >
+                        Wait {deleteConfirmCountdown}s
+                      </motion.span>
+                    ) : (
+                      <motion.span
+                        key="delete-ready"
+                        initial={{ y: 6, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        transition={{ duration: 0.18, ease: "easeOut" }}
+                      >
+                        Yes, delete it
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        ) : null}
+      </AnimatePresence>
+
+      <Suspense fallback={null}>
+        <MemeModal
+          meme={activeMeme}
             user={user}
             isAdminUser={isAdminUser}
+            isBlockedUser={isBlockedUser}
+            onDeleteMeme={handleDeleteMeme}
             onClose={closeModal}
             toggleFavorite={toggleFavorite}
             favorites={favorites}

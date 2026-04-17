@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Download, Heart, Bookmark, MessageCircle, ChevronDown, AlertTriangle } from "lucide-react";
+import { Download, Heart, Bookmark, MessageCircle, ChevronDown, AlertTriangle, Trash2 } from "lucide-react";
 import { motion as Motion, AnimatePresence } from "framer-motion";
 import { supabase } from "../lib/supabase";
 import { getOwnerMemeLikeSnapshot, setOwnerMemeLike } from "../utils/likes";
@@ -13,6 +13,8 @@ export default function MemeCard({
   favorites,
   user,
   isAdminUser = false,
+  isBlockedUser = false,
+  onDeleteMeme,
   likeCount = 0,
   onLikeCountChange,
   onLikeStateChange,
@@ -23,7 +25,14 @@ export default function MemeCard({
   const isFavorite = favorites.includes(meme.id);
   const isStaticMeme = !meme.user_id; // Identifies if it's a pre-loaded static meme
   const imageSrc = meme.image || meme.image_url;
-  const canReport = Boolean(user && !isAdminUser && meme?.user_id && String(meme.user_id) !== String(user.id));
+  const canReport = Boolean(
+    user &&
+      !isAdminUser &&
+      !isBlockedUser &&
+      meme?.user_id &&
+      String(meme.user_id) !== String(user.id)
+  );
+  const canDelete = Boolean(isAdminUser && onDeleteMeme && meme?.user_id);
   const [liked, setLiked] = useState(false);
   const [localLikeCount, setLocalLikeCount] = useState(likeCount || 0);
   const [isLiking, setIsLiking] = useState(false);
@@ -168,6 +177,13 @@ export default function MemeCard({
     }
   };
 
+  const handleDelete = async (e) => {
+    e.stopPropagation();
+    if (!canDelete) return;
+
+    await onDeleteMeme?.(meme);
+  };
+
   const imageSizeClass = isCommentsOpen
     ? "aspect-[4/3] sm:aspect-[16/10] lg:aspect-[21/9]"
     : "aspect-[3/4] sm:aspect-[4/5]";
@@ -208,7 +224,15 @@ export default function MemeCard({
           </div>
         </button>
 
-        {canReport && (
+        {canDelete ? (
+          <button
+            onClick={handleDelete}
+            className="absolute top-2 right-12 sm:top-4 sm:right-16 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-[#561414]/95 backdrop-blur-md flex items-center justify-center border border-red-400/30 shadow-lg shadow-red-950/30 hover:scale-110 transition active:scale-90 hover:bg-[#741616] hover:border-red-300/70 group/delete"
+            title="Delete Meme"
+          >
+            <Trash2 className="w-4 h-4 sm:w-5 sm:h-5 text-red-100 group-hover/delete:text-white transition-colors" />
+          </button>
+        ) : canReport ? (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -219,7 +243,7 @@ export default function MemeCard({
           >
             <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-red-100 group-hover/report:text-white transition-colors" />
           </button>
-        )}
+        ) : null}
 
         <button
           onClick={(e) => {
@@ -305,6 +329,7 @@ export default function MemeCard({
         user={user}
         memeOwnerId={meme.user_id}
         isAdminUser={isAdminUser}
+        isBlockedUser={isBlockedUser}
       />
     </div>
   );

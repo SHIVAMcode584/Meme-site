@@ -2,7 +2,7 @@ import { useState } from "react";
 import { supabase } from "../lib/supabase";
 import { Loader2, Upload, Tag, Smile, Search, Type, Link2 } from "lucide-react";
 
-export default function UploadMeme({ user, onUpload, onSuccess }) {
+export default function UploadMeme({ user, onUpload, onSuccess, isBlockedUser = false }) {
   const [file, setFile] = useState(null);
   const [imageUrl, setImageUrl] = useState("");
   const [title, setTitle] = useState("");
@@ -31,6 +31,10 @@ export default function UploadMeme({ user, onUpload, onSuccess }) {
   };
 
   const handleUpload = async () => {
+    if (isBlockedUser) {
+      return alert("Your account is blocked from uploading memes.");
+    }
+
     if (!title.trim()) return alert("Please add a meme title first.");
 
     const hasImageUrl = Boolean(imageUrl.trim());
@@ -139,6 +143,12 @@ export default function UploadMeme({ user, onUpload, onSuccess }) {
 
   return (
     <div className="space-y-6">
+      {isBlockedUser ? (
+        <div className="rounded-[1.5rem] border border-amber-400/20 bg-amber-500/10 p-5 text-sm text-amber-100">
+          Your account is blocked, so uploads are disabled. Please contact an admin if you think this is a mistake.
+        </div>
+      ) : null}
+
       <div>
         <label htmlFor="file-upload" className="block text-sm font-medium text-zinc-300 mb-2">
           Image File
@@ -219,7 +229,7 @@ export default function UploadMeme({ user, onUpload, onSuccess }) {
 
       <button
         onClick={handleUpload}
-        disabled={loading}
+        disabled={loading || isBlockedUser}
         className="w-full h-14 rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white font-bold flex items-center justify-center gap-2 hover:scale-[1.02] transition shadow-lg shadow-violet-500/20 disabled:opacity-70 disabled:cursor-not-allowed"
       >
         {loading ? (

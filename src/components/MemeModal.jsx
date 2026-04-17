@@ -11,6 +11,7 @@ import {
   Bookmark,
   Sparkles,
   AlertTriangle,
+  Trash2,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { supabase } from "../lib/supabase";
@@ -26,6 +27,8 @@ export default function MemeModal({
   favorites,
   onNext,
   isAdminUser = false,
+  isBlockedUser = false,
+  onDeleteMeme,
   likeCounts = {},
   onLikeCountChange,
   onLikeStateChange,
@@ -39,7 +42,14 @@ export default function MemeModal({
   const imageSrc = meme?.image || meme?.image_url;
   const isFavorite = favorites.includes(meme?.id);
   const isStaticMeme = meme && !meme.user_id;
-  const canReport = Boolean(user && !isAdminUser && meme?.user_id && String(meme.user_id) !== String(user.id));
+  const canReport = Boolean(
+    user &&
+      !isAdminUser &&
+      !isBlockedUser &&
+      meme?.user_id &&
+      String(meme.user_id) !== String(user.id)
+  );
+  const canDelete = Boolean(isAdminUser && onDeleteMeme && meme?.user_id);
 
   useEffect(() => {
     if (!meme) return;
@@ -153,6 +163,12 @@ export default function MemeModal({
     const shareUrl = getShareUrl();
     const text = encodeURIComponent(`Check out this meme: ${meme.title} - ${shareUrl}`);
     window.open(`https://wa.me/?text=${text}`, "_blank");
+  };
+
+  const handleDelete = async () => {
+    if (!canDelete) return;
+
+    await onDeleteMeme?.(meme);
   };
 
   return (
@@ -316,7 +332,14 @@ export default function MemeModal({
                 </button>
               ) : null}
 
-              {canReport && (
+              {canDelete ? (
+                <button
+                  onClick={handleDelete}
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-[1.5rem] border border-red-400/30 bg-[#5a1111]/90 px-4 py-3 text-xs font-semibold text-red-50 shadow-lg shadow-red-950/30 transition hover:bg-[#7a1616] hover:border-red-300/70"
+                >
+                  <Trash2 size={14} className="text-red-100" /> Delete this meme
+                </button>
+              ) : canReport && (
                 <button
                   onClick={() => setIsReportModalOpen(true)}
                   className="mt-4 flex w-full items-center justify-center gap-2 rounded-[1.5rem] border border-red-400/30 bg-[#5a1111]/90 px-4 py-3 text-xs font-semibold text-red-50 shadow-lg shadow-red-950/30 transition hover:bg-[#7a1616] hover:border-red-300/70"
@@ -343,6 +366,7 @@ export default function MemeModal({
         user={user}
         memeOwnerId={meme.user_id}
         isAdminUser={isAdminUser}
+        isBlockedUser={isBlockedUser}
       />
     </div>
   );

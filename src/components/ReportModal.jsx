@@ -6,7 +6,15 @@ import Toast from "./Toast";
 
 const REPORT_REASONS = ["Spam", "Offensive", "Copyright", "Other"];
 
-export default function ReportModal({ isOpen, onClose, memeId, user, memeOwnerId = null, isAdminUser = false }) {
+export default function ReportModal({
+  isOpen,
+  onClose,
+  memeId,
+  user,
+  memeOwnerId = null,
+  isAdminUser = false,
+  isBlockedUser = false,
+}) {
   const [reason, setReason] = useState("");
   const [otherIssue, setOtherIssue] = useState("");
   const [loading, setLoading] = useState(false);
@@ -77,6 +85,7 @@ export default function ReportModal({ isOpen, onClose, memeId, user, memeOwnerId
   const canReport = Boolean(
     user &&
       !isAdminUser &&
+      !isBlockedUser &&
       !canSubmitOwnMeme &&
       reason &&
       (reason !== "Other" || hasOtherDetails)
@@ -100,6 +109,16 @@ export default function ReportModal({ isOpen, onClose, memeId, user, memeOwnerId
         type: "error",
         title: "Admins blocked",
         message: "Admin accounts cannot report memes.",
+        onClose: clearToast,
+      });
+      return;
+    }
+
+    if (isBlockedUser) {
+      setToast({
+        type: "error",
+        title: "Account blocked",
+        message: "Blocked accounts cannot submit reports.",
         onClose: clearToast,
       });
       return;

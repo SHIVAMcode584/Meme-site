@@ -15,6 +15,14 @@ function getNotificationTone(type) {
     };
   }
 
+  if (type === "warning") {
+    return {
+      badge: "border-amber-500/20 bg-amber-500/10 text-amber-200",
+      icon: AlertTriangle,
+      iconColor: "text-amber-200",
+    };
+  }
+
   if (type === "moderation") {
     return {
       badge: "border-amber-500/20 bg-amber-500/10 text-amber-200",
@@ -223,9 +231,9 @@ export default function NotificationsPage({ user, onBack }) {
                   <div className="rounded-2xl border border-violet-400/20 bg-violet-500/10 p-3 text-violet-300">
                     <Bell size={20} />
                   </div>
-                <div className="min-w-0">
+                  <div className="min-w-0">
                   <p className="text-sm text-zinc-400">
-                    Likes and comments from any user is appear here...
+                    Likes, comments, and admin warnings appear here...
                   </p>
                   <div className="mt-3 flex items-center gap-2 text-xs text-zinc-500">
                     <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 font-semibold uppercase tracking-[0.18em] text-zinc-400">
@@ -289,7 +297,7 @@ export default function NotificationsPage({ user, onBack }) {
                   </div>
                   <p className="text-sm font-semibold text-zinc-200">No notifications yet</p>
                   <p className="mt-1 text-xs text-zinc-500">
-                    Likes and comments on your memes will show up here automatically.
+                    Likes, comments, and warnings on your account will show up here automatically.
                   </p>
                 </div>
               ) : (
