@@ -121,6 +121,7 @@ export default function App() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [viewMode, setViewMode] = useState("all");
+  const [isBottomEditorVisible, setIsBottomEditorVisible] = useState(false);
   const [dbMemes, setDbMemes] = useState([]);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
@@ -1054,9 +1055,32 @@ export default function App() {
       </div>
 
       <nav className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-1 min-h-0">
-        <SidebarLink icon={<Home size={20}/>} label="Memes" onClick={() => { setViewMode("all"); setIsSidebarOpen(false); window.scrollTo({top: 0, behavior: 'smooth'}); }} />
-        <SidebarLink icon={<Trophy size={20}/>} label="Leaderboard" onClick={() => { setViewMode("leaderboard"); fetchLeaderboard(); setIsSidebarOpen(false); window.scrollTo({top: 0, behavior: 'smooth'}); }} />
-        <SidebarLink icon={<Search size={20}/>} label="Search" onClick={() => { setIsSidebarOpen(false); document.querySelector('input[type="text"]')?.focus(); }} />
+        <SidebarLink 
+          icon={<Home size={20}/>} 
+          label="Memes" 
+          onClick={() => { 
+            setViewMode("all"); 
+            setIsSidebarOpen(false); 
+            setIsEditorModalOpen(false);
+            setIsUploadModalOpen(false);
+            closeModal();
+            window.scrollTo({top: 0, behavior: 'smooth'}); 
+          }} 
+        />
+        <SidebarLink 
+          icon={<Trophy size={20}/>} 
+          label="Leaderboard" 
+          onClick={() => { 
+            setViewMode("leaderboard"); 
+            fetchLeaderboard(); 
+            setIsSidebarOpen(false); 
+            setIsEditorModalOpen(false);
+            setIsUploadModalOpen(false);
+            closeModal();
+            window.scrollTo({top: 0, behavior: 'smooth'}); 
+          }} 
+        />
+        <SidebarLink icon={<Search size={20}/>} label="Search" onClick={() => { setIsSidebarOpen(false); setIsEditorModalOpen(false); setIsUploadModalOpen(false); closeModal(); document.querySelector('input[type="text"]')?.focus(); }} />
         {user && (
           <>
             <SidebarLink 
@@ -1065,6 +1089,9 @@ export default function App() {
               onClick={() => { 
                 setViewMode("uploads");
                 setIsSidebarOpen(false);
+                setIsEditorModalOpen(false);
+                setIsUploadModalOpen(false);
+                closeModal();
                 window.scrollTo({top: 0, behavior: 'smooth'});
               }} 
             />
@@ -1074,6 +1101,9 @@ export default function App() {
               onClick={() => { 
                 setViewMode("favorites");
                 setIsSidebarOpen(false);
+                setIsEditorModalOpen(false);
+                setIsUploadModalOpen(false);
+                closeModal();
                 window.scrollTo({top: 0, behavior: 'smooth'});
               }} 
             />
@@ -1084,6 +1114,8 @@ export default function App() {
           label="Edit Meme"
           onClick={() => {
             setIsSidebarOpen(false);
+            setIsUploadModalOpen(false);
+            closeModal();
             if (isBlockedUser) {
               setNotification({
                 type: "error",
@@ -1107,6 +1139,8 @@ export default function App() {
               return;
             }
             setIsSidebarOpen(false); 
+            setIsEditorModalOpen(false);
+            closeModal();
             user ? setIsUploadModalOpen(true) : setIsLoginModalOpen(true); 
           }} 
         />
@@ -1114,7 +1148,13 @@ export default function App() {
         <SidebarLink 
           icon={<HelpCircle size={20}/>} 
           label="How to Use" 
-          onClick={() => { setIsSidebarOpen(false); setIsHelpOpen(true); }} 
+          onClick={() => { 
+            setIsSidebarOpen(false); 
+            setIsEditorModalOpen(false);
+            setIsUploadModalOpen(false);
+            closeModal();
+            setIsHelpOpen(true); 
+          }} 
         />
         {isAdminUser ? (
           <SidebarLink
@@ -1122,6 +1162,9 @@ export default function App() {
             label="Admin Panel"
             onClick={() => {
               setIsSidebarOpen(false);
+              setIsEditorModalOpen(false);
+              setIsUploadModalOpen(false);
+              closeModal();
               navigateTo("/admin");
             }}
           />
@@ -1135,6 +1178,9 @@ export default function App() {
               onClick={() => { 
                 setViewMode("profile");
                 setIsSidebarOpen(false);
+                setIsEditorModalOpen(false);
+                setIsUploadModalOpen(false);
+                closeModal();
                 window.scrollTo({top: 0, behavior: 'smooth'});
               }}
               className="flex items-center gap-3 p-2 w-full text-left hover:bg-white/5 rounded-xl transition-colors group"
@@ -1151,10 +1197,22 @@ export default function App() {
                 <p className="text-xs text-zinc-500 truncate">{user.email}</p>
               </div>
             </button>
-            <SidebarLink icon={<LogOut size={20}/>} label="Log Out" onClick={() => { setIsSidebarOpen(false); setIsLogoutConfirmOpen(true); }} />
+            <SidebarLink icon={<LogOut size={20}/>} label="Log Out" onClick={() => { 
+              setIsSidebarOpen(false); 
+              setIsEditorModalOpen(false);
+              setIsUploadModalOpen(false);
+              closeModal();
+              setIsLogoutConfirmOpen(true); 
+            }} />
           </div>
         ) : (
-          <SidebarLink icon={<LogIn size={20}/>} label="Sign In" onClick={() => { setIsSidebarOpen(false); setIsLoginModalOpen(true); }} />
+          <SidebarLink icon={<LogIn size={20}/>} label="Sign In" onClick={() => { 
+            setIsSidebarOpen(false); 
+            setIsEditorModalOpen(false);
+            setIsUploadModalOpen(false);
+            closeModal();
+            setIsLoginModalOpen(true); 
+          }} />
         )}
       </div>
     </div>
@@ -1165,7 +1223,7 @@ export default function App() {
       <AnimatePresence>{showLoader ? <Loader /> : null}</AnimatePresence>
       <div className="min-h-screen bg-[#070B14] text-white flex">
       {/* Desktop Sidebar (Persistent) */}
-      <aside className="hidden lg:block fixed top-0 left-0 z-30 h-screen w-64 bg-[#0d1220] border-r border-white/10 p-6 shadow-2xl overflow-y-auto">
+      <aside className="hidden lg:block fixed top-0 left-0 z-[110] h-screen w-64 bg-[#0d1220] border-r border-white/10 p-6 shadow-2xl overflow-y-auto">
         <SidebarContent />
       </aside>
 
@@ -1178,14 +1236,14 @@ export default function App() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsSidebarOpen(false)}
-              className="fixed inset-0 z-[50] bg-black/60 backdrop-blur-sm lg:hidden"
+              className="fixed inset-0 z-[120] bg-black/60 backdrop-blur-sm lg:hidden"
             />
             <motion.div
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed top-0 left-0 z-[51] h-[100dvh] w-[80%] bg-[#0d1220] border-r border-white/10 p-4 sm:p-6 shadow-2xl sm:w-64 lg:hidden"
+              className="fixed top-0 left-0 z-[121] h-[100dvh] w-[80%] bg-[#0d1220] border-r border-white/10 p-4 sm:p-6 shadow-2xl sm:w-64 lg:hidden"
             >
               <SidebarContent />
             </motion.div>
@@ -1195,7 +1253,7 @@ export default function App() {
 
       <div className="flex-1 lg:pl-64 min-w-0">
         <div className="relative isolate overflow-x-clip">
-          <header className="sticky top-0 z-40 border-b border-white/10 bg-[#070B14]/95 backdrop-blur-xl transition-all">
+          <header className="sticky top-0 z-[105] border-b border-white/10 bg-[#070B14]/95 backdrop-blur-xl transition-all">
             <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6 lg:flex lg:items-center lg:justify-between">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3 sm:gap-4">
@@ -1526,11 +1584,38 @@ export default function App() {
           )}
 
           {/* Default Bottom Editor */}
-          <section className="mt-20 rounded-[2rem] border border-white/10 bg-white/5 p-5 shadow-2xl shadow-black/20 backdrop-blur-xl sm:p-8">
-            <h2 className="mb-6 text-2xl font-bold sm:text-3xl flex items-center gap-3">
-              <Pencil className="text-violet-400" /> Create Your Meme 😎
-            </h2>
-            <MemeEditor user={user} onUpload={handleUploadMeme} isBlockedUser={isBlockedUser} />
+          <section className="mt-20 mb-10">
+            {!isBottomEditorVisible ? (
+              <div className="flex flex-col items-center justify-center p-8 sm:p-12 rounded-[2.5rem] border border-white/10 bg-white/[0.03] backdrop-blur-xl text-center">
+                <div className="w-16 h-16 bg-violet-500/10 rounded-2xl flex items-center justify-center mb-6">
+                  <Pencil className="text-violet-400" size={32} />
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-black mb-4">Ready to Create?</h2>
+                <p className="text-zinc-400 max-w-md mb-8 text-sm sm:text-base">
+                  Launch the meme studio to build your own situational roasts using our built-in canvas tool.
+                </p>
+                <button
+                  onClick={() => setIsBottomEditorVisible(true)}
+                  className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-black text-lg shadow-xl shadow-violet-500/20 hover:opacity-90 active:scale-95 transition-all"
+                >
+                  <Pencil size={20} /> Open Meme Studio
+                </button>
+              </div>
+            ) : (
+              <div className="rounded-[2.5rem] border border-white/10 bg-white/5 p-5 shadow-2xl shadow-black/20 backdrop-blur-xl sm:p-8 lg:p-10 relative">
+                <button 
+                  onClick={() => setIsBottomEditorVisible(false)}
+                  className="absolute top-6 right-6 p-2.5 rounded-full bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition-all border border-white/5"
+                  aria-label="Close studio"
+                >
+                  <X size={20} />
+                </button>
+                <h2 className="mb-8 text-2xl sm:text-3xl font-black flex items-center gap-3">
+                  <Pencil className="text-violet-400" /> Meme Studio
+                </h2>
+                <MemeEditor user={user} onUpload={handleUploadMeme} isBlockedUser={isBlockedUser} />
+              </div>
+            )}
           </section>
         </main>
 

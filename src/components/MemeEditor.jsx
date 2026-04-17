@@ -651,16 +651,16 @@ export default function MemeEditor({
 
   return (
     <div
-      className={`grid gap-5 ${
+      className={`grid gap-6 ${
         isModal
-          ? "lg:grid-cols-[minmax(0,1.02fr)_minmax(0,0.98fr)] xl:grid-cols-[minmax(0,1.06fr)_minmax(0,0.94fr)]"
-          : "lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]"
+          ? "lg:grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]"
+          : "lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]"
       } lg:items-start`}
     >
       <div className="order-2 min-w-0 lg:order-1">
         <div
-          className={`space-y-5 overflow-hidden rounded-[2.2rem] border border-white/10 bg-white/[0.03] shadow-2xl shadow-black/15 backdrop-blur-sm ${
-            isModal ? "p-4 sm:p-5 lg:p-6" : "p-4 sm:p-6 lg:p-8"
+          className={`space-y-6 overflow-hidden rounded-[2.2rem] border border-white/10 bg-white/[0.03] shadow-2xl shadow-black/15 backdrop-blur-sm ${
+            isModal ? "p-5 sm:p-6 lg:p-7" : "p-5 sm:p-7 lg:p-9"
           }`}
         >
           {isRemixEditor ? (
@@ -839,8 +839,8 @@ export default function MemeEditor({
           ) : null}
 
           <div
-            className={`overflow-hidden space-y-4 rounded-[2rem] border border-white/10 bg-white/[0.02] shadow-2xl shadow-black/10 ${
-              isModal ? "p-4" : "p-5"
+            className={`overflow-hidden space-y-5 rounded-[2rem] border border-white/10 bg-white/[0.02] shadow-2xl shadow-black/10 ${
+              isModal ? "p-5" : "p-6"
             }`}
           >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -875,10 +875,10 @@ export default function MemeEditor({
               return (
                 <div
                   key={layer.id}
-                  className={`min-w-0 overflow-hidden rounded-[1.5rem] border ${isModal ? "p-4" : "p-5"} transition-all duration-300 ${
+                  className={`min-w-0 overflow-hidden rounded-[1.75rem] border ${isModal ? "p-5" : "p-6"} transition-all duration-300 ${
                     isActive
-                      ? "border-violet-500/50 bg-violet-500/10 shadow-lg shadow-violet-500/5"
-                      : "border-white/10 bg-black/30 hover:border-white/20"
+                      ? "border-violet-500/60 bg-violet-500/15 shadow-xl shadow-violet-500/10"
+                      : "border-white/5 bg-black/40 hover:border-white/10"
                   }`}
                 >
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -1028,7 +1028,7 @@ export default function MemeEditor({
 
           <div
             className={`flex flex-col gap-4 rounded-[2rem] border border-white/10 bg-white/[0.02] shadow-2xl shadow-black/10 sm:flex-row ${
-              isModal ? "p-4" : "p-5"
+              isModal ? "p-5" : "p-6"
             }`}
           >
           <button
