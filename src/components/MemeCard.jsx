@@ -1,5 +1,13 @@
-import { useState, useEffect } from "react";
-import { Download, Heart, Bookmark, MessageCircle, ChevronDown, AlertTriangle, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  Download,
+  Heart,
+  Bookmark,
+  MessageCircle,
+  ChevronDown,
+  AlertTriangle,
+  Trash2,
+} from "lucide-react";
 import { motion as Motion, AnimatePresence } from "framer-motion";
 import { supabase } from "../lib/supabase";
 import { getOwnerMemeLikeSnapshot, setOwnerMemeLike } from "../utils/likes";
@@ -23,7 +31,7 @@ export default function MemeCard({
   priority = false,
 }) {
   const isFavorite = favorites.includes(meme.id);
-  const isStaticMeme = !meme.user_id; // Identifies if it's a pre-loaded static meme
+  const isStaticMeme = !meme.user_id;
   const imageSrc = meme.image || meme.image_url;
   const canReport = Boolean(
     user &&
@@ -51,7 +59,6 @@ export default function MemeCard({
         return;
       }
 
-      // Use local storage fallback only for static memes not yet in DB
       if (isStaticMeme) {
         const snapshot = getOwnerMemeLikeSnapshot(meme.id, user.id);
         if (!isMounted) return;
@@ -97,7 +104,6 @@ export default function MemeCard({
     const nextLiked = !previousLiked;
     const nextCount = nextLiked ? previousCount + 1 : Math.max(0, previousCount - 1);
 
-    // Optimistic UI Update
     setLiked(nextLiked);
     setLocalLikeCount(nextCount);
     onLikeCountChange?.(meme.id, nextCount, isStaticMeme);
@@ -143,7 +149,7 @@ export default function MemeCard({
       }
     } catch (error) {
       console.error("Like error:", error);
-      setLiked(previousLiked); // Rollback on error
+      setLiked(previousLiked);
       setLocalLikeCount(previousCount);
       onLikeCountChange?.(meme.id, previousCount, isStaticMeme);
       onLikeStateChange?.(meme.id, previousLiked);
@@ -153,10 +159,8 @@ export default function MemeCard({
     }
   };
 
-  // Transform Cloudinary URL for performance
   const getOptimizedUrl = (url) => {
     if (!url || !url.includes("cloudinary.com")) return url;
-    // Inject f_auto (auto format), q_auto (auto quality), w_500 (resize)
     return url.replace("/upload/", "/upload/f_auto,q_auto,w_500,c_scale/");
   };
 
@@ -207,13 +211,10 @@ export default function MemeCard({
             handleLike(e);
           }}
           disabled={isLiking}
-          className={`absolute top-2 right-2 sm:top-4 sm:right-4 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center border border-white/20 hover:scale-110 transition active:scale-90 ${liked ? 'border-pink-500/50' : ''}`}
+          className={`absolute top-2 right-2 sm:top-4 sm:right-4 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center border border-white/20 hover:scale-110 transition active:scale-90 ${liked ? "border-pink-500/50" : ""}`}
         >
           <div className="flex flex-col items-center justify-center">
-            <Motion.div
-              animate={{ scale: liked ? [1, 1.4, 1] : 1 }}
-              transition={{ duration: 0.3 }}
-            >
+            <Motion.div animate={{ scale: liked ? [1, 1.4, 1] : 1 }} transition={{ duration: 0.3 }}>
               <Heart
                 className={`w-4 h-4 sm:w-5 sm:h-5 transition-all ${
                   liked ? "fill-pink-500 text-pink-500" : "text-white"
@@ -253,9 +254,7 @@ export default function MemeCard({
           className="absolute top-2 left-2 sm:top-4 sm:left-4 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center border border-white/20 hover:scale-110 transition"
         >
           <Bookmark
-            className={`w-4 h-4 sm:w-5 sm:h-5 ${
-              isFavorite ? "fill-violet-500 text-violet-500" : "text-white"
-            }`}
+            className={`w-4 h-4 sm:w-5 sm:h-5 ${isFavorite ? "fill-violet-500 text-violet-500" : "text-white"}`}
           />
         </button>
       </div>
@@ -297,9 +296,7 @@ export default function MemeCard({
               <MessageCircle className="h-4 w-4 text-violet-300" />
               {isCommentsOpen ? "Hide Comments" : "Open Comments"}
             </span>
-            <ChevronDown
-              className={`h-4 w-4 text-zinc-400 transition-transform ${isCommentsOpen ? "rotate-180" : ""}`}
-            />
+            <ChevronDown className={`h-4 w-4 text-zinc-400 transition-transform ${isCommentsOpen ? "rotate-180" : ""}`} />
           </button>
         </div>
 
@@ -312,20 +309,16 @@ export default function MemeCard({
               transition={{ duration: 0.25 }}
               className="overflow-hidden"
             >
-              <CommentsSection
-                memeId={meme.id}
-                user={user}
-                isDatabaseMeme={meme.isDatabaseMeme}
-              />
+              <CommentsSection memeId={meme.id} user={user} isDatabaseMeme={meme.isDatabaseMeme} />
             </Motion.div>
           ) : null}
         </AnimatePresence>
       </div>
 
-      <ReportModal 
-        isOpen={isReportModalOpen} 
-        onClose={() => setIsReportModalOpen(false)} 
-        memeId={meme.id} 
+      <ReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        memeId={meme.id}
         user={user}
         memeOwnerId={meme.user_id}
         isAdminUser={isAdminUser}

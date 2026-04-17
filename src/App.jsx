@@ -36,6 +36,7 @@ import AvatarPicker from "./components/AvatarPicker";
 import AdminModeration from "./components/AdminModeration";
 import Footer from "./components/Footer";
 import Hero from "./components/Hero";
+import Loader from "./components/Loader";
 import MemeGrid from "./components/MemeGrid";
 import NotificationBell from "./components/NotificationBell";
 import SearchBar from "./components/SearchBar";
@@ -54,6 +55,7 @@ import { supabase } from "./lib/supabase";
 const MemeModal = lazy(() => import("./components/MemeModal"));
 const UploadMeme = lazy(() => import("./components/UploadMeme"));
 const MemeEditor = lazy(() => import("./components/MemeEditor"));
+const RemixEditorPage = lazy(() => import("./components/RemixEditorPage"));
 const LoginModal = lazy(() => import("./components/LoginModal"));
 const ResetPassword = lazy(() => import("./components/ResetPassword"));
 const HelpModal = lazy(() => import("./components/HelpModal"));
@@ -105,6 +107,7 @@ const SEMANTIC_DEBOUNCE_MS = 450;
 const SEMANTIC_API_URL = import.meta.env.VITE_SEMANTIC_API_URL || "/api/semantic-search";
 
 export default function App() {
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -1002,19 +1005,34 @@ export default function App() {
 
   useEffect(() => {
     const fetchMemes = async () => {
-      const { data, error } = await supabase
-        .from("meme-table")
-        .select("*, profiles(username)")
-        .order("created_at", { ascending: false });
+      const startedAt = Date.now();
+      setLoading(true);
 
-      if (error) return console.error("Error fetching memes:", error);
+      try {
+        const { data, error } = await supabase
+          .from("meme-table")
+          .select("*, profiles(username)")
+          .order("created_at", { ascending: false });
 
-      const formatted = data.map((m) => normalizeMeme(m));
-      setDbMemes(formatted);
+        if (error) {
+          console.error("Error fetching memes:", error);
+          return;
+        }
+
+        const formatted = data.map((m) => normalizeMeme(m));
+        setDbMemes(formatted);
+      } finally {
+        const elapsed = Date.now() - startedAt;
+        const remaining = Math.max(0, 1000 - elapsed);
+        window.setTimeout(() => {
+          setLoading(false);
+        }, remaining);
+      }
     };
 
     fetchMemes();
   }, []);
+  const showLoader = loading && path !== "/reset-password" && path !== "/admin";
 
   if (path === "/reset-password") {
     return <ResetPassword user={user} />;
@@ -1143,7 +1161,9 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-[#070B14] text-white flex">
+    <>
+      <AnimatePresence>{showLoader ? <Loader /> : null}</AnimatePresence>
+      <div className="min-h-screen bg-[#070B14] text-white flex">
       {/* Desktop Sidebar (Persistent) */}
       <aside className="hidden lg:block fixed top-0 left-0 z-30 h-screen w-64 bg-[#0d1220] border-r border-white/10 p-6 shadow-2xl overflow-y-auto">
         <SidebarContent />
@@ -1519,35 +1539,38 @@ export default function App() {
         {/* Editor Popup Modal */}
         <AnimatePresence>
           {isEditorModalOpen && (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 lg:pl-64">
+            <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto p-4 sm:p-5 lg:pl-72 lg:pr-6">
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setIsEditorModalOpen(false)}
-                className="fixed inset-0 bg-black/80 backdrop-blur-md"
+                className="fixed inset-0 bg-[radial-gradient(circle_at_top,rgba(139,92,246,0.16),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.12),transparent_24%),rgba(2,6,23,0.82)] backdrop-blur-2xl"
               />
               <motion.div
-                initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                animate={{ scale: 1, opacity: 1, y: 0 }}
-                exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                className="relative w-full max-w-5xl bg-[#0d1220] border border-white/10 rounded-[2.5rem] p-6 sm:p-10 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar"
+                initial={{ opacity: 0, scale: 0.97, y: 24 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.97, y: 24 }}
+                className="relative mt-2 flex h-[calc(100dvh-2rem)] w-full max-w-[1560px] flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(7,11,20,0.98),rgba(5,8,16,0.95))] shadow-2xl shadow-black/50 sm:mt-4 sm:h-[calc(100dvh-2.5rem)] sm:rounded-[2.25rem]"
               >
-                <div className="flex items-center justify-between mb-6 gap-3">
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => setIsEditorModalOpen(false)}
-                      className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-zinc-300 transition hover:bg-white/10 hover:text-white"
-                    >
-                      <ArrowLeft size={16} />
-                      Back
-                    </button>
-                    <h2 className="text-2xl font-bold">Meme Editor</h2>
-                  </div>
-                  <button onClick={() => setIsEditorModalOpen(false)} className="p-2 rounded-full bg-white/5 hover:bg-white/10"><X size={20}/></button>
-                </div>
-                <Suspense fallback={<div className="flex justify-center p-10"><Loader2 className="animate-spin text-violet-500" /></div>}>
-                  <MemeEditor user={user} onUpload={handleUploadMeme} onSuccess={(msg) => { setIsEditorModalOpen(false); setNotification({ type: 'success', message: msg }); }} isBlockedUser={isBlockedUser} />
+                <Suspense
+                  fallback={
+                    <div className="flex h-full items-center justify-center text-white">
+                      <Loader2 className="animate-spin text-violet-500" />
+                    </div>
+                  }
+                >
+                  <RemixEditorPage
+                    user={user}
+                    isBlockedUser={isBlockedUser}
+                    isModal
+                    onBack={() => setIsEditorModalOpen(false)}
+                    onUpload={handleUploadMeme}
+                    onSuccess={(msg) => {
+                      setIsEditorModalOpen(false);
+                      setNotification({ type: "success", message: msg });
+                    }}
+                  />
                 </Suspense>
               </motion.div>
             </div>
@@ -2206,6 +2229,7 @@ export default function App() {
         </Suspense>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
