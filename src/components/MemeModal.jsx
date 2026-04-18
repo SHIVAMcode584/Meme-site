@@ -337,7 +337,7 @@ export default function MemeModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-end justify-center p-0 sm:items-center sm:p-4 lg:pl-64">
+    <div className="fixed inset-0 z-[150] flex items-end justify-center p-0 xl:items-center xl:p-4 xl:pl-64">
       <motion.button
         type="button"
         initial={{ opacity: 0 }}
@@ -353,7 +353,7 @@ export default function MemeModal({
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 24, scale: 0.98 }}
         transition={{ duration: 0.22, ease: "easeOut" }}
-        className="relative z-10 flex h-[92dvh] w-full max-w-6xl flex-col overflow-hidden border border-white/10 bg-[#0d1220] shadow-2xl shadow-black/50 sm:h-auto sm:max-h-[92vh] sm:rounded-[2rem]"
+        className="relative z-10 flex h-[92dvh] w-full flex-col overflow-hidden border border-white/10 bg-[#0d1220] shadow-2xl shadow-black/50 xl:h-auto xl:max-h-[92vh] xl:max-w-6xl xl:rounded-[2rem]"
       >
         <div className="absolute inset-x-0 top-0 z-10 flex justify-center pt-3 sm:hidden">
           <div className="h-1.5 w-14 rounded-full bg-white/15" />
@@ -361,12 +361,12 @@ export default function MemeModal({
 
         <button
           onClick={onClose}
-          className="absolute right-3 top-3 z-30 cursor-pointer rounded-full border border-white/15 bg-black/40 p-2 text-white transition hover:bg-black/60 sm:right-5 sm:top-5 lg:hidden"
+          className="absolute right-3 top-3 z-30 cursor-pointer rounded-full border border-white/15 bg-black/40 p-2 text-white transition hover:bg-black/60 xl:hidden"
         >
           <X size={20} />
         </button>
 
-        <div className="hidden items-center justify-between gap-3 border-b border-white/10 px-6 py-4 lg:flex">
+        <div className="hidden items-center justify-between gap-3 border-b border-white/10 px-6 py-4 xl:flex">
           <button
             type="button"
             onClick={() => handleNavigate(-1)}
@@ -418,17 +418,17 @@ export default function MemeModal({
             }}
             transition={isDragging ? { duration: 0 } : { duration: 0.28, ease: "easeOut" }}
             style={{ touchAction: "pan-y" }}
-            className="grid h-full min-h-0 lg:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]"
+            className="grid h-full min-h-0 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]"
           >
             <div
-              className="relative flex min-h-[34vh] select-none items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top,#312e81_0%,#0b1020_55%,#05070d_100%)] px-4 pb-4 pt-10 sm:min-h-[44vh] sm:px-6 sm:pb-6 sm:pt-14 lg:min-h-0 lg:px-8 lg:py-8"
+              className="relative flex min-h-[34vh] select-none items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top,#312e81_0%,#0b1020_55%,#05070d_100%)] px-4 pb-4 pt-10 sm:min-h-[44vh] sm:px-6 sm:pb-6 sm:pt-14 xl:min-h-0 xl:px-8 xl:py-8"
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
               onTouchEnd={endSwipe}
               onTouchCancel={endSwipe}
             >
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,rgba(236,72,153,0.18),transparent_45%)] transition-opacity duration-300" />
-              <div className="absolute left-4 top-4 z-20 flex items-center gap-2 rounded-full border border-white/10 bg-black/35 px-3 py-1.5 text-[11px] font-semibold text-white/80 backdrop-blur-md sm:hidden">
+              <div className="absolute left-4 top-4 z-20 flex items-center gap-2 rounded-full border border-white/10 bg-black/35 px-3 py-1.5 text-[11px] font-semibold text-white/80 backdrop-blur-md xl:hidden">
                 <ChevronLeft size={12} />
                 Swipe to browse
                 <ChevronRight size={12} />
@@ -438,13 +438,13 @@ export default function MemeModal({
                   src={imageSrc}
                   alt={meme.title}
                   draggable="false"
-                  className="max-h-[28vh] w-auto max-w-full rounded-[1.25rem] object-contain sm:max-h-[38vh] lg:max-h-[76vh]"
+                  className="max-h-[28vh] w-auto max-w-full rounded-[1.25rem] object-contain sm:max-h-[38vh] xl:max-h-[76vh]"
                 />
               </div>
             </div>
 
             <div className="flex min-h-0 flex-col overflow-hidden">
-              <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-6 lg:hidden">
+              <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-6 xl:hidden">
                 <button
                   type="button"
                   onClick={() => handleNavigate(-1)}
@@ -468,7 +468,7 @@ export default function MemeModal({
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-4 pb-5 pt-4 sm:px-6 sm:pb-6 sm:pt-5 lg:px-7 lg:pb-7 custom-scrollbar">
+              <div className="flex-1 overflow-y-auto px-4 pb-5 pt-4 sm:px-6 sm:pb-6 sm:pt-5 xl:px-7 xl:pb-7 custom-scrollbar">
                 <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-4 shadow-lg shadow-black/20 sm:p-5">
                   <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-violet-200/90">
                     <span className="rounded-full border border-violet-400/20 bg-violet-500/10 px-3 py-1">

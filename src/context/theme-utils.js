@@ -30,9 +30,13 @@ export const THEME_OPTIONS = [
 export function getInitialTheme() {
   if (typeof window === "undefined") return "dark";
 
-  const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
-  if (THEME_OPTIONS.some((option) => option.id === savedTheme)) {
-    return savedTheme;
+  try {
+    const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+    if (THEME_OPTIONS.some((option) => option.id === savedTheme)) {
+      return savedTheme;
+    }
+  } catch {
+    // Some mobile browsers and private modes can block storage access.
   }
 
   return "dark";
@@ -44,4 +48,3 @@ export function applyThemeToDocument(theme) {
   document.documentElement.className = theme;
   document.documentElement.dataset.theme = theme;
 }
-

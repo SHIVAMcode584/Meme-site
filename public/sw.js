@@ -1,4 +1,4 @@
-const CACHE_NAME = "roastriot-cache-v1";
+const CACHE_NAME = "roastriot-cache-v2";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
@@ -42,13 +42,9 @@ self.addEventListener("fetch", (event) => {
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
-        .then((response) => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          return response;
-        })
+        .then((response) => response)
         .catch(async () => {
-          const cachedPage = await caches.match(request);
+          const cachedPage = await caches.match("/index.html");
           if (cachedPage) return cachedPage;
           return caches.match("/offline.html");
         })

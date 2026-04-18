@@ -21,8 +21,8 @@ html.light {
   --app-bg: #f7f8fc;
   --app-surface: #ffffff;
   --app-surface-2: #eef2ff;
-  --app-text: #111827;
-  --app-muted: #6b7280;
+  --app-text: #020617;
+  --app-muted: #475569;
   --app-border: rgba(15, 23, 42, 0.12);
   --app-accent: #2563eb;
   --app-accent-2: #f97316;
@@ -88,18 +88,21 @@ html.cyberpunk {
 html.light .text-white,
 html.light .text-zinc-50,
 html.light .text-zinc-100 {
-  color: var(--app-text) !important;
+  color: #020617 !important;
+  font-weight: 600;
 }
 
 html.light .text-zinc-200,
 html.light .text-zinc-300 {
-  color: #334155 !important;
+  color: #0f172a !important;
+  font-weight: 500;
 }
 
 html.light .text-zinc-400,
 html.light .text-zinc-500,
 html.light .text-zinc-600 {
-  color: var(--app-muted) !important;
+  color: #475569 !important;
+  font-weight: 500;
 }
 
 html.light .border-white\/5,
@@ -231,6 +234,7 @@ body {
 
 html.light body {
   background-attachment: local;
+  font-weight: 500;
 }
 
 button {

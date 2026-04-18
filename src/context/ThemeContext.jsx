@@ -10,7 +10,11 @@ export function ThemeProvider({ children, initialTheme }) {
 
   useEffect(() => {
     applyThemeToDocument(theme);
-    window.localStorage.setItem("roastriot-theme", theme);
+    try {
+      window.localStorage.setItem("roastriot-theme", theme);
+    } catch {
+      // Ignore storage failures so the app can still render on locked-down browsers.
+    }
   }, [theme]);
 
   const setTheme = (nextTheme) => {
@@ -42,4 +46,3 @@ export function useTheme() {
 
   return value;
 }
-

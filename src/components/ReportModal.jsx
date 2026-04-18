@@ -191,7 +191,7 @@ export default function ReportModal({
   return (
     <AnimatePresence>
       {isOpen ? (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 lg:pl-64">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 xl:pl-64">
           <motion.button
             type="button"
             initial={{ opacity: 0 }}

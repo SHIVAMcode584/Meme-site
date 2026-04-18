@@ -16,7 +16,12 @@ const readStore = () => {
 
 const writeStore = (store) => {
   if (typeof window === "undefined") return;
-  localStorage.setItem(OWNER_LIKES_STORAGE_KEY, JSON.stringify(store));
+
+  try {
+    localStorage.setItem(OWNER_LIKES_STORAGE_KEY, JSON.stringify(store));
+  } catch {
+    // Ignore storage failures so likes still work for the current session.
+  }
 };
 
 const normalizeEntry = (entry) => {

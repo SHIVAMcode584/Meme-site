@@ -188,7 +188,11 @@ export default function App() {
   );
 
   useEffect(() => {
-    localStorage.setItem("favorite-memes", JSON.stringify(favorites));
+    try {
+      localStorage.setItem("favorite-memes", JSON.stringify(favorites));
+    } catch {
+      // Keep the app usable if the browser blocks storage writes.
+    }
   }, [favorites]);
 
   useEffect(() => {
