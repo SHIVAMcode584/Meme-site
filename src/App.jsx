@@ -129,6 +129,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isThemeSwitcherOpen, setIsThemeSwitcherOpen] = useState(false);
   const [isEditorModalOpen, setIsEditorModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -166,10 +167,14 @@ export default function App() {
   const [memeList, setMemeList] = useState([]);
   const [currentMemeId, setCurrentMemeId] = useState(null);
   const [currentMemeIndex, setCurrentMemeIndex] = useState(-1);
+  const allMemesNormalized = useMemo(() => {
+    return [...dbMemes, ...memes].map(m => normalizeMeme(m, user?.id));
+  }, [dbMemes, user?.id]);
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const path = currentPath;
   const isOverlayOpen = Boolean(
     isSidebarOpen ||
+      isThemeSwitcherOpen ||
       currentMemeId ||
       isEditorModalOpen ||
       isUploadModalOpen ||
@@ -442,10 +447,6 @@ export default function App() {
       isCancelled = true;
     };
   }, [debouncedSearch, selectedCategory, user?.id, viewMode]);
-
-  const allMemesNormalized = useMemo(() => {
-    return [...dbMemes, ...memes].map(m => normalizeMeme(m, user?.id));
-  }, [dbMemes, user?.id]);
 
   useEffect(() => {
     setMemeList(allMemesNormalized);
@@ -1369,7 +1370,10 @@ export default function App() {
                   </div>
 
                   <div className="flex shrink-0 items-center gap-1.5 sm:gap-3 md:gap-2">
-                    <ThemeSwitcher />
+                    <ThemeSwitcher
+                      isOpen={isThemeSwitcherOpen}
+                      onOpenChange={setIsThemeSwitcherOpen}
+                    />
                     {profile ? (
                       <div className="flex shrink-0 items-center gap-1 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-2 py-1 sm:gap-1.5 sm:px-4 sm:py-2 md:px-2.5 md:py-1.5">
                         <Award size={13} className="text-[color:var(--app-accent)] sm:w-4 sm:h-4" />

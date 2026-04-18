@@ -2,9 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Check, ChevronDown, Palette } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 
-export default function ThemeSwitcher() {
+export default function ThemeSwitcher({ isOpen, onOpenChange }) {
   const { theme, setTheme, themeOptions } = useTheme();
-  const [isOpen, setIsOpen] = useState(false);
   const [menuStyle, setMenuStyle] = useState(null);
   const rootRef = useRef(null);
   const activeTheme = themeOptions.find((option) => option.id === theme) || themeOptions[1];
@@ -49,13 +48,13 @@ export default function ThemeSwitcher() {
   useEffect(() => {
     const onPointerDown = (event) => {
       if (!rootRef.current?.contains(event.target)) {
-        setIsOpen(false);
+        onOpenChange(false);
       }
     };
 
     const onKeyDown = (event) => {
       if (event.key === "Escape") {
-        setIsOpen(false);
+        onOpenChange(false);
       }
     };
 
@@ -66,13 +65,13 @@ export default function ThemeSwitcher() {
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, []);
+  }, [onOpenChange]);
 
   return (
     <div ref={rootRef} className="relative shrink-0">
       <button
         type="button"
-        onClick={() => setIsOpen((current) => !current)}
+        onClick={() => onOpenChange(!isOpen)}
         className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-2.5 py-1.5 text-[11px] font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-2)] sm:gap-2 sm:px-4 sm:py-2 sm:text-xs"
         aria-expanded={isOpen}
         aria-haspopup="menu"
@@ -111,7 +110,7 @@ export default function ThemeSwitcher() {
                     aria-checked={isActive}
                     onClick={() => {
                       setTheme(option.id);
-                      setIsOpen(false);
+                      onOpenChange(false);
                     }}
                     className={`group flex items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition sm:py-3 ${
                       isActive
