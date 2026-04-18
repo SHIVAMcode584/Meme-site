@@ -1,5 +1,155 @@
 @import "tailwindcss";
 
+:root {
+  --app-bg: #070b14;
+  --app-surface: #0d1220;
+  --app-surface-2: #11182a;
+  --app-text: #f8fafc;
+  --app-muted: #94a3b8;
+  --app-border: rgba(255, 255, 255, 0.1);
+  --app-accent: #8b5cf6;
+  --app-accent-2: #d946ef;
+  --app-glow: rgba(139, 92, 246, 0.24);
+  --app-page-gradient:
+    radial-gradient(circle at top, rgba(139, 92, 246, 0.18), transparent 35%),
+    radial-gradient(circle at 20% 0%, rgba(236, 72, 153, 0.08), transparent 28%),
+    linear-gradient(180deg, #070b14 0%, #04070d 100%);
+  color-scheme: dark;
+}
+
+html.light {
+  --app-bg: #f7f8fc;
+  --app-surface: #ffffff;
+  --app-surface-2: #eef2ff;
+  --app-text: #111827;
+  --app-muted: #6b7280;
+  --app-border: rgba(15, 23, 42, 0.12);
+  --app-accent: #2563eb;
+  --app-accent-2: #f97316;
+  --app-glow: rgba(37, 99, 235, 0.18);
+  --app-page-gradient:
+    radial-gradient(circle at top, rgba(37, 99, 235, 0.12), transparent 34%),
+    radial-gradient(circle at 20% 0%, rgba(249, 115, 22, 0.08), transparent 28%),
+    linear-gradient(180deg, #f8fbff 0%, #eef2ff 100%);
+  color-scheme: light;
+}
+
+html.dark {
+  --app-bg: #070b14;
+  --app-surface: #0d1220;
+  --app-surface-2: #11182a;
+  --app-text: #f8fafc;
+  --app-muted: #94a3b8;
+  --app-border: rgba(255, 255, 255, 0.1);
+  --app-accent: #8b5cf6;
+  --app-accent-2: #d946ef;
+  --app-glow: rgba(139, 92, 246, 0.24);
+  --app-page-gradient:
+    radial-gradient(circle at top, rgba(139, 92, 246, 0.18), transparent 35%),
+    radial-gradient(circle at 20% 0%, rgba(236, 72, 153, 0.08), transparent 28%),
+    linear-gradient(180deg, #070b14 0%, #04070d 100%);
+  color-scheme: dark;
+}
+
+html.neon {
+  --app-bg: #050608;
+  --app-surface: #0c1020;
+  --app-surface-2: #11162a;
+  --app-text: #ecfff8;
+  --app-muted: #8af7d0;
+  --app-border: rgba(74, 222, 128, 0.18);
+  --app-accent: #39ff14;
+  --app-accent-2: #00e5ff;
+  --app-glow: rgba(57, 255, 20, 0.24);
+  --app-page-gradient:
+    radial-gradient(circle at top, rgba(57, 255, 20, 0.16), transparent 35%),
+    radial-gradient(circle at 20% 0%, rgba(0, 229, 255, 0.08), transparent 28%),
+    linear-gradient(180deg, #050608 0%, #020203 100%);
+  color-scheme: dark;
+}
+
+html.cyberpunk {
+  --app-bg: #0b0620;
+  --app-surface: #170a2a;
+  --app-surface-2: #26113d;
+  --app-text: #fff2fd;
+  --app-muted: #f0a7ff;
+  --app-border: rgba(255, 0, 200, 0.22);
+  --app-accent: #ff00d4;
+  --app-accent-2: #ffd166;
+  --app-glow: rgba(255, 0, 212, 0.24);
+  --app-page-gradient:
+    radial-gradient(circle at top, rgba(255, 0, 212, 0.14), transparent 35%),
+    radial-gradient(circle at 20% 0%, rgba(255, 209, 102, 0.08), transparent 28%),
+    linear-gradient(180deg, #0b0620 0%, #05020f 100%);
+  color-scheme: dark;
+}
+
+html.light .text-white,
+html.light .text-zinc-50,
+html.light .text-zinc-100 {
+  color: var(--app-text) !important;
+}
+
+html.light .text-zinc-200,
+html.light .text-zinc-300 {
+  color: #334155 !important;
+}
+
+html.light .text-zinc-400,
+html.light .text-zinc-500,
+html.light .text-zinc-600 {
+  color: var(--app-muted) !important;
+}
+
+html.light .border-white\/5,
+html.light .border-white\/10,
+html.light .border-white\/15 {
+  border-color: var(--app-border) !important;
+}
+
+html.light .bg-white\/5,
+html.light .bg-white\/10 {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+}
+
+html.light .admin-panel [class*="bg-[#0d1220]"],
+html.light .admin-panel [class*="bg-[#111827]/60"],
+html.light .admin-panel [class*="bg-[#070B14]/50"],
+html.light .admin-panel [class*="bg-[#0d1220]/95"],
+html.light .admin-panel [class*="bg-black/30"],
+html.light .admin-panel [class*="bg-black/40"],
+html.light .admin-panel [class*="bg-black/50"] {
+  background-color: rgba(255, 255, 255, 0.88) !important;
+}
+
+html.light .admin-panel [class*="border-white/5"],
+html.light .admin-panel [class*="border-white/10"],
+html.light .admin-panel [class*="border-white/15"] {
+  border-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+html.light .admin-panel [class*="text-white"] {
+  color: #0f172a !important;
+}
+
+html.light .admin-panel [class*="text-zinc-100"],
+html.light .admin-panel [class*="text-zinc-200"],
+html.light .admin-panel [class*="text-zinc-300"] {
+  color: #334155 !important;
+}
+
+html.light .admin-panel [class*="text-zinc-400"],
+html.light .admin-panel [class*="text-zinc-500"] {
+  color: #64748b !important;
+}
+
+html.light .admin-panel [class*="bg-white/[0.03]"],
+html.light .admin-panel [class*="bg-white/[0.04]"],
+html.light .admin-panel [class*="bg-white/[0.05]"] {
+  background-color: rgba(255, 255, 255, 0.94) !important;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -11,14 +161,27 @@ body,
   padding: 0;
   min-height: 100%;
   width: 100%;
-  background: #070b14;
-  color: white;
+  background: var(--app-bg);
+  color: var(--app-text);
   font-family: Inter, system-ui, sans-serif;
 }
 
 body {
   overflow-x: hidden;
   overscroll-behavior-y: none;
+  background: var(--app-page-gradient);
+  background-attachment: fixed;
+  color: var(--app-text);
+  transition:
+    background-color 0.3s ease,
+    background-image 0.3s ease,
+    color 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+html.light body {
+  background-attachment: local;
 }
 
 button {

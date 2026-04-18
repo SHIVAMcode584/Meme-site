@@ -681,7 +681,7 @@ export default function AdminModeration({ user, onBack, onMemeDeleted }) {
   ];
 
   return (
-    <div className="relative mx-auto max-w-7xl overflow-x-hidden px-3 py-3 sm:px-6 sm:py-6 lg:px-8">
+    <div className="admin-panel relative mx-auto max-w-7xl overflow-x-hidden px-3 py-3 sm:px-6 sm:py-6 lg:px-8">
       <div className="absolute inset-x-0 top-0 -z-10 h-64 bg-[radial-gradient(circle_at_top,rgba(168,85,247,0.16),transparent_55%)]" />
 
       <div className="mb-4 flex items-center justify-center rounded-full border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-[0.22em] text-violet-200 sm:px-4 sm:text-sm sm:tracking-[0.35em]">

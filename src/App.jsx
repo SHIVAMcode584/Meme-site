@@ -39,6 +39,7 @@ import Hero from "./components/Hero";
 import Loader from "./components/Loader";
 import MemeGrid from "./components/MemeGrid";
 import NotificationBell from "./components/NotificationBell";
+import ThemeSwitcher from "./components/ThemeSwitcher";
 import SearchBar from "./components/SearchBar";
 import { memes } from "./data/memes";
 import { categories, smartSearch, suggestions } from "./utils/helpers";
@@ -111,7 +112,6 @@ export default function App() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
-  const [activeMeme, setActiveMeme] = useState(null);
   const [favorites, setFavorites] = useState(getInitialFavorites);
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -150,11 +150,14 @@ export default function App() {
   const [isUsernameConfirmOpen, setIsUsernameConfirmOpen] = useState(false);
   const [usernameDraft, setUsernameDraft] = useState("");
   const [isSavingUsername, setIsSavingUsername] = useState(false);
+  const [memeList, setMemeList] = useState([]);
+  const [currentMemeId, setCurrentMemeId] = useState(null);
+  const [currentMemeIndex, setCurrentMemeIndex] = useState(-1);
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const path = currentPath;
   const isOverlayOpen = Boolean(
     isSidebarOpen ||
-      activeMeme ||
+      currentMemeId ||
       isEditorModalOpen ||
       isUploadModalOpen ||
       isLoginModalOpen ||
@@ -401,6 +404,34 @@ export default function App() {
   const allMemesNormalized = useMemo(() => {
     return [...dbMemes, ...memes].map(m => normalizeMeme(m, user?.id));
   }, [dbMemes, user?.id]);
+
+  useEffect(() => {
+    setMemeList(allMemesNormalized);
+  }, [allMemesNormalized]);
+
+  const currentMeme = useMemo(() => {
+    if (currentMemeId == null) return null;
+    const activeList = memeList.length > 0 ? memeList : allMemesNormalized;
+    return activeList.find((meme) => String(meme.id) === String(currentMemeId)) || null;
+  }, [allMemesNormalized, currentMemeId, memeList]);
+
+  useEffect(() => {
+    if (currentMemeId == null) {
+      if (currentMemeIndex !== -1) setCurrentMemeIndex(-1);
+      return;
+    }
+
+    const nextIndex = memeList.findIndex((meme) => String(meme.id) === String(currentMemeId));
+    if (nextIndex === -1) {
+      setCurrentMemeId(null);
+      setCurrentMemeIndex(-1);
+      return;
+    }
+
+    if (nextIndex !== currentMemeIndex) {
+      setCurrentMemeIndex(nextIndex);
+    }
+  }, [currentMemeId, currentMemeIndex, memeList]);
 
   const searchPlaceholderTitles = useMemo(() => {
     const seen = new Set();
@@ -663,24 +694,55 @@ export default function App() {
     };
   }, []);
   const openMeme = (meme) => {
-    setActiveMeme(meme);
+    if (!meme) return;
+    const activeList = memeList.length > 0 ? memeList : allMemesNormalized;
+    const nextIndex = activeList.findIndex((item) => String(item.id) === String(meme.id));
+    setCurrentMemeId(meme.id);
+    setCurrentMemeIndex(nextIndex);
     const url = new URL(window.location);
     url.searchParams.set("meme", meme.id);
     window.history.replaceState({}, "", url);
   };
 
   const closeModal = () => {
-    setActiveMeme(null);
+    setCurrentMemeId(null);
+    setCurrentMemeIndex(-1);
     const url = new URL(window.location);
     url.searchParams.delete("meme");
     window.history.replaceState({}, "", url);
   };
 
   const handleRandomMeme = () => {
-    if (allMemesNormalized.length === 0) return;
-    const randomIndex = Math.floor(Math.random() * allMemesNormalized.length);
-    openMeme(allMemesNormalized[randomIndex]);
+    const activeList = memeList.length > 0 ? memeList : allMemesNormalized;
+    if (activeList.length === 0) return;
+    const randomIndex = Math.floor(Math.random() * activeList.length);
+    openMeme(activeList[randomIndex]);
   };
+
+  const navigateMeme = useCallback(
+    (direction) => {
+      const activeList = memeList.length > 0 ? memeList : allMemesNormalized;
+      if (!activeList.length || currentMemeIndex < 0) return false;
+
+      const nextIndex = currentMemeIndex + direction;
+      if (nextIndex < 0 || nextIndex >= activeList.length) return false;
+
+      const nextMeme = activeList[nextIndex];
+      if (!nextMeme) return false;
+
+      setCurrentMemeId(nextMeme.id);
+      setCurrentMemeIndex(nextIndex);
+
+      const url = new URL(window.location);
+      url.searchParams.set("meme", nextMeme.id);
+      window.history.replaceState({}, "", url);
+      return true;
+    },
+    [allMemesNormalized, currentMemeIndex, memeList]
+  );
+
+  const handlePreviousMeme = useCallback(() => navigateMeme(-1), [navigateMeme]);
+  const handleNextMeme = useCallback(() => navigateMeme(1), [navigateMeme]);
 
   const handleInstallApp = async () => {
     if (isInstallable && deferredInstallPrompt) {
@@ -893,15 +955,14 @@ export default function App() {
       return next;
     });
 
-    setActiveMeme((current) => {
-      if (!current || String(current.id) !== targetId) return current;
-
+    if (currentMemeId && String(currentMemeId) === targetId) {
       const url = new URL(window.location);
       url.searchParams.delete("meme");
       window.history.replaceState({}, "", url);
-      return null;
-    });
-  }, []);
+      setCurrentMemeId(null);
+      setCurrentMemeIndex(-1);
+    }
+  }, [currentMemeId]);
 
   useEffect(() => {
     if (!pendingMemeDelete) {
@@ -1221,9 +1282,9 @@ export default function App() {
   return (
     <>
       <AnimatePresence>{showLoader ? <Loader /> : null}</AnimatePresence>
-      <div className="min-h-screen bg-[#070B14] text-white flex">
+      <div className="min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] flex">
       {/* Desktop Sidebar (Persistent) */}
-      <aside className="hidden lg:block fixed top-0 left-0 z-[110] h-screen w-64 bg-[#0d1220] border-r border-white/10 p-6 shadow-2xl overflow-y-auto">
+      <aside className="hidden lg:block fixed top-0 left-0 z-[110] h-screen w-64 bg-[var(--app-surface)] border-r border-[color:var(--app-border)] p-6 shadow-2xl overflow-y-auto">
         <SidebarContent />
       </aside>
 
@@ -1243,7 +1304,7 @@ export default function App() {
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed top-0 left-0 z-[121] h-[100dvh] w-[80%] bg-[#0d1220] border-r border-white/10 p-4 sm:p-6 shadow-2xl sm:w-64 lg:hidden"
+              className="fixed top-0 left-0 z-[121] h-[100dvh] w-[80%] bg-[var(--app-surface)] border-r border-[color:var(--app-border)] p-4 sm:p-6 shadow-2xl sm:w-64 lg:hidden"
             >
               <SidebarContent />
             </motion.div>
@@ -1253,73 +1314,83 @@ export default function App() {
 
       <div className="flex-1 lg:pl-64 min-w-0">
         <div className="relative isolate overflow-x-clip">
-          <header className="sticky top-0 z-[105] border-b border-white/10 bg-[#070B14]/95 backdrop-blur-xl transition-all">
-            <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6 lg:flex lg:items-center lg:justify-between">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-                  <button 
-                    onClick={() => setIsSidebarOpen(true)}
-                    className="p-2 hover:bg-white/5 rounded-xl transition-colors border border-white/5 lg:hidden"
-                  >
-                    <Menu size={24} />
-                  </button>
-                  <img src={logo} alt="RoastRiot Logo" className="w-8 h-8 sm:w-10 sm:h-10 object-contain shrink-0" />
-                  <div className="hidden xs:block min-w-0">
-                    <p className="text-xs uppercase tracking-[0.35em] text-zinc-400">Meme Finder</p>
-                    <h1 className="text-base font-semibold sm:text-xl truncate">Discover & Create</h1>
+          <header className="sticky top-0 z-[105] border-b border-[color:var(--app-border)] bg-[color:var(--app-bg)]/92 backdrop-blur-xl transition-all">
+            <div className="mx-auto max-w-6xl px-3 py-2 sm:px-6 sm:py-3">
+              <div className="flex flex-col gap-2.5 rounded-[1.6rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-3 py-2.5 shadow-[0_18px_60px_rgba(2,6,23,0.12)] sm:gap-3 sm:px-5 sm:py-3 sm:rounded-[2rem] md:flex-row md:items-center md:justify-between md:gap-3 md:px-4 md:py-2.5">
+                <div className="flex items-center justify-between gap-2 md:gap-3 lg:gap-4">
+                  <div className="flex min-w-0 items-center gap-2 md:gap-3 lg:gap-4">
+                    <button
+                      onClick={() => setIsSidebarOpen(true)}
+                      className="shrink-0 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] p-2 transition hover:scale-[1.03] hover:bg-[color:var(--app-surface)] lg:hidden"
+                    >
+                      <Menu size={20} />
+                    </button>
+                    <img
+                      src={logo}
+                      alt="RoastRiot Logo"
+                      className="h-8 w-8 shrink-0 object-contain sm:h-10 sm:w-10"
+                    />
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-1.5 sm:gap-3 md:gap-2">
+                    <ThemeSwitcher />
+                    {profile ? (
+                      <div className="flex shrink-0 items-center gap-1 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-2 py-1 sm:gap-1.5 sm:px-4 sm:py-2 md:px-2.5 md:py-1.5">
+                        <Award size={13} className="text-[color:var(--app-accent)] sm:w-4 sm:h-4" />
+                        <span className="text-[9px] font-bold sm:text-sm md:text-[11px]">
+                          {profile.points} pts
+                        </span>
+                      </div>
+                    ) : null}
+                    <NotificationBell user={user} />
                   </div>
                 </div>
-              </div>
 
-              <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1 lg:mt-0 lg:overflow-visible lg:pb-0">
-                {profile && (
-                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 bg-white/5 border border-white/10 rounded-2xl shrink-0">
-                    <Award size={14} className="text-violet-400 sm:w-4 sm:h-4" />
-                    <span className="text-[10px] sm:text-sm font-bold bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
-                      {profile.points} pts
-                    </span>
-                  </div>
-                )}
-                <NotificationBell user={user} />
-                {!user && (
+                <div className="flex w-full flex-wrap items-center justify-end gap-1.5 border-t border-[color:var(--app-border)]/60 pt-2.5 sm:gap-2 sm:pt-3 md:w-auto md:flex-nowrap md:border-t-0 md:pt-0 md:gap-2 lg:gap-2.5">
+                  {!user ? (
+                    <button
+                      onClick={() => setIsLoginModalOpen(true)}
+                      className="shrink-0 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-2.5 py-1.5 text-[11px] font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface)] sm:px-4 sm:py-2 sm:text-sm md:px-2.5 md:py-1.5 md:text-[11px]"
+                    >
+                      Login
+                    </button>
+                  ) : null}
                   <button
-                    onClick={() => setIsLoginModalOpen(true)}
-                    className="shrink-0 px-3 py-1.5 sm:px-4 sm:py-2 bg-purple-600 rounded-full text-xs sm:text-sm font-semibold"
+                    onClick={handleRandomMeme}
+                    className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-lg shadow-fuchsia-500/20 transition hover:scale-105 active:scale-95 sm:gap-2 sm:px-4 sm:py-2 sm:text-sm md:gap-1 md:px-2.5 md:py-1.5 md:text-[11px]"
                   >
-                    Login
+                    <Sparkles size={14} />
+                    <span className="hidden sm:inline">Get Random Meme</span>
+                    <span className="sm:hidden">Random</span>
                   </button>
-                )}
-                <button
-                  onClick={handleRandomMeme}
-                  className="shrink-0 flex items-center gap-2 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-white shadow-lg shadow-fuchsia-500/20 transition hover:scale-105 active:scale-95"
-                >
-                  <Sparkles size={16} />
-                  <span className="hidden sm:inline">Get Random Meme</span>
-                  <span className="sm:hidden">Random</span>
-                </button>
-                {!isStandaloneMode && (isInstallable || showIosInstallHint) && (
+                  {!isStandaloneMode && (isInstallable || showIosInstallHint) ? (
+                    <button
+                      onClick={handleInstallApp}
+                      className="shrink-0 inline-flex items-center gap-1 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-2.5 py-1.5 text-[11px] font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface)] sm:gap-2 sm:px-4 sm:py-2 sm:text-sm md:gap-1 md:px-2.5 md:py-1.5 md:text-[11px]"
+                    >
+                      <Download size={14} />
+                      <span className="hidden sm:inline">Install App</span>
+                    </button>
+                  ) : null}
                   <button
-                    onClick={handleInstallApp}
-                    className="shrink-0 flex items-center gap-1.5 rounded-full border border-violet-400/40 bg-violet-500/10 px-2.5 py-1.5 sm:gap-2 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-violet-300 transition hover:bg-violet-500/20"
+                    onClick={() => {
+                      setViewMode(viewMode === "favorites" ? "all" : "favorites");
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                    className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] font-semibold transition-all sm:gap-2 sm:px-4 sm:py-2 sm:text-sm md:gap-1 md:px-2.5 md:py-1.5 md:text-[11px] ${
+                      viewMode === "favorites"
+                        ? "border-[color:var(--app-accent)] bg-[color:var(--app-surface-2)] text-[color:var(--app-text)]"
+                        : "border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] text-[color:var(--app-text)] hover:bg-[color:var(--app-surface)]"
+                    }`}
                   >
-                    <Download size={16} />
-                    <span className="hidden sm:inline">Install App</span>
+                    <Bookmark size={14} className={viewMode === "favorites" ? "fill-violet-400" : ""} />
+                    <span className="hidden xs:inline">Bookmarks:</span>
+                    <span>{favorites.length}</span>
                   </button>
-                )}
-                <button
-                  onClick={() => { setViewMode(viewMode === "favorites" ? "all" : "favorites"); window.scrollTo({top: 0, behavior: 'smooth'}); }}
-                  className={`shrink-0 flex items-center gap-2 rounded-full border px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm transition-all ${
-                    viewMode === "favorites" 
-                      ? "border-violet-500/50 bg-violet-500/10 text-violet-300" 
-                      : "border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10"
-                  }`}
-                >
-                  <Bookmark size={16} className={viewMode === "favorites" ? "fill-violet-400" : ""} />
-                  <span className="hidden xs:inline">Bookmarks: </span>{favorites.length}
-                </button>
+                </div>
               </div>
             </div>
-        </header>
+          </header>
 
         <main className="relative z-10 mx-auto max-w-6xl px-4 pb-16 sm:px-6">
           {viewMode === "leaderboard" ? (
@@ -1517,7 +1588,7 @@ export default function App() {
           ) : (
             <>
               <Hero />
-              <section className="-mt-16 relative z-20 rounded-[2rem] border border-white/10 bg-[#0d1220] p-5 shadow-2xl shadow-black/50 backdrop-blur-xl sm:p-8">
+              <section className="-mt-16 relative z-20 rounded-[2rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-5 shadow-2xl shadow-black/20 backdrop-blur-xl sm:p-8">
                 <SearchBar
                   search={search}
                   setSearch={setSearch}
@@ -1586,7 +1657,7 @@ export default function App() {
           {/* Default Bottom Editor */}
           <section className="mt-20 mb-10">
             {!isBottomEditorVisible ? (
-              <div className="flex flex-col items-center justify-center p-8 sm:p-12 rounded-[2.5rem] border border-white/10 bg-white/[0.03] backdrop-blur-xl text-center">
+              <div className="flex flex-col items-center justify-center rounded-[2.5rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-8 text-center backdrop-blur-xl sm:p-12">
                 <div className="w-16 h-16 bg-violet-500/10 rounded-2xl flex items-center justify-center mb-6">
                   <Pencil className="text-violet-400" size={32} />
                 </div>
@@ -1602,7 +1673,7 @@ export default function App() {
                 </button>
               </div>
             ) : (
-              <div className="rounded-[2.5rem] border border-white/10 bg-white/5 p-5 shadow-2xl shadow-black/20 backdrop-blur-xl sm:p-8 lg:p-10 relative">
+              <div className="relative rounded-[2.5rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-5 shadow-2xl shadow-black/20 backdrop-blur-xl sm:p-8 lg:p-10">
                 <button 
                   onClick={() => setIsBottomEditorVisible(false)}
                   className="absolute top-6 right-6 p-2.5 rounded-full bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition-all border border-white/5"
@@ -1677,20 +1748,47 @@ export default function App() {
                 initial={{ scale: 0.9, opacity: 0, y: 20 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                className="relative w-full max-w-lg bg-[#0d1220] border border-white/10 rounded-[2.5rem] p-8 shadow-2xl"
+                className="relative flex w-full max-w-lg max-h-[90vh] flex-col overflow-hidden rounded-[2.5rem] border border-[color:var(--app-border)] bg-[var(--app-surface)] shadow-2xl"
               >
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold">Upload Meme 📤</h2>
-                  <button onClick={() => setIsUploadModalOpen(false)} className="p-2 rounded-full bg-white/5 hover:bg-white/10"><X size={20}/></button>
+                <div className="shrink-0 border-b border-white/10 bg-gradient-to-b from-white/5 to-transparent px-6 py-5 sm:px-8">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.28em] text-violet-300/80">
+                        Upload Studio
+                      </p>
+                      <h2 className="mt-1 text-2xl font-bold">Upload Meme</h2>
+                    </div>
+                    <button
+                      onClick={() => setIsUploadModalOpen(false)}
+                      className="rounded-full border border-white/10 bg-white/5 p-2 transition hover:bg-white/10"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
                 </div>
-                <Suspense fallback={<div className="flex justify-center p-10"><Loader2 className="animate-spin text-violet-500" /></div>}>
-                  <UploadMeme user={user} onUpload={handleUploadMeme} onSuccess={(msg) => { setIsUploadModalOpen(false); setNotification({ type: 'success', message: msg }); }} isBlockedUser={isBlockedUser} />
-                </Suspense>
+                <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6 sm:px-8 custom-scrollbar">
+                  <Suspense
+                    fallback={
+                      <div className="flex justify-center p-10">
+                        <Loader2 className="animate-spin text-violet-500" />
+                      </div>
+                    }
+                  >
+                    <UploadMeme
+                      user={user}
+                      onUpload={handleUploadMeme}
+                      onSuccess={(msg) => {
+                        setIsUploadModalOpen(false);
+                        setNotification({ type: 'success', message: msg });
+                      }}
+                      isBlockedUser={isBlockedUser}
+                    />
+                  </Suspense>
+                </div>
               </motion.div>
             </div>
           )}
         </AnimatePresence>
-
         {/* Avatar Picker Modal */}
         <AnimatePresence>
           {isAvatarModalOpen && user && (
@@ -2290,18 +2388,21 @@ export default function App() {
 
       <Suspense fallback={null}>
         <MemeModal
-          meme={activeMeme}
-            user={user}
-            isAdminUser={isAdminUser}
-            isBlockedUser={isBlockedUser}
-            onDeleteMeme={handleDeleteMeme}
-            onClose={closeModal}
-            toggleFavorite={toggleFavorite}
-            favorites={favorites}
-            onNext={handleRandomMeme}
-            likeCounts={allLikeCounts}
-            onLikeCountChange={handleLikeCountChange}
-            onLikeStateChange={handleLikeStateChange}
+          meme={currentMeme}
+          memeList={memeList}
+          currentIndex={currentMemeIndex}
+          user={user}
+          isAdminUser={isAdminUser}
+          isBlockedUser={isBlockedUser}
+          onDeleteMeme={handleDeleteMeme}
+          onClose={closeModal}
+          onNext={handleNextMeme}
+          onPrevious={handlePreviousMeme}
+          toggleFavorite={toggleFavorite}
+          favorites={favorites}
+          likeCounts={allLikeCounts}
+          onLikeCountChange={handleLikeCountChange}
+          onLikeStateChange={handleLikeStateChange}
           />
         </Suspense>
         <Suspense fallback={null}>
@@ -2318,3 +2419,4 @@ export default function App() {
     </>
   );
 }
+

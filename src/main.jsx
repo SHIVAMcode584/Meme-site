@@ -2,10 +2,17 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
+import { ThemeProvider } from "./context/ThemeContext.jsx";
+import { applyThemeToDocument, getInitialTheme } from "./context/theme-utils.js";
+
+const initialTheme = getInitialTheme();
+applyThemeToDocument(initialTheme);
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <App />
+    <ThemeProvider initialTheme={initialTheme}>
+      <App />
+    </ThemeProvider>
   </React.StrictMode>,
 )
 

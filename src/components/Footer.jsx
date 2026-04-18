@@ -25,67 +25,94 @@ const GithubIcon = ({ size = 24, ...props }) => (
 
 export default function Footer() {
   return (
-    <footer className="border-t border-white/10 mt-20 bg-[#070B14]/50 backdrop-blur-xl">
-      <div className="max-w-6xl mx-auto px-6 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 items-start">
-          {/* Branding & SEO Description */}
+    <footer className="mt-20 border-t border-[color:var(--app-border)] bg-[color:var(--app-surface)]/80 backdrop-blur-xl">
+      <div className="mx-auto max-w-6xl px-6 py-12">
+        <div className="grid grid-cols-1 items-start gap-12 md:grid-cols-3">
           <div className="space-y-4">
-            <h2 className="font-black text-2xl tracking-tighter bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
+            <h2 className="bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-2xl font-black tracking-tighter text-transparent">
               RoastRiot.meme
             </h2>
-            <p className="text-zinc-400 leading-relaxed">
-              The ultimate destination to discover and create the perfect memes for every situation. 
-              Search memes by mood, reaction, reply, or real-life situations. 
+            <p className="leading-relaxed text-[color:var(--app-muted)]">
+              The ultimate destination to discover and create the perfect memes for every situation.
+              Search memes by mood, reaction, reply, or real-life situations.
               Join thousands of creators sharing humor daily.
             </p>
           </div>
 
-          {/* Navigation Links */}
           <div className="space-y-4">
-            <h3 className="text-white font-bold text-lg">Explore</h3>
-            <nav className="flex flex-col gap-2 text-zinc-400">
-              <a href="#" className="hover:text-violet-400 transition-colors inline-flex items-center gap-2">Trending Memes <ExternalLink size={14}/></a>
-              <a href="#" className="hover:text-violet-400 transition-colors">Meme Editor</a>
-              <a href="#" className="hover:text-violet-400 transition-colors">All Categories</a>
-              <a href="#" className="hover:text-violet-400 transition-colors">Search by Situation</a>
+            <h3 className="text-lg font-bold text-[color:var(--app-text)]">Explore</h3>
+            <nav className="flex flex-col gap-2 text-[color:var(--app-muted)]">
+              <a href="#" className="inline-flex items-center gap-2 transition-colors hover:text-violet-400">
+                Trending Memes <ExternalLink size={14} />
+              </a>
+              <a href="#" className="transition-colors hover:text-violet-400">Meme Editor</a>
+              <a href="#" className="transition-colors hover:text-violet-400">All Categories</a>
+              <a href="#" className="transition-colors hover:text-violet-400">Search by Situation</a>
             </nav>
           </div>
 
-          {/* Social & Contact Section */}
           <div className="space-y-4">
-            <h3 className="text-white font-bold text-lg">Get in Touch</h3>
+            <h3 className="text-lg font-bold text-[color:var(--app-text)]">Get in Touch</h3>
             <div className="flex gap-4">
-              <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="p-3 rounded-2xl bg-white/5 text-zinc-400 hover:text-white hover:bg-violet-500/20 transition group" aria-label="Follow us on Twitter">
-                <Twitter size={20} className="group-hover:scale-110 transition-transform" />
+              <a
+                href="https://twitter.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)]/80 p-3 text-[color:var(--app-muted)] transition hover:bg-violet-500/20 hover:text-[color:var(--app-text)]"
+                aria-label="Follow us on Twitter"
+              >
+                <Twitter size={20} className="transition-transform group-hover:scale-110" />
               </a>
-              <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="p-3 rounded-2xl bg-white/5 text-zinc-400 hover:text-white hover:bg-violet-500/20 transition group" aria-label="Follow us on Instagram">
-                <Instagram size={20} className="group-hover:scale-110 transition-transform" />
+              <a
+                href="https://instagram.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)]/80 p-3 text-[color:var(--app-muted)] transition hover:bg-violet-500/20 hover:text-[color:var(--app-text)]"
+                aria-label="Follow us on Instagram"
+              >
+                <Instagram size={20} className="transition-transform group-hover:scale-110" />
               </a>
-              <a href="mailto:support@memefinder.com" className="p-3 rounded-2xl bg-white/5 text-zinc-400 hover:text-white hover:bg-violet-500/20 transition group" aria-label="Email Support">
-                <Mail size={20} className="group-hover:translate-y-[-2px] transition-transform" />
+              <a
+                href="mailto:support@memefinder.com"
+                className="group rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)]/80 p-3 text-[color:var(--app-muted)] transition hover:bg-violet-500/20 hover:text-[color:var(--app-text)]"
+                aria-label="Email Support"
+              >
+                <Mail size={20} className="transition-transform group-hover:translate-y-[-2px]" />
               </a>
-              <a href="https://github.com/SHIVAMcode584" target="_blank" rel="noopener noreferrer" className="p-3 rounded-2xl bg-white/5 text-zinc-400 hover:text-white hover:bg-violet-500/20 transition group" aria-label="GitHub">
-                <GithubIcon size={20} className="group-hover:scale-110 transition-transform" />
+              <a
+                href="https://github.com/SHIVAMcode584"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)]/80 p-3 text-[color:var(--app-muted)] transition hover:bg-violet-500/20 hover:text-[color:var(--app-text)]"
+                aria-label="GitHub"
+              >
+                <GithubIcon size={20} className="transition-transform group-hover:scale-110" />
               </a>
             </div>
-            <p className="text-sm text-zinc-500">
-              Drop me a line at: <br/>
-              <a href="https://mail.google.com/mail/?view=cm&fs=1&to=shivampixel1@gmail.com" target="_blank" rel="noopener noreferrer" className="text-zinc-300 font-medium hover:text-violet-400 transition-colors cursor-pointer">
+            <p className="text-sm text-[color:var(--app-muted)]">
+              Drop me a line at: <br />
+              <a
+                href="https://mail.google.com/mail/?view=cm&fs=1&to=shivampixel1@gmail.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="cursor-pointer font-medium text-[color:var(--app-text)] transition-colors hover:text-violet-400"
+              >
                 shivampixel1@gmail.com
               </a>
             </p>
           </div>
         </div>
 
-        {/* Bottom Bar */}
-        <div className="mt-12 pt-8 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-6 text-sm text-zinc-500">
+        <div className="mt-12 flex flex-col items-center justify-between gap-6 border-t border-[color:var(--app-border)]/50 pt-8 text-sm text-[color:var(--app-muted)] md:flex-row">
           <div className="text-center md:text-left">
-            <p>© 2026 RoastRiot.meme — All Rights Reserved.</p>
-            <p className="text-xs text-zinc-600 mt-1">Developed with ❤️ by <span className="text-violet-400/80 font-semibold">Shivam Kumar</span></p>
+            <p>Â© 2026 RoastRiot.meme â€” All Rights Reserved.</p>
+            <p className="mt-1 text-xs text-[color:var(--app-muted)]">
+              Developed with â¤ï¸ by <span className="font-semibold text-violet-400/80">Shivam Kumar</span>
+            </p>
           </div>
           <div className="flex gap-8 text-xs uppercase tracking-widest">
-            <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
+            <a href="#" className="transition-colors hover:text-[color:var(--app-text)]">Privacy Policy</a>
+            <a href="#" className="transition-colors hover:text-[color:var(--app-text)]">Terms of Service</a>
           </div>
         </div>
       </div>

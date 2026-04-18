@@ -193,12 +193,12 @@ export default function MemeCard({
     : "aspect-[3/4] sm:aspect-[4/5]";
 
   return (
-    <div className="group bg-[#101624] border border-white/10 rounded-3xl overflow-hidden hover:border-violet-400/30 transition shadow-lg">
+    <div className="group overflow-hidden rounded-3xl border border-[color:var(--app-border)] bg-[color:var(--app-surface)] shadow-lg transition hover:border-[color:var(--app-accent)]/30">
       <div className="relative cursor-pointer" onClick={() => onOpen(meme)}>
         <img
           src={getOptimizedUrl(imageSrc)}
           alt={meme.title}
-          className={`w-full object-cover group-hover:scale-105 transition duration-500 bg-zinc-900 ${imageSizeClass}`}
+          className={`w-full object-cover bg-[color:var(--app-surface-2)] transition duration-500 group-hover:scale-105 ${imageSizeClass}`}
           loading={priority ? "eager" : "lazy"}
           decoding="async"
           width="500"
@@ -211,27 +211,27 @@ export default function MemeCard({
             handleLike(e);
           }}
           disabled={isLiking}
-          className={`absolute top-2 right-2 sm:top-4 sm:right-4 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center border border-white/20 hover:scale-110 transition active:scale-90 ${liked ? "border-pink-500/50" : ""}`}
+          className={`absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)]/85 backdrop-blur-md transition active:scale-90 hover:scale-110 sm:right-4 sm:top-4 sm:h-10 sm:w-10 ${liked ? "border-pink-500/50" : ""}`}
         >
           <div className="flex flex-col items-center justify-center">
             <Motion.div animate={{ scale: liked ? [1, 1.4, 1] : 1 }} transition={{ duration: 0.3 }}>
               <Heart
                 className={`w-4 h-4 sm:w-5 sm:h-5 transition-all ${
-                  liked ? "fill-pink-500 text-pink-500" : "text-white"
+                  liked ? "fill-pink-500 text-pink-500" : "text-[color:var(--app-text)]"
                 }`}
               />
             </Motion.div>
-            <span className="text-[8px] sm:text-[10px] font-black text-white mt-0.5">{localLikeCount}</span>
+            <span className="mt-0.5 text-[8px] font-black text-[color:var(--app-text)] sm:text-[10px]">{localLikeCount}</span>
           </div>
         </button>
 
         {canDelete ? (
           <button
             onClick={handleDelete}
-            className="absolute top-2 right-12 sm:top-4 sm:right-16 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-[#561414]/95 backdrop-blur-md flex items-center justify-center border border-red-400/30 shadow-lg shadow-red-950/30 hover:scale-110 transition active:scale-90 hover:bg-[#741616] hover:border-red-300/70 group/delete"
+            className="group/delete absolute right-12 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-red-400/30 bg-red-950/80 backdrop-blur-md shadow-lg shadow-red-950/30 transition active:scale-90 hover:scale-110 hover:border-red-300/70 hover:bg-red-900 sm:right-16 sm:top-4 sm:h-10 sm:w-10"
             title="Delete Meme"
           >
-            <Trash2 className="w-4 h-4 sm:w-5 sm:h-5 text-red-100 group-hover/delete:text-white transition-colors" />
+            <Trash2 className="h-4 w-4 text-red-100 transition-colors group-hover/delete:text-white sm:h-5 sm:w-5" />
           </button>
         ) : canReport ? (
           <button
@@ -239,10 +239,10 @@ export default function MemeCard({
               e.stopPropagation();
               setIsReportModalOpen(true);
             }}
-            className="absolute top-2 right-12 sm:top-4 sm:right-16 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-[#5a1111]/90 backdrop-blur-md flex items-center justify-center border border-red-400/30 shadow-lg shadow-red-950/30 hover:scale-110 transition active:scale-90 hover:bg-[#7a1616] hover:border-red-300/70 group/report"
+            className="group/report absolute right-12 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-red-400/30 bg-red-950/80 backdrop-blur-md shadow-lg shadow-red-950/30 transition active:scale-90 hover:scale-110 hover:border-red-300/70 hover:bg-red-900 sm:right-16 sm:top-4 sm:h-10 sm:w-10"
             title="Report Meme"
           >
-            <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-red-100 group-hover/report:text-white transition-colors" />
+            <AlertTriangle className="h-4 w-4 text-red-100 transition-colors group-hover/report:text-white sm:h-5 sm:w-5" />
           </button>
         ) : null}
 
@@ -251,17 +251,17 @@ export default function MemeCard({
             e.stopPropagation();
             toggleFavorite(meme.id);
           }}
-          className="absolute top-2 left-2 sm:top-4 sm:left-4 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center border border-white/20 hover:scale-110 transition"
+          className="absolute left-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)]/85 backdrop-blur-md transition hover:scale-110 sm:left-4 sm:top-4 sm:h-10 sm:w-10"
         >
           <Bookmark
-            className={`w-4 h-4 sm:w-5 sm:h-5 ${isFavorite ? "fill-violet-500 text-violet-500" : "text-white"}`}
+            className={`h-4 w-4 sm:h-5 sm:w-5 ${isFavorite ? "fill-violet-500 text-violet-500" : "text-[color:var(--app-text)]"}`}
           />
         </button>
       </div>
 
       <div className="p-3 sm:p-5">
         <h3 className="text-sm sm:text-2xl font-bold line-clamp-1 sm:line-clamp-none">{meme.title}</h3>
-        <p className="text-[10px] sm:text-sm text-zinc-400">
+        <p className="text-[10px] sm:text-sm text-[color:var(--app-muted)]">
           {meme.category} • {meme.mood}
         </p>
 
@@ -269,7 +269,7 @@ export default function MemeCard({
           {(Array.isArray(meme.keywords) ? meme.keywords : []).slice(0, 4).map((tag, index) => (
             <span
               key={index}
-              className="text-xs px-3 py-1 rounded-full bg-white/5 border border-white/10 text-zinc-300"
+              className="rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-1 text-xs text-[color:var(--app-text)]"
             >
               {tag}
             </span>
@@ -279,7 +279,7 @@ export default function MemeCard({
         <div className="mt-3 sm:mt-5">
           <button
             onClick={handleDownload}
-            className="w-full h-9 sm:h-12 rounded-xl sm:rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white text-[10px] sm:text-base font-semibold flex items-center justify-center gap-1.5 sm:gap-2 hover:scale-[1.02] transition shadow-lg shadow-violet-500/20"
+            className="flex h-9 w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-[10px] font-semibold text-white shadow-lg shadow-violet-500/20 transition hover:scale-[1.02] sm:h-12 sm:gap-2 sm:rounded-2xl sm:text-base"
           >
             <Download className="w-4 h-4 sm:w-5 sm:h-5" />
             <span>Download Meme</span>
@@ -290,13 +290,13 @@ export default function MemeCard({
           <button
             type="button"
             onClick={() => onToggleComments?.(meme.id)}
-            className="flex h-10 w-full items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 text-xs font-semibold text-zinc-200 transition hover:border-violet-400/30 hover:bg-white/10 sm:h-11 sm:rounded-2xl sm:text-sm"
+            className="flex h-10 w-full items-center justify-between rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-4 text-xs font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent)]/30 hover:bg-[color:var(--app-surface)] sm:h-11 sm:rounded-2xl sm:text-sm"
           >
             <span className="flex items-center gap-2">
-              <MessageCircle className="h-4 w-4 text-violet-300" />
+              <MessageCircle className="h-4 w-4 text-violet-400" />
               {isCommentsOpen ? "Hide Comments" : "Open Comments"}
             </span>
-            <ChevronDown className={`h-4 w-4 text-zinc-400 transition-transform ${isCommentsOpen ? "rotate-180" : ""}`} />
+            <ChevronDown className={`h-4 w-4 text-[color:var(--app-muted)] transition-transform ${isCommentsOpen ? "rotate-180" : ""}`} />
           </button>
         </div>
 
