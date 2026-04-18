@@ -8,33 +8,38 @@ export default function ThemeSwitcher({ isOpen, onOpenChange }) {
   const rootRef = useRef(null);
   const activeTheme = themeOptions.find((option) => option.id === theme) || themeOptions[1];
 
+  const calculateMenuStyle = () => {
+    const root = rootRef.current;
+
+    if (!root) return null;
+
+    const rect = root.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const horizontalGap = 12;
+    const maxMenuWidth = 288;
+    const menuWidth = Math.min(maxMenuWidth, Math.max(0, viewportWidth - horizontalGap * 2));
+
+    const left = Math.max(
+      horizontalGap,
+      Math.min(rect.right - menuWidth, viewportWidth - menuWidth - horizontalGap)
+    );
+
+    return {
+      position: "fixed",
+      top: `${Math.round(rect.bottom + 8)}px`,
+      left: `${Math.round(left)}px`,
+      width: `${Math.round(menuWidth)}px`,
+    };
+  };
+
   useLayoutEffect(() => {
     if (!isOpen) {
       return undefined;
     }
 
     const updateMenuPosition = () => {
-      const root = rootRef.current;
-
-      if (!root) return;
-
-      const rect = root.getBoundingClientRect();
-      const viewportWidth = window.innerWidth;
-      const horizontalGap = 12;
-      const maxMenuWidth = 288;
-      const menuWidth = Math.min(maxMenuWidth, Math.max(0, viewportWidth - horizontalGap * 2));
-
-      const left = Math.max(
-        horizontalGap,
-        Math.min(rect.right - menuWidth, viewportWidth - menuWidth - horizontalGap)
-      );
-
-      setMenuStyle({
-        position: "fixed",
-        top: `${Math.round(rect.bottom + 8)}px`,
-        left: `${Math.round(left)}px`,
-        width: `${Math.round(menuWidth)}px`,
-      });
+      const nextStyle = calculateMenuStyle();
+      if (nextStyle) setMenuStyle(nextStyle);
     };
 
     updateMenuPosition();
@@ -71,7 +76,19 @@ export default function ThemeSwitcher({ isOpen, onOpenChange }) {
     <div ref={rootRef} className="relative shrink-0">
       <button
         type="button"
-        onClick={() => onOpenChange(!isOpen)}
+        onClick={() => {
+          if (isOpen) {
+            onOpenChange(false);
+            return;
+          }
+
+          const nextStyle = calculateMenuStyle();
+          if (nextStyle) {
+            setMenuStyle(nextStyle);
+          }
+
+          onOpenChange(true);
+        }}
         className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-2.5 py-1.5 text-[11px] font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-2)] sm:gap-2 sm:px-4 sm:py-2 sm:text-xs"
         aria-expanded={isOpen}
         aria-haspopup="menu"
@@ -87,7 +104,7 @@ export default function ThemeSwitcher({ isOpen, onOpenChange }) {
       {isOpen ? (
         <div
           className="z-[220] max-h-[calc(100dvh-7rem)] overflow-y-auto overflow-x-hidden rounded-[1.5rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] shadow-[0_24px_70px_var(--app-glow)] backdrop-blur-xl"
-          style={menuStyle || undefined}
+          style={menuStyle || { position: "fixed", top: "0px", left: "0px", visibility: "hidden", pointerEvents: "none" }}
           role="menu"
           aria-label="Theme selector"
         >
