@@ -256,7 +256,15 @@ export default function App() {
   }, [isOverlayOpen]);
 
   useEffect(() => {
-    const media = window.matchMedia("(display-mode: standalone)");
+    const media = typeof window.matchMedia === "function"
+      ? window.matchMedia("(display-mode: standalone)")
+      : null;
+
+    if (!media) {
+      setShowIosInstallHint(false);
+      return undefined;
+    }
+
     const detectStandalone = () => media.matches || window.navigator.standalone === true;
     const updateStandaloneMode = () => setIsStandaloneMode(detectStandalone());
 

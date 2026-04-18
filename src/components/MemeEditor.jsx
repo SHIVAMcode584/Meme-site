@@ -553,7 +553,7 @@ export default function MemeEditor({
         user_id: currentUser.id,
         category: category.trim(),
         mood: mood.trim(),
-        keywords: normalizeKeywords(keywords),
+        keywords: normalizeKeywords(keywords).join(", "),
         top_text: textLayers.find((layer) => layer.id === "top")?.text?.trim() || null,
         bottom_text: textLayers.find((layer) => layer.id === "bottom")?.text?.trim() || null,
         original_meme_id: originalMemeId,
@@ -566,9 +566,6 @@ export default function MemeEditor({
       );
 
       if (error) throw error;
-
-      const { error: pointError } = await supabase.rpc("increment_points", { amount: 10 });
-      if (pointError) console.error("Error earning points:", pointError.message);
 
       const savedPayload = {
         ...savedMeme,

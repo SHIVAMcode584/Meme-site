@@ -364,16 +364,13 @@ export default function UploadMeme({ onUpload, onSuccess, isBlockedUser = false 
         image_url: uploadedImageUrl,
         category: category.trim(),
         mood: mood.trim(),
-        keywords: parsedKeywordInput,
+        keywords: parsedKeywordInput.join(", "),
         user_id: currentUser.id,
       };
 
       const { data: savedMeme, error } = await insertMemeWithSlugFallback(supabase, payload, "*");
 
       if (error) throw error;
-
-      const { error: pointError } = await supabase.rpc("increment_points", { amount: 10 });
-      if (pointError) console.error("Error earning points:", pointError.message);
 
       setFile(null);
       setImageUrl("");
