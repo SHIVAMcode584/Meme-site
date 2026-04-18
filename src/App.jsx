@@ -1397,38 +1397,41 @@ export default function App() {
             <motion.section 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="mt-10 max-w-2xl mx-auto p-6 sm:p-10 bg-[#0d1220] border border-white/10 rounded-[2.5rem] shadow-2xl text-center"
+              className="mt-10 max-w-2xl mx-auto p-6 sm:p-10 bg-[color:var(--app-surface)] border border-[color:var(--app-border)] rounded-[2.5rem] shadow-2xl text-center"
             >
               <div className="mb-6 text-left">
                 <button
                   onClick={() => setViewMode("all")}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-zinc-300 transition hover:bg-white/10 hover:text-white"
+                  className="inline-flex items-center gap-2 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-4 py-2 text-sm font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface)]"
                 >
                   <ArrowLeft size={16} />
                   Back
                 </button>
               </div>
-              <Trophy size={48} className="mx-auto mb-4 text-amber-400" />
-              <h2 className="text-3xl font-black mb-2">Meme Hall of Fame</h2>
-              <p className="text-zinc-500 mb-8">Top contributors in the RoastRiot community</p>
+              <Trophy size={48} className="mx-auto mb-4 text-amber-500" />
+              <h2 className="mb-2 text-3xl font-black text-[color:var(--app-text)]">Meme Hall of Fame</h2>
+              <p className="mb-8 text-[color:var(--app-muted)]">Top contributors in the RoastRiot community</p>
               
               <div className="space-y-3">
                 {leaderboard.map((player, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5">
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] p-4 transition hover:bg-[color:var(--app-surface)]"
+                  >
                     <div className="flex items-center gap-4">
                       <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
                         idx === 0 ? 'bg-amber-400 text-black' : 
                         idx === 1 ? 'bg-zinc-300 text-black' : 
-                        idx === 2 ? 'bg-amber-700 text-white' : 'text-zinc-500'
+                        idx === 2 ? 'bg-amber-700 text-white' : 'bg-[color:var(--app-bg)] text-[color:var(--app-muted)]'
                       }`}>
                         {idx + 1}
                       </span>
-                      <span className="font-bold">{player.username}</span>
+                      <span className="font-bold text-[color:var(--app-text)]">{player.username}</span>
                       <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${getBadge(player.points).bg} ${getBadge(player.points).color}`}>
                         {getBadge(player.points).name}
                       </span>
                     </div>
-                    <span className="font-black text-violet-400">{player.points} pts</span>
+                    <span className="font-black text-[color:var(--app-accent)]">{player.points} pts</span>
                   </div>
                 ))}
               </div>
@@ -1437,12 +1440,12 @@ export default function App() {
             <motion.section 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mt-10 max-w-2xl mx-auto p-6 sm:p-10 bg-[#0d1220] border border-white/10 rounded-[2.5rem] shadow-2xl"
+              className="mt-10 max-w-2xl mx-auto p-6 sm:p-10 bg-[color:var(--app-surface)] border border-[color:var(--app-border)] rounded-[2.5rem] shadow-2xl"
             >
               <div className="mb-6">
                 <button
                   onClick={() => setViewMode("all")}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-zinc-300 transition hover:bg-white/10 hover:text-white"
+                  className="inline-flex items-center gap-2 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-4 py-2 text-sm font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface)]"
                 >
                   <ArrowLeft size={16} />
                   Back
@@ -1453,7 +1456,7 @@ export default function App() {
                   <img 
                     src={currentAvatarUrl} 
                     alt="Profile" 
-                    className="w-full h-full rounded-full bg-[#0d1220] object-cover"
+                    className="w-full h-full rounded-full bg-[color:var(--app-surface)] object-cover"
                   />
                 </div>
                 <div>
@@ -1504,7 +1507,7 @@ export default function App() {
                   </button>
                 </div>
 
-                <div className="rounded-[2rem] border border-white/10 bg-white/5 p-4 sm:p-5">
+                <div className="rounded-[2rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] p-4 sm:p-5">
                   <div className="flex items-center gap-2">
                     <UserIcon size={18} className="text-violet-400" />
                     <h3 className="font-semibold">Profile Username</h3>
@@ -1512,7 +1515,7 @@ export default function App() {
                   <p className="mt-1 text-xs text-zinc-500">
                     Update the name shown on your profile, uploads, and leaderboard.
                   </p>
-                  <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#111827]/60 p-3">
+                  <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] p-3">
                     <div>
                       <p className="text-xs text-zinc-500">Current username</p>
                       <p className="font-semibold text-white">{displayUsername}</p>
@@ -1526,7 +1529,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="rounded-[2rem] border border-white/10 bg-white/5 p-4 sm:p-5">
+                <div className="rounded-[2rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] p-4 sm:p-5">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <div className="flex items-center gap-2">
@@ -1545,11 +1548,11 @@ export default function App() {
                     </button>
                   </div>
 
-                  <div className="mt-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-[#111827]/60 p-3">
+                  <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] p-3">
                     <img
                       src={currentAvatarUrl}
                       alt="Current avatar preview"
-                      className="h-14 w-14 rounded-full border border-violet-400/30 bg-[#0d1220] object-cover"
+                      className="h-14 w-14 rounded-full border border-violet-400/30 bg-[color:var(--app-surface)] object-cover"
                     />
                     <div>
                       <p className="font-semibold text-white">Current avatar</p>
@@ -1560,7 +1563,7 @@ export default function App() {
 
                 <button 
                   onClick={() => setIsResetConfirmOpen(true)}
-                  className="w-full p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all flex items-center justify-between group"
+                  className="w-full p-4 rounded-2xl bg-[color:var(--app-surface-2)] border border-[color:var(--app-border)] hover:bg-[color:var(--app-surface)] transition-all flex items-center justify-between group"
                 >
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-lg bg-violet-500/10 text-violet-400">
@@ -1568,7 +1571,7 @@ export default function App() {
                     </div>
                     <span className="font-semibold">Request Password Reset Email</span>
                   </div>
-                  <ChevronRight size={18} className="text-zinc-600 group-hover:text-white group-hover:translate-x-1 transition-all" />
+                  <ChevronRight size={18} className="text-zinc-600 group-hover:text-[color:var(--app-text)] group-hover:translate-x-1 transition-all" />
                 </button>
 
                 <button 

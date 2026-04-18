@@ -31,15 +31,15 @@ export default function RemixEditorPage({
   onSuccess,
 }) {
   const shellClassName = isModal
-    ? "relative flex h-full min-h-0 flex-col overflow-hidden bg-transparent text-white"
-    : "relative min-h-screen overflow-hidden bg-[#070B14] text-white";
+    ? "relative flex h-full min-h-0 flex-col overflow-hidden bg-transparent text-[color:var(--app-text)]"
+    : "relative min-h-screen overflow-hidden bg-[color:var(--app-bg)] text-[color:var(--app-text)]";
 
   const contentClassName = isModal
     ? "relative flex h-full min-h-0 flex-col px-2 py-3 sm:p-4"
     : "relative mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8";
 
   const panelClassName = isModal
-    ? "rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(10,14,24,0.96),rgba(7,11,20,0.9))] px-2.5 py-4 shadow-xl shadow-black/30 backdrop-blur-2xl sm:px-5 sm:py-4"
+    ? "rounded-[2rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-2.5 py-4 shadow-xl shadow-black/10 backdrop-blur-2xl sm:px-5 sm:py-4"
     : "";
 
   const editorWrapperClassName = isModal
@@ -72,15 +72,15 @@ export default function RemixEditorPage({
             <div className="flex flex-col gap-3">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-violet-400/25 bg-violet-500/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-violet-200">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-[color:var(--app-accent)]/20 bg-[color:var(--app-accent)]/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                     <Sparkles className="h-3.5 w-3.5" />
                     Remix studio
                   </div>
                   <div className="mt-1.5 flex flex-col gap-0.5 lg:flex-row lg:items-end lg:gap-3">
-                    <h1 className="text-xl font-black tracking-tight text-white sm:text-2xl">
+                    <h1 className="text-xl font-black tracking-tight text-[color:var(--app-text)] sm:text-2xl">
                       Edit meme
                     </h1>
-                    <p className="text-[11px] leading-tight text-zinc-400">
+                    <p className="text-[11px] leading-tight text-[color:var(--app-muted)]">
                       Keep the original safe and jump straight into the preview and controls.
                     </p>
                   </div>
@@ -88,24 +88,24 @@ export default function RemixEditorPage({
 
                 <button
                   onClick={onBack}
-                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-bold text-zinc-200 transition hover:border-white/20 hover:bg-white/10"
+                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-4 py-2.5 text-sm font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface)]"
                 >
                   <ArrowLeft size={16} />
                   {primaryActionLabel}
                 </button>
               </div>
 
-              <div className="flex flex-wrap gap-2 text-xs text-zinc-400">
-                <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                  <BadgeCheck size={13} className="text-emerald-400" />
+              <div className="flex flex-wrap gap-2 text-xs text-[color:var(--app-muted)]">
+                <span className="inline-flex items-center gap-2 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-1.5">
+                  <BadgeCheck size={13} className="text-emerald-500" />
                   {modalChips[0]}
                 </span>
-                <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                  <MousePointer2 size={13} className="text-cyan-400" />
+                <span className="inline-flex items-center gap-2 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-1.5">
+                  <MousePointer2 size={13} className="text-cyan-500" />
                   {modalChips[1]}
                 </span>
-                <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                  <Layers3 size={13} className="text-violet-400" />
+                <span className="inline-flex items-center gap-2 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-1.5">
+                  <Layers3 size={13} className="text-[color:var(--app-accent)]" />
                   {modalChips[2]}
                 </span>
               </div>

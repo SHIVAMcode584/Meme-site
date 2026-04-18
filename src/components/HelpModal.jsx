@@ -2,28 +2,30 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, LogIn, Upload, Edit3, Heart, Wand2, Trophy, HelpCircle, Share2, Zap, Sparkles, Award, Search, MessageCircle, ArrowRight } from "lucide-react";
 
 const GuideSection = ({ icon: Icon, title, description, steps, action }) => (
-  <div className="space-y-4 group p-5 sm:p-6 rounded-[2rem] bg-white/5 border border-white/5 hover:border-violet-500/30 hover:bg-white/[0.08] transition-all duration-300">
+  <div className="group space-y-4 rounded-[2rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] p-5 transition-all duration-300 hover:border-[color:var(--app-accent)]/35 hover:bg-[color:var(--app-surface)] sm:p-6">
     <div className="flex items-center gap-4">
-      <div className="p-3 rounded-2xl bg-violet-500/10 text-violet-400 group-hover:bg-violet-500 group-hover:text-white group-hover:rotate-3 transition-all duration-300">
+      <div className="rounded-2xl bg-[color:var(--app-accent)]/10 p-3 text-[color:var(--app-accent)] transition-all duration-300 group-hover:rotate-3 group-hover:bg-[color:var(--app-accent)] group-hover:text-white">
         <Icon size={20} />
       </div>
-      <h3 className="font-bold text-lg text-white group-hover:text-violet-300 transition-colors">{title}</h3>
+      <h3 className="text-lg font-bold text-[color:var(--app-text)] transition-colors">{title}</h3>
     </div>
-    <p className="text-zinc-400 text-sm leading-relaxed pl-1">{description}</p>
+    <p className="pl-1 text-sm leading-relaxed text-[color:var(--app-muted)] transition-colors group-hover:text-[color:var(--app-text)]">
+      {description}
+    </p>
     <ul className="grid gap-2.5 pl-1">
       {steps.map((step, i) => (
-        <li key={i} className="flex items-start gap-3 text-sm text-zinc-500">
-          <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-violet-500/40 shrink-0" />
-          <span className="group-hover:text-zinc-300 transition-colors">{step}</span>
+        <li key={i} className="flex items-start gap-3 text-sm text-[color:var(--app-muted)] transition-colors group-hover:text-[color:var(--app-text)]">
+          <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[color:var(--app-accent)]/45" />
+          <span>{step}</span>
         </li>
       ))}
     </ul>
     {action && (
       <button 
         onClick={action.onClick}
-        className="mt-4 flex items-center gap-2 text-sm font-bold text-violet-400 hover:text-violet-300 transition-colors group/btn"
+        className="group/btn mt-4 flex items-center gap-2 text-sm font-bold text-[color:var(--app-accent)] transition-colors hover:text-[color:var(--app-accent)]/80"
       >
-        {action.label} <ArrowRight size={14} className="group-hover/btn:translate-x-1 transition-transform" />
+        {action.label} <ArrowRight size={14} className="transition-transform group-hover/btn:translate-x-1" />
       </button>
     )}
   </div>
@@ -33,7 +35,7 @@ export default function HelpModal({ isOpen, onClose, user, onLoginClick }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 lg:pl-64">
+    <div className="fixed inset-0 z-[140] flex items-start justify-center p-4 pt-20 lg:pl-64 sm:items-center sm:p-4">
       {/* Backdrop */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -48,7 +50,7 @@ export default function HelpModal({ isOpen, onClose, user, onLoginClick }) {
         initial={{ scale: 0.9, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.9, opacity: 0, y: 20 }}
-        className="relative w-full max-w-2xl bg-[var(--app-surface)] border border-[color:var(--app-border)] rounded-[2.5rem] p-6 sm:p-10 shadow-2xl overflow-y-auto max-h-[85vh] custom-scrollbar transition-all"
+        className="relative w-full max-w-2xl max-h-[calc(100dvh-6rem)] overflow-y-auto rounded-[2.5rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-6 shadow-2xl transition-all custom-scrollbar sm:max-h-[85vh] sm:p-10"
       > 
         <div className="flex items-center justify-between mb-10">
           <div className="flex items-center gap-4">
@@ -56,13 +58,13 @@ export default function HelpModal({ isOpen, onClose, user, onLoginClick }) {
               <HelpCircle size={28} />
             </div>
             <div>
-              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">How to use RoastRiot</h2>
-              <p className="text-zinc-500 text-sm mt-1">Master the art of situational memeing</p>
+              <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-[color:var(--app-text)]">How to use RoastRiot</h2>
+              <p className="mt-1 text-sm text-[color:var(--app-muted)]">Master the art of situational memeing</p>
             </div>
           </div>
           <button 
             onClick={onClose} 
-            className="cursor-pointer p-2.5 rounded-full bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition-all border border-white/5"
+            className="cursor-pointer rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] p-2.5 text-[color:var(--app-muted)] transition-all hover:bg-[color:var(--app-surface)] hover:text-[color:var(--app-text)]"
           >
             <X size={20} />
           </button>
@@ -147,7 +149,7 @@ export default function HelpModal({ isOpen, onClose, user, onLoginClick }) {
 
         <button
           onClick={!user ? onLoginClick : onClose}
-          className="w-full mt-12 h-16 rounded-[1.5rem] bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-black text-lg shadow-xl shadow-violet-500/20 hover:opacity-90 active:scale-[0.98] transition-all"
+          className="mt-12 h-16 w-full rounded-[1.5rem] bg-gradient-to-r from-violet-600 to-fuchsia-600 text-lg font-black text-white shadow-xl shadow-violet-500/20 transition-all hover:opacity-90 active:scale-[0.98]"
         >
           {!user ? (
             <span className="flex items-center justify-center gap-2">

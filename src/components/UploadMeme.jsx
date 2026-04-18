@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 
 export default function UploadMeme({ onUpload, onSuccess, isBlockedUser = false }) {
+  const fileInputRef = useRef(null);
   const [file, setFile] = useState(null);
   const [imageUrl, setImageUrl] = useState("");
   const [imageSource, setImageSource] = useState("");
@@ -82,6 +83,41 @@ export default function UploadMeme({ onUpload, onSuccess, isBlockedUser = false 
     setIsKeywordPanelOpen(true);
   };
 
+  const isProbablyImageFile = (nextFile) => {
+    if (!nextFile) return false;
+
+    if (nextFile.type?.startsWith("image/")) return true;
+
+    return /\.(png|jpe?g|gif|webp|bmp|avif|heic|heif)$/i.test(nextFile.name || "");
+  };
+
+  const uploadFileToCloudinary = async (sourceFile) => {
+    const formData = new FormData();
+    formData.append("file", sourceFile);
+    formData.append("upload_preset", "meme_upload");
+
+    const response = await fetch("https://api.cloudinary.com/v1_1/dntclntau/image/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok || !payload?.secure_url) {
+      throw new Error(payload?.error?.message || "Image upload failed");
+    }
+
+    return payload.secure_url;
+  };
+
+  const fileToDataUrl = (inputFile) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(new Error("Could not read the selected image file."));
+      reader.readAsDataURL(inputFile);
+    });
+
   const handleFileChange = (event) => {
     const nextFile = event.target.files?.[0] || null;
     setOcrMessage("");
@@ -93,7 +129,7 @@ export default function UploadMeme({ onUpload, onSuccess, isBlockedUser = false 
       return;
     }
 
-    if (!nextFile.type?.startsWith("image/")) {
+    if (!isProbablyImageFile(nextFile)) {
       alert("Please choose a valid image file.");
       return;
     }
@@ -308,18 +344,15 @@ export default function UploadMeme({ onUpload, onSuccess, isBlockedUser = false 
         return;
       }
 
-      const formData = new FormData();
-      formData.append("file", hasImageUrl ? imageUrl.trim() : file);
-      formData.append("upload_preset", "meme_upload");
+      let uploadedImageUrl = imageUrl.trim();
 
-      const res = await fetch("https://api.cloudinary.com/v1_1/dntclntau/image/upload", {
-        method: "POST",
-        body: formData,
-      });
-      const cloudData = await res.json();
-
-      if (!res.ok || !cloudData.secure_url) {
-        throw new Error(cloudData?.error?.message || "Image upload failed");
+      if (!hasImageUrl) {
+        try {
+          uploadedImageUrl = await uploadFileToCloudinary(file);
+        } catch (uploadError) {
+          console.warn("Cloudinary upload failed, falling back to data URL:", uploadError);
+          uploadedImageUrl = await fileToDataUrl(file);
+        }
       }
 
       const { error: profileGuardError } = await supabase.from("profiles").upsert(
@@ -337,7 +370,7 @@ export default function UploadMeme({ onUpload, onSuccess, isBlockedUser = false 
       const payload = {
         title: title.trim(),
         slug,
-        image_url: cloudData.secure_url,
+        image_url: uploadedImageUrl,
         category: category.trim(),
         mood: mood.trim(),
         keywords: parsedKeywordInput,
@@ -363,6 +396,7 @@ export default function UploadMeme({ onUpload, onSuccess, isBlockedUser = false 
       setMood("");
       setKeywords("");
       clearKeywordSuggestions();
+      if (fileInputRef.current) fileInputRef.current.value = "";
 
       if (onUpload && savedMeme) {
         onUpload({
@@ -408,6 +442,7 @@ export default function UploadMeme({ onUpload, onSuccess, isBlockedUser = false 
           Image File
         </label>
         <input
+          ref={fileInputRef}
           id="file-upload"
           type="file"
           accept="image/*"
@@ -481,7 +516,7 @@ export default function UploadMeme({ onUpload, onSuccess, isBlockedUser = false 
             type="button"
             onClick={handlePrimaryKeywordAction}
             disabled={!canSuggest}
-            className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-violet-400/20 bg-violet-500/10 px-4 text-sm font-semibold text-violet-100 transition hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-violet-400/20 bg-violet-500/10 px-4 text-sm font-semibold text-white transition hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {ocrLoading ? (
               <Loader2 className="animate-spin" size={16} />
@@ -599,6 +634,7 @@ export default function UploadMeme({ onUpload, onSuccess, isBlockedUser = false 
       </div>
 
       <button
+        type="button"
         onClick={handleUpload}
         disabled={loading || isBlockedUser}
         className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 font-bold text-white shadow-lg shadow-violet-500/20 transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-70"
