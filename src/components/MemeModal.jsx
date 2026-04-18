@@ -275,7 +275,7 @@ export default function MemeModal({
     }
   };
 
-  const getShareUrl = () => `${window.location.origin}/meme/${meme.slug}`;
+  const getShareUrl = () => `${window.location.origin}/meme/${meme.slug || meme.id}`;
 
   const handleLike = async () => {
     if (!user) return alert("Please sign in to like memes!");

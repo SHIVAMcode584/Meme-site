@@ -22,6 +22,7 @@ import {
   Type,
   Upload,
 } from "lucide-react";
+import { buildMemeSlug, insertMemeWithSlugFallback } from "../utils/memePersistence";
 
 export default function UploadMeme({ onUpload, onSuccess, isBlockedUser = false }) {
   const fileInputRef = useRef(null);
@@ -40,16 +41,6 @@ export default function UploadMeme({ onUpload, onSuccess, isBlockedUser = false 
   const [keywordVariant, setKeywordVariant] = useState("balanced");
   const [isKeywordPanelOpen, setIsKeywordPanelOpen] = useState(true);
   const ocrCacheRef = useRef(new Map());
-
-  const generateSlug = (text) => {
-    return text
-      .toString()
-      .toLowerCase()
-      .trim()
-      .replace(/[^\w\s-]/g, "")
-      .replace(/[\s_-]+/g, "-")
-      .replace(/^-+|-+$/g, "");
-  };
 
   const isValidHttpUrl = (value) => {
     try {
@@ -365,7 +356,7 @@ export default function UploadMeme({ onUpload, onSuccess, isBlockedUser = false 
       );
       if (profileGuardError) console.warn("Profile sync warning:", profileGuardError.message);
 
-      const slug = `${generateSlug(title)}-${Math.random().toString(36).substring(2, 7)}`;
+      const slug = buildMemeSlug(title);
 
       const payload = {
         title: title.trim(),
@@ -377,11 +368,7 @@ export default function UploadMeme({ onUpload, onSuccess, isBlockedUser = false 
         user_id: currentUser.id,
       };
 
-      const { data: savedMeme, error } = await supabase
-        .from("meme-table")
-        .insert([payload])
-        .select("*")
-        .single();
+      const { data: savedMeme, error } = await insertMemeWithSlugFallback(supabase, payload, "*");
 
       if (error) throw error;
 

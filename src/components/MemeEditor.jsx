@@ -16,6 +16,7 @@ import {
   Wand2,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import { buildMemeSlug, insertMemeWithSlugFallback } from "../utils/memePersistence";
 
 const FONT_OPTIONS = [
   "Impact",
@@ -28,16 +29,6 @@ const FONT_OPTIONS = [
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
-}
-
-function generateSlug(text) {
-  return text
-    .toString()
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/[\s_-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
 }
 
 function buildLayer(kind, overrides = {}) {
@@ -552,7 +543,7 @@ export default function MemeEditor({
         console.warn("Profile sync warning:", profileGuardError.message);
       }
 
-      const slug = `${generateSlug(uploadTitle)}-${Math.random().toString(36).substring(2, 7)}`;
+      const slug = buildMemeSlug(uploadTitle);
 
       const payload = {
         title: uploadTitle.trim(),
@@ -567,11 +558,11 @@ export default function MemeEditor({
         original_meme_id: originalMemeId,
       };
 
-      const { data: savedMeme, error } = await supabase
-        .from("meme-table")
-        .insert([payload])
-        .select("*, profiles(username)")
-        .single();
+      const { data: savedMeme, error } = await insertMemeWithSlugFallback(
+        supabase,
+        payload,
+        "*, profiles(username)"
+      );
 
       if (error) throw error;
 

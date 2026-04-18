@@ -1,12 +1,50 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Check, ChevronDown, Palette } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 
 export default function ThemeSwitcher() {
   const { theme, setTheme, themeOptions } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
+  const [menuStyle, setMenuStyle] = useState(null);
   const rootRef = useRef(null);
   const activeTheme = themeOptions.find((option) => option.id === theme) || themeOptions[1];
+
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      return undefined;
+    }
+
+    const updateMenuPosition = () => {
+      const root = rootRef.current;
+
+      if (!root) return;
+
+      const rect = root.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const horizontalGap = 12;
+      const maxMenuWidth = 288;
+      const menuWidth = Math.min(maxMenuWidth, Math.max(0, viewportWidth - horizontalGap * 2));
+
+      const left = Math.max(
+        horizontalGap,
+        Math.min(rect.right - menuWidth, viewportWidth - menuWidth - horizontalGap)
+      );
+
+      setMenuStyle({
+        position: "fixed",
+        top: `${Math.round(rect.bottom + 8)}px`,
+        left: `${Math.round(left)}px`,
+        width: `${Math.round(menuWidth)}px`,
+      });
+    };
+
+    updateMenuPosition();
+    window.addEventListener("resize", updateMenuPosition);
+
+    return () => {
+      window.removeEventListener("resize", updateMenuPosition);
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     const onPointerDown = (event) => {
@@ -49,7 +87,8 @@ export default function ThemeSwitcher() {
 
       {isOpen ? (
         <div
-          className="absolute right-0 top-[calc(100%+0.5rem)] z-[220] max-h-[calc(100dvh-7rem)] w-[calc(100vw-1rem)] max-w-[18rem] overflow-y-auto overflow-x-hidden rounded-[1.5rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] shadow-[0_24px_70px_var(--app-glow)] backdrop-blur-xl sm:w-[min(18rem,calc(100vw-1.5rem))]"
+          className="z-[220] max-h-[calc(100dvh-7rem)] overflow-y-auto overflow-x-hidden rounded-[1.5rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] shadow-[0_24px_70px_var(--app-glow)] backdrop-blur-xl"
+          style={menuStyle || undefined}
           role="menu"
           aria-label="Theme selector"
         >
