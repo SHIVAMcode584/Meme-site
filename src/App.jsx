@@ -970,6 +970,7 @@ export default function App() {
       setDbLikeCounts((prev) => ({ ...prev, [String(meme.id)]: prev[String(meme.id)] || 0 }));
     }
     if (user) fetchProfile(user.id, user); // Refresh points immediately
+    fetchLeaderboard();
   };
 
   const handleMemeDeleted = useCallback((memeId) => {

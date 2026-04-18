@@ -535,8 +535,9 @@ export default function MemeEditor({
           {
             id: currentUser.id,
             username: currentUser.user_metadata?.username || uploadTitle.split(" ")[0] || "User",
+            points: 0,
           },
-          { onConflict: "id" }
+          { onConflict: "id", ignoreDuplicates: true }
         );
 
       if (profileGuardError) {

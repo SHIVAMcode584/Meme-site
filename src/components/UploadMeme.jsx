@@ -352,7 +352,7 @@ export default function UploadMeme({ onUpload, onSuccess, isBlockedUser = false 
           username: currentUser.user_metadata?.username || title.split(" ")[0] || "User",
           points: 0,
         },
-        { onConflict: "id" }
+        { onConflict: "id", ignoreDuplicates: true }
       );
       if (profileGuardError) console.warn("Profile sync warning:", profileGuardError.message);
 
