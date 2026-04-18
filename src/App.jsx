@@ -95,6 +95,19 @@ const normalizeMeme = (m, currentUserId) => {
   };
 };  
 
+const getMemeRouteTarget = (url) => {
+  const memeQuery = url.searchParams.get("meme");
+  if (memeQuery) return memeQuery;
+
+  const match = url.pathname.match(/^\/meme\/([^/?#]+)/i);
+  return match ? decodeURIComponent(match[1]) : "";
+};
+
+const buildMemeRoute = (meme) => {
+  const target = meme?.slug || meme?.id;
+  return target ? `/meme/${encodeURIComponent(String(target))}` : "/";
+};
+
 // Badge helper logic
 const getBadge = (pts) => {
   if (pts >= 1000) return { name: "Legend", color: "text-amber-400", bg: "bg-amber-400/10" };
@@ -200,6 +213,31 @@ export default function App() {
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
+
+  useEffect(() => {
+    if (!allMemesNormalized.length) return;
+
+    const url = new URL(window.location.href);
+    const routeTarget = getMemeRouteTarget(url);
+    if (!routeTarget) return;
+
+    const activeList = memeList.length > 0 ? memeList : allMemesNormalized;
+    const nextIndex = activeList.findIndex((meme) => {
+      const memeId = String(meme.id);
+      const memeSlug = meme.slug ? String(meme.slug) : "";
+      return memeId === routeTarget || memeSlug === routeTarget;
+    });
+
+    if (nextIndex < 0) return;
+
+    const nextMeme = activeList[nextIndex];
+    if (!nextMeme) return;
+
+    if (String(currentMemeId) !== String(nextMeme.id) || currentMemeIndex !== nextIndex) {
+      setCurrentMemeId(nextMeme.id);
+      setCurrentMemeIndex(nextIndex);
+    }
+  }, [allMemesNormalized, currentMemeId, currentMemeIndex, memeList]);
 
   // Lock page scroll whenever any overlay is open
   useEffect(() => {
@@ -703,17 +741,13 @@ export default function App() {
     const nextIndex = activeList.findIndex((item) => String(item.id) === String(meme.id));
     setCurrentMemeId(meme.id);
     setCurrentMemeIndex(nextIndex);
-    const url = new URL(window.location);
-    url.searchParams.set("meme", meme.id);
-    window.history.replaceState({}, "", url);
+    window.history.replaceState({}, "", buildMemeRoute(meme));
   };
 
   const closeModal = () => {
     setCurrentMemeId(null);
     setCurrentMemeIndex(-1);
-    const url = new URL(window.location);
-    url.searchParams.delete("meme");
-    window.history.replaceState({}, "", url);
+    window.history.replaceState({}, "", "/");
   };
 
   const handleRandomMeme = () => {
@@ -959,10 +993,8 @@ export default function App() {
       return next;
     });
 
-    if (currentMemeId && String(currentMemeId) === targetId) {
-      const url = new URL(window.location);
-      url.searchParams.delete("meme");
-      window.history.replaceState({}, "", url);
+      if (currentMemeId && String(currentMemeId) === targetId) {
+      window.history.replaceState({}, "", "/");
       setCurrentMemeId(null);
       setCurrentMemeIndex(-1);
     }
