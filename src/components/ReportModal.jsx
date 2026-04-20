@@ -191,7 +191,7 @@ export default function ReportModal({
   return (
     <AnimatePresence>
       {isOpen ? (
-        <div className="fixed inset-0 z-[100] overflow-y-auto p-4 xl:pl-64">
+        <div className="fixed inset-0 z-[220] flex items-end justify-center overflow-y-auto overscroll-contain p-3 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:items-center sm:p-4 xl:pl-64">
           <motion.button
             type="button"
             initial={{ opacity: 0 }}
@@ -202,13 +202,13 @@ export default function ReportModal({
             aria-label="Close report modal"
           />
 
-          <div className="flex min-h-full items-start justify-center py-4 sm:items-center">
+          <div className="flex w-full min-h-full items-end justify-center sm:items-center">
             <motion.div
               initial={{ opacity: 0, y: 20, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.96 }}
               transition={{ duration: 0.22, ease: "easeOut" }}
-              className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-white/10 bg-[#0d1220] shadow-2xl shadow-black/40 max-h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-4rem)]"
+              className="relative w-full max-w-md overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#0d1220] shadow-2xl shadow-black/40 max-h-[calc(100dvh-1.5rem-env(safe-area-inset-bottom))] sm:rounded-[2rem] sm:max-h-[calc(100dvh-4rem)]"
             >
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.12),transparent_48%)]" />
               <button
@@ -219,7 +219,7 @@ export default function ReportModal({
                 <X size={18} />
               </button>
 
-              <div className="relative max-h-[calc(100dvh-2rem)] overflow-y-auto p-5 pr-14 sm:max-h-[calc(100dvh-4rem)] sm:p-6 sm:pr-16">
+              <div className="relative max-h-full overflow-y-auto p-5 pr-14 sm:p-6 sm:pr-16">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-3">
                     <div className="rounded-2xl border border-red-400/20 bg-red-500/10 p-3 text-red-300">

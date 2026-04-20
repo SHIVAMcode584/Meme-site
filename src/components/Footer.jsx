@@ -1,7 +1,7 @@
-import { Mail, ExternalLink } from "lucide-react";
+import { Mail, ExternalLink, Heart } from "lucide-react";
 
 // Brand icons like Twitter and Instagram were removed in newer versions of lucide-react.
-// We define them as local components here to fix the import error permanently.
+// We define them as local components here to keep the footer self-contained.
 const Twitter = ({ size = 24, ...props }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z" />
@@ -105,9 +105,11 @@ export default function Footer() {
 
         <div className="mt-12 flex flex-col items-center justify-between gap-6 border-t border-[color:var(--app-border)]/50 pt-8 text-sm text-[color:var(--app-muted)] md:flex-row">
           <div className="text-center md:text-left">
-            <p>Â© 2026 RoastRiot.meme â€” All Rights Reserved.</p>
+            <p>Copyright 2026 RoastRiot.meme. All Rights Reserved.</p>
             <p className="mt-1 text-xs text-[color:var(--app-muted)]">
-              Developed with â¤ï¸ by <span className="font-semibold text-violet-400/80">Shivam Kumar</span>
+              Developed with{" "}
+              <Heart size={14} className="inline-block align-[-2px] text-rose-400 fill-current" aria-hidden="true" />{" "}
+              by <span className="font-semibold text-violet-400/80">Shivam Kumar</span>
             </p>
           </div>
           <div className="flex gap-8 text-xs uppercase tracking-widest">
