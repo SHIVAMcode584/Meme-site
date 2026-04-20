@@ -460,8 +460,8 @@ export default function CommentsSection({
 
   const wrapperClassName =
     variant === "modal"
-      ? "mt-6 rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-4 sm:p-5"
-      : "mt-4 rounded-[1.5rem] border border-white/10 bg-[#0b1020]/90 p-4";
+      ? "mt-6 rounded-[1.75rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface)]/95 p-4 sm:p-5"
+      : "mt-4 rounded-[1.5rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface)]/95 p-4";
 
   const renderCommentNode = (comment, depth = 0) => {
     const isOwnComment = comment.user_id === user?.id;
@@ -481,15 +481,15 @@ export default function CommentsSection({
         transition={{ duration: 0.2 }}
         className={`rounded-[1.35rem] border px-4 py-3 shadow-lg shadow-black/10 ${
           comment.isPending
-            ? "border-violet-400/25 bg-violet-500/10"
-            : "border-white/10 bg-white/[0.03]"
-        } ${depth > 0 ? "ml-4 border-l-2 border-l-white/10 pl-4 sm:ml-6" : ""}`}
+            ? "border-[color:var(--app-accent)]/25 bg-violet-500/10"
+            : "border-[color:var(--app-border)] bg-[color:var(--app-bg)]/35"
+        } ${depth > 0 ? "ml-4 border-l-2 border-l-[color:var(--app-border)] pl-4 sm:ml-6" : ""}`}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              {depth > 0 ? <CornerDownRight className="h-3.5 w-3.5 text-zinc-500" /> : null}
-              <span className="truncate text-sm font-semibold text-white">
+              {depth > 0 ? <CornerDownRight className="h-3.5 w-3.5 text-[color:var(--app-muted)]" /> : null}
+              <span className="truncate text-sm font-semibold text-[color:var(--app-text)]">
                 {comment.username || "Meme fan"}
               </span>
               {isOwnComment ? (
@@ -499,7 +499,7 @@ export default function CommentsSection({
               ) : null}
             </div>
 
-            <div className="mt-1 flex items-center gap-1.5 text-xs text-zinc-500">
+            <div className="mt-1 flex items-center gap-1.5 text-xs text-[color:var(--app-muted)]">
               <Clock3 className="h-3 w-3" />
               <span>{formatRelativeTime(comment.created_at, now)}</span>
               {comment.isPending ? <span className="text-violet-200">Sending...</span> : null}
@@ -511,7 +511,7 @@ export default function CommentsSection({
               type="button"
               onClick={() => handleDelete(comment)}
               disabled={isDeleting}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-zinc-400 transition hover:border-red-400/30 hover:bg-red-500/10 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)]/70 text-[color:var(--app-muted)] transition hover:border-red-400/30 hover:bg-red-500/10 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-60"
               aria-label="Delete comment"
             >
               {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
@@ -519,7 +519,7 @@ export default function CommentsSection({
           ) : null}
         </div>
 
-        <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-zinc-200">
+        <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-[color:var(--app-text)]">
           {comment.text}
         </p>
 
@@ -529,7 +529,7 @@ export default function CommentsSection({
               type="button"
               onClick={() => handleStartReply(comment)}
               disabled={!user}
-              className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-zinc-300 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)]/70 px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Reply className="h-3.5 w-3.5" />
               Reply
@@ -555,7 +555,7 @@ export default function CommentsSection({
               animate={{ opacity: 1, height: "auto", y: 0 }}
               exit={{ opacity: 0, height: 0, y: -6 }}
               transition={{ duration: 0.2, ease: "easeOut" }}
-              className="mt-4 overflow-hidden rounded-[1.25rem] border border-white/10 bg-black/20 p-3"
+              className="mt-4 overflow-hidden rounded-[1.25rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)]/70 p-3"
             >
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-violet-300">
                 <Reply className="h-3.5 w-3.5" />
@@ -570,17 +570,17 @@ export default function CommentsSection({
                 }}
                 rows={3}
                 placeholder={`Reply to ${comment.username || "Meme fan"}...`}
-                className="mt-3 min-h-[84px] w-full resize-none rounded-2xl border border-white/10 bg-[#070B14] px-4 py-3 text-sm text-white outline-none transition placeholder:text-zinc-500 focus:border-violet-500/40"
+                className="mt-3 min-h-[84px] w-full resize-none rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-4 py-3 text-sm text-[color:var(--app-text)] outline-none transition placeholder:text-[color:var(--app-muted)] focus:border-violet-500/40"
               />
 
               <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-xs text-zinc-500">Press Enter to post, Shift+Enter for a new line.</p>
+                <p className="text-xs text-[color:var(--app-muted)]">Press Enter to post, Shift+Enter for a new line.</p>
 
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={clearReplyComposer}
-                    className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-semibold text-zinc-300 transition hover:bg-white/10"
+                    className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-4 py-2.5 text-sm font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-2)]"
                   >
                     Cancel
                   </button>
@@ -629,10 +629,10 @@ export default function CommentsSection({
   if (!isDatabaseMeme || !memeId) {
     return (
       <section className={wrapperClassName}>
-        <div className="flex items-start gap-3 rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-4 text-sm text-zinc-400">
-          <Lock className="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" />
+        <div className="flex items-start gap-3 rounded-2xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-2)]/50 p-4 text-sm text-[color:var(--app-muted)]">
+          <Lock className="mt-0.5 h-4 w-4 shrink-0 text-[color:var(--app-muted)]" />
           <div>
-            <p className="font-semibold text-zinc-300">Comments are unavailable here</p>
+            <p className="font-semibold text-[color:var(--app-text)]">Comments are unavailable here</p>
             <p className="mt-1">
               This meme is bundled locally. Uploaded Supabase memes support full discussions.
             </p>
@@ -651,8 +651,8 @@ export default function CommentsSection({
               <MessageCircle className="h-4 w-4" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-white sm:text-base">Comments</h3>
-              <p className="text-xs text-zinc-500">
+              <h3 className="text-sm font-semibold text-[color:var(--app-text)] sm:text-base">Comments</h3>
+              <p className="text-xs text-[color:var(--app-muted)]">
                 {commentCount} {commentCount === 1 ? "comment" : "comments"} in this thread
               </p>
             </div>
@@ -667,7 +667,7 @@ export default function CommentsSection({
         ) : null}
       </div>
 
-      <div className="group/commentbox relative mt-4 overflow-hidden rounded-[1.35rem] border border-white/10 bg-black/20 p-3 transition-colors duration-300 focus-within:border-violet-300/45">
+      <div className="group/commentbox relative mt-4 overflow-hidden rounded-[1.35rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)]/70 p-3 transition-colors duration-300 focus-within:border-violet-300/45">
         <div className="pointer-events-none absolute inset-0 rounded-[1.35rem] border border-violet-400/80 opacity-0 [clip-path:inset(100%_0_0_0_round_1.35rem)] transition-[clip-path,opacity] duration-500 ease-out group-focus-within/commentbox:opacity-100 group-focus-within/commentbox:[clip-path:inset(0_0_0_0_round_1.35rem)]" />
 
         <div className="relative z-10">
@@ -685,11 +685,11 @@ export default function CommentsSection({
             }}
             disabled={!user || isSubmitting}
             placeholder={user ? "Write a comment..." : "Sign in to write a comment..."}
-            className="min-h-[92px] w-full resize-none bg-transparent text-sm text-white outline-none placeholder:text-zinc-500 disabled:cursor-not-allowed disabled:opacity-70"
+            className="min-h-[92px] w-full resize-none bg-transparent text-sm text-[color:var(--app-text)] outline-none placeholder:text-[color:var(--app-muted)] disabled:cursor-not-allowed disabled:opacity-70"
           />
 
           <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-zinc-500">Press Enter to post, Shift+Enter for a new line.</p>
+            <p className="text-xs text-[color:var(--app-muted)]">Press Enter to post, Shift+Enter for a new line.</p>
 
             <button
               type="button"
@@ -719,14 +719,14 @@ export default function CommentsSection({
 
       <div className="mt-4 space-y-3">
         {loading ? (
-          <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-5 text-sm text-zinc-400">
+          <div className="flex items-center gap-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)]/50 px-4 py-5 text-sm text-[color:var(--app-muted)]">
             <Loader2 className="h-4 w-4 animate-spin text-violet-300" />
             Loading comments...
           </div>
         ) : commentTree.length === 0 ? (
-          <div className="rounded-[1.35rem] border border-dashed border-white/10 bg-white/[0.03] px-4 py-6 text-center">
-            <p className="text-sm font-medium text-zinc-200">Start the thread</p>
-            <p className="mt-1 text-xs text-zinc-500">Be the first to react to this meme.</p>
+          <div className="rounded-[1.35rem] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-2)]/50 px-4 py-6 text-center">
+            <p className="text-sm font-medium text-[color:var(--app-text)]">Start the thread</p>
+            <p className="mt-1 text-xs text-[color:var(--app-muted)]">Be the first to react to this meme.</p>
           </div>
         ) : (
           <AnimatePresence initial={false}>

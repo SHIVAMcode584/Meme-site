@@ -28,8 +28,8 @@ export default function SearchBar({ search, setSearch, placeholderTitles = [] })
 
   return (
     <div className="max-w-4xl mx-auto">
-      <div className="relative">
-        <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-400 w-5 h-5" />
+      <div className="group relative rounded-[1.75rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface)]/95 shadow-[0_18px_50px_var(--app-glow)] backdrop-blur-xl transition focus-within:border-[color:var(--app-accent)]/45 focus-within:shadow-[0_22px_70px_var(--app-glow)]">
+        <Search className="absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-[color:var(--app-muted)] transition-colors group-focus-within:text-[color:var(--app-accent)]" />
         {!search ? (
           <div className="pointer-events-none absolute inset-y-0 left-14 right-5 flex items-center overflow-hidden">
             <AnimatePresence mode="wait">
@@ -39,7 +39,7 @@ export default function SearchBar({ search, setSearch, placeholderTitles = [] })
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
                 transition={{ duration: 0.35, ease: "easeInOut" }}
-                className="truncate text-zinc-500"
+                className="truncate text-[color:var(--app-muted)] opacity-85"
               >
                 Type your situation (e.g. {activePlaceholder})
               </motion.span>
@@ -52,7 +52,7 @@ export default function SearchBar({ search, setSearch, placeholderTitles = [] })
           placeholder=""
           aria-label="Search memes by situation"
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full h-14 sm:h-16 pl-14 pr-5 rounded-2xl bg-[#101624] border border-white/10 text-white placeholder:text-zinc-500 outline-none focus:border-violet-400/40 focus:ring-2 focus:ring-violet-500/20 transition"
+          className="h-14 w-full rounded-[1.75rem] bg-transparent pl-14 pr-5 text-[color:var(--app-text)] outline-none transition placeholder:text-[color:var(--app-muted)] sm:h-16"
         />
       </div>
     </div>

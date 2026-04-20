@@ -191,7 +191,7 @@ export default function ReportModal({
   return (
     <AnimatePresence>
       {isOpen ? (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 xl:pl-64">
+        <div className="fixed inset-0 z-[100] overflow-y-auto p-4 xl:pl-64">
           <motion.button
             type="button"
             initial={{ opacity: 0 }}
@@ -202,38 +202,40 @@ export default function ReportModal({
             aria-label="Close report modal"
           />
 
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.96 }}
-            transition={{ duration: 0.22, ease: "easeOut" }}
-            className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-white/10 bg-[#0d1220] shadow-2xl shadow-black/40"
-          >
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.12),transparent_48%)]" />
-            <div className="relative p-6">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-3">
-                  <div className="rounded-2xl border border-red-400/20 bg-red-500/10 p-3 text-red-300">
-                    <AlertTriangle size={20} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-red-300">
-                      Report content
-                    </p>
-                    <h2 className="mt-1 text-2xl font-black tracking-tight text-white">Report Meme</h2>
-                    <p className="mt-1 text-sm text-zinc-400">
-                      Pick the best reason so admins can review it quickly.
-                    </p>
+          <div className="flex min-h-full items-start justify-center py-4 sm:items-center">
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.96 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+              className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-white/10 bg-[#0d1220] shadow-2xl shadow-black/40 max-h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-4rem)]"
+            >
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.12),transparent_48%)]" />
+              <button
+                onClick={onClose}
+                className="absolute right-4 top-4 z-20 rounded-full border border-white/10 bg-black/60 p-2 text-zinc-200 shadow-lg shadow-black/20 transition hover:bg-black/75 hover:text-white sm:right-5 sm:top-5"
+                aria-label="Close report modal"
+              >
+                <X size={18} />
+              </button>
+
+              <div className="relative max-h-[calc(100dvh-2rem)] overflow-y-auto p-5 pr-14 sm:max-h-[calc(100dvh-4rem)] sm:p-6 sm:pr-16">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-2xl border border-red-400/20 bg-red-500/10 p-3 text-red-300">
+                      <AlertTriangle size={20} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-red-300">
+                        Report content
+                      </p>
+                      <h2 className="mt-1 text-2xl font-black tracking-tight text-white">Report Meme</h2>
+                      <p className="mt-1 text-sm text-zinc-400">
+                        Pick the best reason so admins can review it quickly.
+                      </p>
+                    </div>
                   </div>
                 </div>
-
-                <button
-                  onClick={onClose}
-                  className="rounded-full border border-white/10 bg-white/5 p-2 text-zinc-400 transition hover:bg-white/10 hover:text-white"
-                >
-                  <X size={18} />
-                </button>
-              </div>
 
               {canSubmitOwnMeme ? (
                 <div className="mt-5 flex items-start gap-3 rounded-2xl border border-red-400/20 bg-red-500/10 p-4 text-sm text-red-100">
@@ -326,8 +328,9 @@ export default function ReportModal({
                   </button>
                 </div>
               )}
-            </div>
-          </motion.div>
+              </div>
+            </motion.div>
+          </div>
 
           <AnimatePresence>
             {toast ? (
