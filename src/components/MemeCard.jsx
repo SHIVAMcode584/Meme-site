@@ -7,6 +7,7 @@ import {
   ChevronDown,
   AlertTriangle,
   Trash2,
+  Sparkles,
 } from "lucide-react";
 import { motion as Motion, AnimatePresence } from "framer-motion";
 import { supabase } from "../lib/supabase";
@@ -32,6 +33,7 @@ export default function MemeCard({
 }) {
   const isFavorite = favorites.includes(meme.id);
   const isStaticMeme = !meme.user_id;
+  const isAutoMeme = Boolean(meme?.isAutoMeme || meme?.is_auto || meme?.original_source === "meme-api");
   const imageSrc = meme.image || meme.image_url;
   const canReport = Boolean(
     user &&
@@ -257,6 +259,15 @@ export default function MemeCard({
             className={`h-4 w-4 sm:h-5 sm:w-5 ${isFavorite ? "fill-violet-500 text-violet-500" : "text-[color:var(--app-text)]"}`}
           />
         </button>
+
+        {isAutoMeme ? (
+          <div className="absolute left-1/2 top-2 -translate-x-1/2 rounded-full border border-cyan-400/20 bg-cyan-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-100 shadow-lg backdrop-blur-md sm:top-4 sm:px-3 sm:text-[11px]">
+            <span className="inline-flex items-center gap-1">
+              <Sparkles className="h-3 w-3" />
+              Auto Meme
+            </span>
+          </div>
+        ) : null}
       </div>
 
       <div className="p-3 sm:p-5">

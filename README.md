@@ -13,6 +13,7 @@ https://meme-site-lovat.vercel.app/
 - Email/password and magic link authentication
 - Password reset flow
 - Meme uploads with title, image, category, mood, and keywords
+- Admin-controlled meme publishing with OCR-generated keywords
 - Like and unlike support with duplicate protection
 - Meme comments with optimistic posting and delete permissions
 - User profiles with points
@@ -53,6 +54,8 @@ https://meme-site-lovat.vercel.app/
 - `category`
 - `mood`
 - `keywords`
+- `is_auto`
+- `original_source`
 - `user_id`
 - `created_at`
 - `embedding`
@@ -112,6 +115,8 @@ Set these in your local `.env` file and in Vercel project settings:
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `OPENAI_API_KEY`
 - `OPENAI_EMBEDDING_MODEL` (optional, default: `text-embedding-3-small`)
+- `OCR_SPACE_API_KEY` for OCR-based keyword extraction
+- `OPENAI_KEYWORD_MODEL` (optional, default: `gpt-4o-mini`)
 
 ### 4. Run the database migrations
 
@@ -125,6 +130,7 @@ and
 
 This enables `pgvector`, adds the `embedding` column, and creates the `match_memes(...)` RPC.
 The comments migration creates the `comments` table, enables RLS, and adds comment policies.
+The auto-ingestion migration adds `is_auto`, `original_source`, and a unique index on `image_url`.
 
 ### 5. Backfill meme embeddings
 
@@ -166,6 +172,16 @@ Payload example:
 ```
 
 If AI search fails, the endpoint automatically falls back to keyword filtering.
+
+### Meme Publishing API
+
+Admin route:
+
+`GET /api/admin/meme-publisher`
+
+This route fetches random meme suggestions for admins. Select one or more memes in the admin panel, then publish them into `meme-table`.
+
+Publishing uses the same OCR and keyword generation pipeline as regular uploads.
 
 ## Troubleshooting
 

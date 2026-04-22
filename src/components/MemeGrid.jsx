@@ -3,6 +3,23 @@ import { motion as Motion } from "framer-motion";
 import { Image as ImageIcon, ChevronDown } from "lucide-react";
 import MemeCard from "./MemeCard";
 
+function isIpadLikeDevice() {
+  if (typeof window === "undefined") return false;
+
+  const userAgent = window.navigator.userAgent || "";
+  const platform = window.navigator.platform || "";
+
+  return /iPad/i.test(userAgent) || (platform === "MacIntel" && window.navigator.maxTouchPoints > 1);
+}
+
+function getItemsPerPageForViewport() {
+  if (typeof window === "undefined") return 6;
+  if (isIpadLikeDevice()) return 6;
+  if (window.innerWidth >= 1280) return 8;
+  if (window.innerWidth >= 640) return 6;
+  return 4;
+}
+
 export default function MemeGrid({
   memes,
   onOpen,
@@ -17,16 +34,31 @@ export default function MemeGrid({
   onLikeCountChange,
   onLikeStateChange,
 }) {
-  const ITEMS_PER_PAGE = 6;
-  const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
+  const [itemsPerPage, setItemsPerPage] = useState(() => getItemsPerPageForViewport());
+  const [visibleCount, setVisibleCount] = useState(() => getItemsPerPageForViewport());
   const [openCommentsMemeId, setOpenCommentsMemeId] = useState(null);
   const memesSignature = memes.map((meme) => meme.id).join("|");
 
+  useEffect(() => {
+    const handleResize = () => {
+      setItemsPerPage(getItemsPerPageForViewport());
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   // Reset visible count only when the actual meme set changes.
   useEffect(() => {
-    setVisibleCount(ITEMS_PER_PAGE);
-    setOpenCommentsMemeId(null);
-  }, [memesSignature]);
+    const frame = window.requestAnimationFrame(() => {
+      setVisibleCount(itemsPerPage);
+      setOpenCommentsMemeId(null);
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [itemsPerPage, memesSignature]);
 
   if (memes.length === 0) {
     return (
@@ -54,21 +86,26 @@ export default function MemeGrid({
 
   const displayedMemes = memes.slice(0, visibleCount);
   const hasMore = visibleCount < memes.length;
+  const isIpad = isIpadLikeDevice();
+  const gridClassName = isIpad
+    ? "grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-8"
+    : "grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-8";
+  const expandedCardClassName = isIpad ? "col-span-2 md:col-span-3" : "col-span-2 md:col-span-3 xl:col-span-4";
 
   const handleLoadMore = () => {
-    setVisibleCount((prev) => prev + ITEMS_PER_PAGE);
+    setVisibleCount((prev) => prev + itemsPerPage);
   };
 
   return (
     <div className="space-y-10">
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-8">
+      <div className={gridClassName}>
         {displayedMemes.map((meme, index) => (
           <Motion.div
             key={`${meme.id}-${index}`}
             initial={{ opacity: 0, y: 25 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, delay: (index % ITEMS_PER_PAGE) * 0.04 }}
-            className={openCommentsMemeId === meme.id ? "col-span-2 lg:col-span-3" : ""}
+            transition={{ duration: 0.35, delay: (index % itemsPerPage) * 0.04 }}
+            className={openCommentsMemeId === meme.id ? expandedCardClassName : ""}
           >
             <MemeCard
               meme={meme}

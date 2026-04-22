@@ -73,6 +73,10 @@ function getInitialFavorites() {
 // Helper to ensure data from any source matches the component expectations
 const normalizeMeme = (m, currentUserId) => {
   const profileData = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+  const isAutoMeme =
+    m.is_auto === true ||
+    m.is_auto === "true" ||
+    m.original_source === "meme-api";
   
   return {
     ...m,
@@ -89,9 +93,10 @@ const normalizeMeme = (m, currentUserId) => {
       : (typeof m.keywords === 'string' ? m.keywords.replace(/[\[\]"']/g, '').split(/[\s,]+/).filter(Boolean) : []),
     username: m.user_id 
       ? (currentUserId && m.user_id === currentUserId ? "You" : (profileData?.username || "User"))
-      : "Owner",
+      : (isAutoMeme ? "Auto" : "Owner"),
     image: m.image_url || m.image || "",
     isDatabaseMeme: Boolean(m.image_url || m.created_at || m.user_id),
+    isAutoMeme,
   };
 };  
 
@@ -170,6 +175,10 @@ export default function App() {
   const allMemesNormalized = useMemo(() => {
     return [...dbMemes, ...memes].map(m => normalizeMeme(m, user?.id));
   }, [dbMemes, user?.id]);
+  const autoMemesCount = useMemo(
+    () => allMemesNormalized.filter((meme) => meme.isAutoMeme).length,
+    [allMemesNormalized]
+  );
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const path = currentPath;
   const isOverlayOpen = Boolean(
@@ -540,6 +549,8 @@ export default function App() {
       baseList = baseList.filter(m => favorites.includes(m.id));
     } else if (viewMode === "liked") {
       baseList = baseList.filter((m) => likedMemeIdSet.has(String(m.id)));
+    } else if (viewMode === "auto") {
+      baseList = baseList.filter((m) => m.isAutoMeme);
     }
 
     const searchedMemes = smartSearch(baseList, search, selectedCategory);
@@ -981,6 +992,25 @@ export default function App() {
     fetchLeaderboard();
   };
 
+  const handleAdminMemePublished = useCallback(
+    (memesToAdd = []) => {
+      const nextMemes = Array.isArray(memesToAdd) ? memesToAdd : [];
+      if (nextMemes.length === 0) return;
+
+      const normalizedNextMemes = nextMemes.map((meme) => normalizeMeme(meme, user?.id));
+      const nextIds = new Set(normalizedNextMemes.map((meme) => String(meme.id)));
+
+      setDbMemes((prev) => [
+        ...normalizedNextMemes,
+        ...prev.filter((meme) => !nextIds.has(String(meme.id))),
+      ]);
+
+      if (user) fetchProfile(user.id, user);
+      fetchLeaderboard();
+    },
+    [user?.id]
+  );
+
   const handleMemeDeleted = useCallback((memeId) => {
     const targetId = String(memeId);
 
@@ -1147,7 +1177,14 @@ export default function App() {
   }
 
   if (path === "/admin") {
-    return <AdminModeration user={user} onBack={() => navigateTo("/")} onMemeDeleted={handleMemeDeleted} />;
+    return (
+      <AdminModeration
+        user={user}
+        onBack={() => navigateTo("/")}
+        onMemeDeleted={handleMemeDeleted}
+        onMemePublished={handleAdminMemePublished}
+      />
+    );
   }
 
   const SidebarContent = () => (
@@ -1436,6 +1473,21 @@ export default function App() {
                     <span className="hidden xs:inline">Bookmarks:</span>
                     <span>{favorites.length}</span>
                   </button>
+                  <button
+                    onClick={() => {
+                      setViewMode(viewMode === "auto" ? "all" : "auto");
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                    className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] font-semibold transition-all sm:gap-2 sm:px-4 sm:py-2 sm:text-sm md:gap-1 md:px-2.5 md:py-1.5 md:text-[11px] ${
+                      viewMode === "auto"
+                        ? "border-cyan-400/40 bg-cyan-500/10 text-cyan-100"
+                        : "border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] text-[color:var(--app-text)] hover:bg-[color:var(--app-surface)]"
+                    }`}
+                  >
+                    <Sparkles size={14} className={viewMode === "auto" ? "text-cyan-300" : ""} />
+                    <span className="hidden xs:inline">Auto:</span>
+                    <span>{autoMemesCount}</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -1659,6 +1711,8 @@ export default function App() {
                         ? "My Bookmarked Memes"
                         : viewMode === "liked"
                         ? "My Liked Memes"
+                        : viewMode === "auto"
+                        ? "Auto-Ingested Memes"
                         : "Meme Results"}
                     </h2>
                     <p className="text-zinc-400">
@@ -1718,7 +1772,17 @@ export default function App() {
                   Launch the meme studio to build your own situational roasts using our built-in canvas tool.
                 </p>
                 <button
-                  onClick={() => setIsBottomEditorVisible(true)}
+                  onClick={() => {
+                    if (isBlockedUser) {
+                      setNotification({
+                        type: "error",
+                        message: "Your account is blocked from editing memes.",
+                      });
+                      return;
+                    }
+
+                    setIsEditorModalOpen(true);
+                  }}
                   className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-black text-lg shadow-xl shadow-violet-500/20 hover:opacity-90 active:scale-95 transition-all"
                 >
                   <Pencil size={20} /> Open Meme Studio

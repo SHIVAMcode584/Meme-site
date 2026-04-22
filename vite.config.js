@@ -1,7 +1,9 @@
 import { Buffer } from 'node:buffer'
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { getMemeSuggestions, parseMemeApiSource, publishSelectedMemes } from './api/_lib/meme-ingest.js'
+import { createAdminUserClient, requireAdminRequest } from './api/_lib/admin-auth.js'
 
 const process = globalThis.process
 const OCR_API_URL = 'https://api.ocr.space/parse/image'
@@ -109,6 +111,80 @@ function ocrKeywordsDevPlugin() {
   }
 }
 
-export default defineConfig({
-  plugins: [react(), tailwindcss(), ocrKeywordsDevPlugin()],
+function adminMemePublisherDevPlugin() {
+  return {
+    name: 'admin-meme-publisher-dev-route',
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        const pathname = new URL(req.url || '/', 'http://localhost').pathname
+
+        if (pathname !== '/api/admin/meme-publisher') {
+          return next()
+        }
+
+        if (!['GET', 'POST'].includes(req.method || '')) {
+          return sendJson(res, 405, { ok: false, error: 'Method Not Allowed' })
+        }
+
+        try {
+          const { supabase, token, user } = await requireAdminRequest(req)
+          const userClient = createAdminUserClient(token)
+
+          if (req.method === 'GET') {
+            const url = new URL(req.url || '/api/admin/meme-publisher', 'http://localhost')
+            const limit = Math.min(Math.max(Number(url.searchParams.get('limit') || 5), 1), 10)
+            const source = parseMemeApiSource(url.searchParams.get('source') || 'all')
+            const candidates = await getMemeSuggestions({ supabase: userClient, limit, source })
+
+            return sendJson(res, 200, {
+              ok: true,
+              candidates,
+            })
+          }
+
+          const body = await readRequestBody(req)
+          const memes = Array.isArray(body?.memes) ? body.memes : []
+
+          if (memes.length === 0) {
+            return sendJson(res, 400, {
+              ok: false,
+              error: 'No memes were selected.',
+            })
+          }
+
+          const result = await publishSelectedMemes({
+            supabase: userClient,
+            memes,
+            userId: user?.id || null,
+            openAiApiKey: '',
+          })
+
+          return sendJson(res, 200, {
+            ok: true,
+            ...result,
+          })
+        } catch (error) {
+          return sendJson(res, error.statusCode || 500, {
+            ok: false,
+            error: error.message || 'Meme publishing failed',
+          })
+        }
+      })
+    },
+  }
+}
+
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+
+  process.env.SUPABASE_URL ||= env.SUPABASE_URL || env.VITE_SUPABASE_URL || ''
+  process.env.VITE_SUPABASE_URL ||= env.VITE_SUPABASE_URL || env.SUPABASE_URL || ''
+  process.env.SUPABASE_ANON_KEY ||= env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY || ''
+  process.env.VITE_SUPABASE_ANON_KEY ||= env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || ''
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||= env.SUPABASE_SERVICE_ROLE_KEY || ''
+  process.env.OCR_SPACE_API_KEY ||= env.OCR_SPACE_API_KEY || ''
+
+  return {
+    plugins: [react(), tailwindcss(), ocrKeywordsDevPlugin(), adminMemePublisherDevPlugin()],
+  }
 })

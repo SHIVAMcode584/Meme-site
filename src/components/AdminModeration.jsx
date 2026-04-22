@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import Toast from "./Toast";
 import Footer from "./Footer";
+import AdminMemePublisher from "./AdminMemePublisher";
 
 function formatDate(value) {
   if (!value) return "Unknown date";
@@ -81,7 +82,7 @@ function getUserTone(role) {
   };
 }
 
-export default function AdminModeration({ user, onBack, onMemeDeleted }) {
+export default function AdminModeration({ user, onBack, onMemeDeleted, onMemePublished }) {
   const [reports, setReports] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -678,10 +679,11 @@ export default function AdminModeration({ user, onBack, onMemeDeleted }) {
   const sectionTabs = [
     { key: "reports", label: "Reports", count: totalCount },
     { key: "users", label: "Users", count: totalUsers },
+    { key: "publisher", label: "Publish", count: "API" },
   ];
 
   return (
-    <div className="admin-panel relative mx-auto max-w-7xl overflow-x-hidden px-3 py-3 sm:px-6 sm:py-6 lg:px-8">
+    <div className="admin-panel relative mx-auto max-w-7xl overflow-x-visible px-3 py-3 sm:px-6 sm:py-6 lg:px-8">
       <div className="absolute inset-x-0 top-0 -z-10 h-64 bg-[radial-gradient(circle_at_top,rgba(168,85,247,0.16),transparent_55%)]" />
 
       <div className="mb-4 flex items-center justify-center rounded-full border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-[0.22em] text-violet-200 sm:px-4 sm:text-sm sm:tracking-[0.35em]">
@@ -773,7 +775,15 @@ export default function AdminModeration({ user, onBack, onMemeDeleted }) {
         </div>
       </div>
 
-      {activeSection === "reports" ? (
+      {activeSection === "publisher" ? (
+        <section className="space-y-6 overflow-visible">
+          <AdminMemePublisher
+            user={user}
+            pushToast={pushToast}
+            onPublishedMemes={onMemePublished}
+          />
+        </section>
+      ) : activeSection === "reports" ? (
         <>
           <div className="mb-6 overflow-x-auto pb-1">
             <div className="flex min-w-max gap-2">

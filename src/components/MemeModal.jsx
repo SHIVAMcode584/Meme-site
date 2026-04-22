@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   X,
   Download,
@@ -14,7 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion as Motion } from "framer-motion";
 import { supabase } from "../lib/supabase";
 import { getOwnerMemeLikeSnapshot, setOwnerMemeLike } from "../utils/likes";
 import CommentsSection from "./CommentsSection";
@@ -54,6 +54,7 @@ export default function MemeModal({
 
   const isFavorite = favorites.includes(meme?.id);
   const isStaticMeme = meme && !meme.user_id;
+  const isAutoMeme = Boolean(meme?.isAutoMeme || meme?.is_auto || meme?.original_source === "meme-api");
   const canReport = Boolean(
     user &&
       !isAdminUser &&
@@ -116,7 +117,7 @@ export default function MemeModal({
     preloadImage(next?.image || next?.image_url);
   }, [currentIndex, meme, memeList, preloadImage, totalMemes]);
 
-  const handleNavigate = (direction) => {
+  const handleNavigate = useCallback((direction) => {
     const canNavigate = direction < 0 ? canGoPrev && onPrevious : canGoNext && onNext;
     if (!canNavigate) {
       setDragX(0);
@@ -138,9 +139,9 @@ export default function MemeModal({
     }
 
     return true;
-  };
+  }, [canGoNext, canGoPrev, onNext, onPrevious]);
 
-  const handleKeyDown = (event) => {
+  const handleKeyDown = useCallback((event) => {
     if (event.key === "Escape") {
       onClose();
       return;
@@ -163,7 +164,7 @@ export default function MemeModal({
       event.preventDefault();
       handleNavigate(1);
     }
-  };
+  }, [handleNavigate, onClose]);
 
   useEffect(() => {
     if (!meme) return undefined;
@@ -337,8 +338,8 @@ export default function MemeModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-end justify-center p-0 xl:items-center xl:p-4 xl:pl-64">
-      <motion.button
+    <div className="fixed inset-0 z-[150] flex items-end justify-center p-0 lg:left-[18rem] lg:right-4 lg:top-4 lg:bottom-4 lg:items-center lg:px-4">
+      <Motion.button
         type="button"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -348,12 +349,12 @@ export default function MemeModal({
         aria-label="Close meme popup"
       />
 
-      <motion.div
+      <Motion.div
         initial={{ opacity: 0, y: 24, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 24, scale: 0.98 }}
         transition={{ duration: 0.22, ease: "easeOut" }}
-        className="relative z-10 flex h-[92dvh] w-full flex-col overflow-hidden border border-white/10 bg-[#0d1220] shadow-2xl shadow-black/50 xl:h-auto xl:max-h-[92vh] xl:max-w-6xl xl:rounded-[2rem]"
+        className="relative z-10 flex h-[92dvh] w-full flex-col overflow-hidden border border-white/10 bg-[#0d1220] shadow-2xl shadow-black/50 lg:h-full lg:rounded-[2rem] xl:h-auto xl:max-h-[92vh] xl:max-w-6xl"
       >
         <div className="absolute inset-x-0 top-0 z-10 flex justify-center pt-3 sm:hidden">
           <div className="h-1.5 w-14 rounded-full bg-white/15" />
@@ -403,7 +404,7 @@ export default function MemeModal({
         </div>
 
         <AnimatePresence mode="wait" initial={false}>
-          <motion.div
+          <Motion.div
             key={meme.id}
             initial={{
               opacity: 0,
@@ -477,6 +478,12 @@ export default function MemeModal({
                     <span className="rounded-full border border-fuchsia-400/20 bg-fuchsia-500/10 px-3 py-1 text-fuchsia-200">
                       {meme.mood || "Reaction"}
                     </span>
+                    {isAutoMeme ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-cyan-100">
+                        <Sparkles size={12} />
+                        Auto Meme
+                      </span>
+                    ) : null}
                   </div>
 
                   <h2 className="mt-4 text-2xl font-black tracking-tight text-white sm:text-3xl">
@@ -600,9 +607,9 @@ export default function MemeModal({
                 />
               </div>
             </div>
-          </motion.div>
+          </Motion.div>
         </AnimatePresence>
-      </motion.div>
+      </Motion.div>
 
       <ReportModal 
         isOpen={isReportModalOpen} 

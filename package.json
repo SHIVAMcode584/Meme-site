@@ -11,6 +11,9 @@
     "embeddings:backfill": "node scripts/backfill-embeddings.mjs"
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.1",
+    "@capacitor/cli": "^8.3.1",
+    "@capacitor/core": "^8.3.1",
     "@supabase/supabase-js": "^2.103.0",
     "@tailwindcss/vite": "^4.2.2",
     "framer-motion": "^12.38.0",
