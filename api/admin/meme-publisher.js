@@ -4,7 +4,7 @@ import {
   parseRunLimit,
   publishSelectedMemes,
 } from "../_lib/meme-ingest.js";
-import { createAdminUserClient, requireAdminRequest } from "../_lib/admin-auth.js";
+import { requireAdminRequest } from "../_lib/admin-auth.js";
 
 function sendJson(res, status, body) {
   res.statusCode = status;
@@ -26,8 +26,7 @@ function readJsonBody(req) {
 
 export default async function handler(req, res) {
   try {
-    const { user, token } = await requireAdminRequest(req);
-    const adminClient = createAdminUserClient(token);
+    const { user, supabase: adminClient } = await requireAdminRequest(req);
 
     if (req.method === "GET") {
       const url = new URL(req.url || "/api/admin/meme-publisher", "http://localhost");
