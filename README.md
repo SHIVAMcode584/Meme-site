@@ -182,6 +182,7 @@ Admin route:
 This route fetches random meme suggestions for admins. Select one or more memes in the admin panel, then publish them into `meme-table`.
 
 Make sure `SUPABASE_SERVICE_ROLE_KEY` is set in Vercel, because this route reads and writes `meme-table` through the server after admin authentication.
+Also make sure `public.profiles` has a `role` column and your admin account row is set to `role = 'admin'`, because the route checks that field before allowing access.
 
 Publishing uses the same OCR and keyword generation pipeline as regular uploads.
 
@@ -194,6 +195,12 @@ If you see "AI search unavailable", usually one of these is missing:
 3. The SQL migration was not applied, so `match_memes` does not exist.
 4. Embeddings have not been backfilled yet.
 5. You are running only `vite dev`, which does not serve the `api/` functions.
+
+If the admin meme publisher returns 500, double-check:
+
+1. `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are set in Vercel.
+2. `public.profiles` has a `role` column.
+3. Your admin user's profile row is set to `role = 'admin'`.
 
 For local testing, either:
 
