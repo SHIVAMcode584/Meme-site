@@ -20,7 +20,9 @@ export function createAdminSupabaseClient() {
     "";
 
   if (!supabaseUrl || !supabaseKey) {
-    throw new Error("Missing SUPABASE_URL or a Supabase API key");
+    throw new Error(
+      "Missing Supabase server env vars. Set SUPABASE_URL (or VITE_SUPABASE_URL) and SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY in Vercel."
+    );
   }
 
   return createClient(supabaseUrl, supabaseKey, {
@@ -36,7 +38,9 @@ export function createAdminUserClient(token) {
   const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Missing SUPABASE_URL or SUPABASE_ANON_KEY");
+    throw new Error(
+      "Missing Supabase server env vars. Set SUPABASE_URL (or VITE_SUPABASE_URL) and SUPABASE_ANON_KEY (or VITE_SUPABASE_ANON_KEY) in Vercel."
+    );
   }
 
   const authToken = String(token || "").trim();
