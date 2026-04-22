@@ -39,6 +39,7 @@ import Hero from "./components/Hero";
 import Loader from "./components/Loader";
 import MemeGrid from "./components/MemeGrid";
 import NotificationBell from "./components/NotificationBell";
+import RizzGeneratorSidebar from "./components/RizzGeneratorSidebar";
 import ThemeSwitcher from "./components/ThemeSwitcher";
 import SearchBar from "./components/SearchBar";
 import { memes } from "./data/memes";
@@ -139,6 +140,7 @@ export default function App() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isRizzOpen, setIsRizzOpen] = useState(false);
   const [viewMode, setViewMode] = useState("all");
   const [isBottomEditorVisible, setIsBottomEditorVisible] = useState(false);
   const [dbMemes, setDbMemes] = useState([]);
@@ -196,7 +198,8 @@ export default function App() {
       isUsernameConfirmOpen ||
       notification ||
       resetStatus ||
-      showIosInstallModal
+      showIosInstallModal ||
+      isRizzOpen
   );
   const navigateTo = useCallback((nextPath) => {
     if (window.location.pathname !== nextPath) {
@@ -1225,6 +1228,17 @@ export default function App() {
           }} 
         />
         <SidebarLink icon={<Search size={20}/>} label="Search" onClick={() => { setIsSidebarOpen(false); setIsEditorModalOpen(false); setIsUploadModalOpen(false); closeModal(); document.querySelector('input[type="text"]')?.focus(); }} />
+        <SidebarLink
+          icon={<Sparkles size={20} />}
+          label="Rizz 😏"
+          onClick={() => {
+            setIsSidebarOpen(false);
+            setIsEditorModalOpen(false);
+            setIsUploadModalOpen(false);
+            closeModal();
+            setIsRizzOpen(true);
+          }}
+        />
         {user && (
           <>
             <SidebarLink 
@@ -1365,6 +1379,7 @@ export default function App() {
   return (
     <>
       <AnimatePresence>{showLoader ? <Loader /> : null}</AnimatePresence>
+      <RizzGeneratorSidebar isOpen={isRizzOpen} onOpenChange={setIsRizzOpen} />
       <div className="min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] flex">
       {/* Desktop Sidebar (Persistent) */}
       <aside className="hidden lg:block fixed top-0 left-0 z-[110] h-screen w-64 bg-[var(--app-surface)] border-r border-[color:var(--app-border)] p-6 shadow-2xl overflow-y-auto">
