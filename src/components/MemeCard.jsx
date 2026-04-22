@@ -230,7 +230,7 @@ export default function MemeCard({
         {canDelete ? (
           <button
             onClick={handleDelete}
-            className="group/delete absolute right-12 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-red-400/30 bg-red-950/80 backdrop-blur-md shadow-lg shadow-red-950/30 transition active:scale-90 hover:scale-110 hover:border-red-300/70 hover:bg-red-900 sm:right-16 sm:top-4 sm:h-10 sm:w-10"
+            className="group/delete absolute right-2 top-12 flex h-8 w-8 items-center justify-center rounded-full border border-red-400/30 bg-red-950/80 backdrop-blur-md shadow-lg shadow-red-950/30 transition active:scale-90 hover:scale-110 hover:border-red-300/70 hover:bg-red-900 sm:right-16 sm:top-4 sm:h-10 sm:w-10"
             title="Delete Meme"
           >
             <Trash2 className="h-4 w-4 text-red-100 transition-colors group-hover/delete:text-white sm:h-5 sm:w-5" />
@@ -241,7 +241,7 @@ export default function MemeCard({
               e.stopPropagation();
               setIsReportModalOpen(true);
             }}
-            className="group/report absolute right-12 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-red-400/30 bg-red-950/80 backdrop-blur-md shadow-lg shadow-red-950/30 transition active:scale-90 hover:scale-110 hover:border-red-300/70 hover:bg-red-900 sm:right-16 sm:top-4 sm:h-10 sm:w-10"
+            className="group/report absolute right-2 top-12 flex h-8 w-8 items-center justify-center rounded-full border border-red-400/30 bg-red-950/80 backdrop-blur-md shadow-lg shadow-red-950/30 transition active:scale-90 hover:scale-110 hover:border-red-300/70 hover:bg-red-900 sm:right-16 sm:top-4 sm:h-10 sm:w-10"
             title="Report Meme"
           >
             <AlertTriangle className="h-4 w-4 text-red-100 transition-colors group-hover/report:text-white sm:h-5 sm:w-5" />

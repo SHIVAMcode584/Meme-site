@@ -3,18 +3,26 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   ChevronDown,
   Copy,
+  ExternalLink,
   Heart,
+  Image as ImageIcon,
   Loader2,
   RefreshCw,
+  Search,
   Sparkles,
   X,
 } from "lucide-react";
 
-const RIZZ_API_URL = "https://rizz-api.vercel.app/api/random";
+const RIZZ_API_URLS = [
+  "https://rizzapi.vercel.app/random",
+  "https://o1swy96l80.execute-api.ap-south-1.amazonaws.com/api/random",
+  "https://rizz-api.vercel.app/api/random",
+];
 const STORAGE_KEY = "rizz-generator-saved-v1";
 const HISTORY_LIMIT = 5;
 const GENERATED_SOURCE = "api";
 const FALLBACK_SOURCE = "local";
+const KEYWORD_SEARCH_LIMIT = 20;
 const GENERATE_COOLDOWN_MS = 900;
 const TYPE_SPEED_MS = 18;
 
@@ -57,9 +65,24 @@ function pickRandomItem(items = []) {
   return items[Math.floor(Math.random() * items.length)] || "";
 }
 
+function dedupeByImage(items = []) {
+  const seen = new Set();
+
+  return items.filter((item) => {
+    const key = normalizeText(item?.imageUrl || item?.postUrl || item?.id || item?.title || "").toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function extractRizzText(payload, rawText) {
   if (typeof payload === "string") {
     return normalizeText(payload);
+  }
+
+  if (payload && typeof payload === "object" && typeof payload.text === "string") {
+    return normalizeText(payload.text);
   }
 
   if (Array.isArray(payload)) {
@@ -92,48 +115,55 @@ function extractRizzText(payload, rawText) {
 }
 
 async function fetchRizzFromApi() {
-  const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), 10000);
+  for (const url of RIZZ_API_URLS) {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 10000);
 
-  try {
-    const response = await fetch(RIZZ_API_URL, {
-      method: "GET",
-      signal: controller.signal,
-      headers: {
-        accept: "application/json,text/plain;q=0.9,*/*;q=0.8",
-      },
-    });
+    try {
+      const response = await fetch(url, {
+        method: "GET",
+        signal: controller.signal,
+        headers: {
+          accept: "application/json,text/plain;q=0.9,*/*;q=0.8",
+        },
+      });
 
-    const rawText = await response.text();
-    let payload = rawText;
+      const rawText = await response.text();
+      let payload = rawText;
 
-    const contentType = response.headers.get("content-type") || "";
-    const looksJson = contentType.includes("application/json") || /^[\s]*[\[{]/.test(rawText);
+      const contentType = response.headers.get("content-type") || "";
+      const looksJson = contentType.includes("application/json") || /^[\s]*[\[{]/.test(rawText);
 
-    if (looksJson) {
-      try {
-        payload = JSON.parse(rawText);
-      } catch {
-        payload = rawText;
+      if (looksJson) {
+        try {
+          payload = JSON.parse(rawText);
+        } catch {
+          payload = rawText;
+        }
       }
-    }
 
-    if (!response.ok) {
-      throw new Error(`Rizz API returned ${response.status}`);
-    }
+      if (!response.ok) {
+        continue;
+      }
 
-    const rizzText = extractRizzText(payload, rawText);
-    if (!rizzText) {
-      throw new Error("Empty rizz response");
-    }
+      const rizzText =
+        typeof payload?.text === "string" ? normalizeText(payload.text) : extractRizzText(payload, rawText);
+      if (!rizzText) {
+        continue;
+      }
 
-    return {
-      text: rizzText,
-      source: GENERATED_SOURCE,
-    };
-  } finally {
-    window.clearTimeout(timeoutId);
+      return {
+        text: rizzText,
+        source: GENERATED_SOURCE,
+      };
+    } catch {
+      // Try the next documented endpoint.
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
   }
+
+  throw new Error("Rizz API unavailable");
 }
 
 function buildFallbackLine(categoryKey = "all") {
@@ -146,18 +176,46 @@ function buildFallbackLine(categoryKey = "all") {
   };
 }
 
+function dedupeRizzItems(items = []) {
+  const seen = new Set();
+
+  return items.filter((item) => {
+    const key = normalizeText(item?.text || "").toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export default function RizzGeneratorSidebar({ isOpen, onOpenChange }) {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [currentRizz, setCurrentRizz] = useState(null);
   const [history, setHistory] = useState([]);
   const [savedRizz, setSavedRizz] = useState([]);
+  const [isKeywordSearchOpen, setIsKeywordSearchOpen] = useState(false);
+  const [keywordQuery, setKeywordQuery] = useState("");
+  const [keywordSearchResults, setKeywordSearchResults] = useState([]);
+  const [keywordSearchActiveQuery, setKeywordSearchActiveQuery] = useState("");
+  const [keywordSearchSource, setKeywordSearchSource] = useState("idle");
+  const [keywordSearchReason, setKeywordSearchReason] = useState("");
+  const [keywordSearchHasMore, setKeywordSearchHasMore] = useState(false);
+  const [keywordSearchAfter, setKeywordSearchAfter] = useState(null);
+  const [keywordSearchPage, setKeywordSearchPage] = useState(1);
+  const [keywordSearchLoading, setKeywordSearchLoading] = useState(false);
+  const [keywordSearchLoadingMore, setKeywordSearchLoadingMore] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [copyStatus, setCopyStatus] = useState("");
   const [typedText, setTypedText] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [touchStartX, setTouchStartX] = useState(null);
+  const [showIntroPulse, setShowIntroPulse] = useState(false);
+  const keywordInputRef = useRef(null);
   const lastGenerateAtRef = useRef(0);
   const didOpenRef = useRef(false);
+  const didShowIntroRef = useRef(false);
+  const keywordSearchAbortRef = useRef(null);
+  const keywordSearchRequestIdRef = useRef(0);
+  const keywordSearchCacheRef = useRef(new Map());
 
   const currentText = currentRizz?.text || "";
 
@@ -202,14 +260,26 @@ export default function RizzGeneratorSidebar({ isOpen, onOpenChange }) {
   useEffect(() => {
     if (!isOpen) {
       didOpenRef.current = false;
+      setShowIntroPulse(false);
       return undefined;
     }
 
     if (didOpenRef.current) return undefined;
     didOpenRef.current = true;
 
+    let introTimer = null;
+    if (!didShowIntroRef.current) {
+      didShowIntroRef.current = true;
+      setShowIntroPulse(true);
+      introTimer = window.setTimeout(() => setShowIntroPulse(false), 2200);
+    }
+
     void generateRizz({ preferApi: true });
-    return undefined;
+    return () => {
+      if (introTimer) {
+        window.clearTimeout(introTimer);
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
@@ -248,6 +318,25 @@ export default function RizzGeneratorSidebar({ isOpen, onOpenChange }) {
     const timer = window.setTimeout(() => setActionMessage(""), 1800);
     return () => window.clearTimeout(timer);
   }, [actionMessage]);
+
+  useEffect(() => {
+    if (!isKeywordSearchOpen) return undefined;
+
+    const timer = window.setTimeout(() => {
+      keywordInputRef.current?.focus();
+    }, 50);
+
+    return () => window.clearTimeout(timer);
+  }, [isKeywordSearchOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (keywordSearchAbortRef.current) {
+        keywordSearchAbortRef.current.abort();
+        keywordSearchAbortRef.current = null;
+      }
+    };
+  }, []);
 
   const pushHistory = (nextRizz) => {
     if (!nextRizz?.text) return;
@@ -347,11 +436,160 @@ export default function RizzGeneratorSidebar({ isOpen, onOpenChange }) {
           text: normalizeText(currentText),
           category: selectedCategory,
           createdAt: new Date().toISOString(),
+          source: currentRizz?.source || GENERATED_SOURCE,
         },
         ...current,
       ];
     });
   };
+
+  const openKeywordSearch = () => {
+    setIsKeywordSearchOpen(true);
+    setActionMessage("Search opened");
+  };
+
+  const closeKeywordSearch = () => {
+    setIsKeywordSearchOpen(false);
+  };
+
+  async function loadKeywordMemeResults({ query, page = 1, after = null, append = false } = {}) {
+    const normalizedQuery = normalizeText(query);
+    if (!normalizedQuery) return;
+
+    const cacheKey = `${normalizedQuery.toLowerCase()}|${page}|${after || ""}`;
+    const cached = keywordSearchCacheRef.current.get(cacheKey);
+    if (cached) {
+      if (append) {
+        setKeywordSearchResults((current) => dedupeByImage([...current, ...cached.results]));
+      } else {
+        setKeywordSearchResults(cached.results);
+      }
+      setKeywordSearchSource(cached.source);
+      setKeywordSearchReason(cached.reason || "");
+      setKeywordSearchHasMore(cached.hasMore);
+      setKeywordSearchAfter(cached.after);
+      setKeywordSearchPage(cached.nextPage);
+      setKeywordSearchActiveQuery(normalizedQuery);
+      setKeywordSearchLoading(false);
+      setKeywordSearchLoadingMore(false);
+      return;
+    }
+
+    keywordSearchRequestIdRef.current += 1;
+    const requestId = keywordSearchRequestIdRef.current;
+
+    if (keywordSearchAbortRef.current) {
+      keywordSearchAbortRef.current.abort();
+    }
+
+    const controller = new AbortController();
+    keywordSearchAbortRef.current = controller;
+
+    if (append) {
+      setKeywordSearchLoadingMore(true);
+    } else {
+      setKeywordSearchLoading(true);
+    }
+    setKeywordSearchReason("");
+    let requestTimeoutId = null;
+
+    try {
+      const url = new URL("/api/keyword-meme-search", window.location.origin);
+      url.searchParams.set("q", normalizedQuery);
+      url.searchParams.set("limit", String(KEYWORD_SEARCH_LIMIT));
+      url.searchParams.set("page", String(page));
+      if (after) {
+        url.searchParams.set("after", after);
+      }
+
+      if (requestId !== keywordSearchRequestIdRef.current) return;
+
+      requestTimeoutId = window.setTimeout(() => controller.abort(), 12000);
+
+      const response = await fetch(url.toString(), {
+        signal: controller.signal,
+      });
+      const payload = await response.json();
+
+      if (requestId !== keywordSearchRequestIdRef.current) return;
+
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.error || "Keyword meme search failed.");
+      }
+
+      const nextResults = dedupeByImage(Array.isArray(payload?.results) ? payload.results : []);
+      const nextSource = payload?.source || "reddit";
+      const nextReason = payload?.reason || "";
+      const nextHasMore = Boolean(payload?.hasMore);
+      const nextAfter = payload?.after || null;
+      const nextPage = page + 1;
+
+      setKeywordSearchResults((current) =>
+        append ? dedupeByImage([...current, ...nextResults]) : nextResults
+      );
+      setKeywordSearchSource(nextSource);
+      setKeywordSearchReason(nextReason);
+      setKeywordSearchHasMore(nextHasMore);
+      setKeywordSearchAfter(nextAfter);
+      setKeywordSearchPage(nextPage);
+      setKeywordSearchActiveQuery(normalizedQuery);
+      setActionMessage(nextResults.length > 0 ? `Found ${nextResults.length} memes` : "No memes found");
+
+      keywordSearchCacheRef.current.set(cacheKey, {
+        results: nextResults,
+        source: nextSource,
+        reason: nextReason,
+        hasMore: nextHasMore,
+        after: nextAfter,
+        nextPage,
+      });
+    } catch (error) {
+      if (requestId !== keywordSearchRequestIdRef.current) return;
+      setKeywordSearchResults([]);
+      setKeywordSearchSource("idle");
+      setKeywordSearchReason(
+        error?.name === "AbortError"
+          ? "Search timed out. Try another keyword."
+          : error.message || "Keyword meme search failed."
+      );
+      setKeywordSearchHasMore(false);
+      setKeywordSearchAfter(null);
+      setKeywordSearchPage(1);
+      setActionMessage(
+        error?.name === "AbortError"
+          ? "Search timed out"
+          : error.message || "Keyword meme search failed."
+      );
+    } finally {
+      if (requestTimeoutId) {
+        window.clearTimeout(requestTimeoutId);
+      }
+      if (requestId !== keywordSearchRequestIdRef.current) return;
+      if (append) {
+        setKeywordSearchLoadingMore(false);
+      } else {
+        setKeywordSearchLoading(false);
+      }
+    }
+  }
+
+  function handleKeywordSearchSubmit(event) {
+    event.preventDefault();
+    void loadKeywordMemeResults({ query: keywordQuery, page: 1, after: null, append: false });
+  }
+
+  function handleLoadMoreKeywordMemes() {
+    if (!keywordSearchActiveQuery || keywordSearchLoading || keywordSearchLoadingMore || !keywordSearchHasMore) {
+      return;
+    }
+
+    void loadKeywordMemeResults({
+      query: keywordSearchActiveQuery,
+      page: keywordSearchPage,
+      after: keywordSearchAfter,
+      append: true,
+    });
+  }
 
   const copyCurrent = async () => {
     if (!currentText) return;
@@ -387,19 +625,27 @@ export default function RizzGeneratorSidebar({ isOpen, onOpenChange }) {
     <>
       <AnimatePresence>
         {!isOpen ? (
-          <motion.button
-            type="button"
-            onClick={() => onOpenChange?.(true)}
+          <motion.div
             initial={{ opacity: 0, y: 20, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.96 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="fixed bottom-4 right-4 z-[180] inline-flex items-center gap-2 rounded-full border border-fuchsia-400/30 bg-[#0d1220]/95 px-4 py-3 text-sm font-bold text-fuchsia-100 shadow-2xl shadow-fuchsia-500/20 backdrop-blur-xl transition hover:scale-[1.03] hover:bg-[#121a2f] sm:bottom-6 sm:right-6"
+            className="fixed bottom-4 right-4 z-[180] sm:bottom-6 sm:right-6"
           >
-            <Sparkles size={16} className="text-fuchsia-300" />
-            Rizz
-            <span className="text-base">😏</span>
-          </motion.button>
+            <button
+              type="button"
+              onClick={() => onOpenChange?.(true)}
+              className="group relative inline-flex items-center overflow-hidden rounded-full p-[1.5px] shadow-2xl shadow-fuchsia-500/20 transition hover:scale-[1.03]"
+            >
+              <span className="absolute inset-0 rounded-full bg-[conic-gradient(from_0deg,var(--app-accent),var(--app-accent-2),#22d3ee,var(--app-accent))] animate-[spin_3.5s_linear_infinite]" />
+              <span className="absolute inset-[1px] rounded-full bg-[color:var(--app-surface)]/96 backdrop-blur-xl transition group-hover:bg-[color:var(--app-surface-2)]/96" />
+              <span className="relative inline-flex items-center gap-2 rounded-full px-4 py-3 text-sm font-bold text-[color:var(--app-text)]">
+                <Sparkles size={16} className="text-[color:var(--app-accent-2)]" />
+                Rizz
+                <span className="text-base">??</span>
+              </span>
+            </button>
+          </motion.div>
         ) : null}
       </AnimatePresence>
 
@@ -432,21 +678,21 @@ export default function RizzGeneratorSidebar({ isOpen, onOpenChange }) {
               }}
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
-              className="fixed inset-y-0 right-0 z-[185] flex h-[100dvh] w-full max-w-[440px] flex-col border-l border-white/10 bg-[#0b1020]/96 shadow-[0_30px_100px_rgba(0,0,0,0.55)] backdrop-blur-2xl sm:rounded-l-[2rem]"
+              className="fixed inset-y-0 right-0 z-[185] flex h-[100dvh] w-full max-w-[460px] flex-col border-l border-[color:var(--app-border)] bg-[color:var(--app-bg)]/96 shadow-[0_30px_100px_rgba(0,0,0,0.55)] backdrop-blur-2xl sm:rounded-l-[2rem]"
             >
-              <div className="flex items-center justify-between border-b border-white/10 px-4 py-4 sm:px-6">
+              <div className="relative overflow-hidden border-b border-[color:var(--app-border)] px-4 py-4 sm:px-6">
                 <div className="min-w-0">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-fuchsia-300">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[color:var(--app-accent-2)]">
                     Sidebar tool
                   </p>
-                  <h2 className="mt-1 text-xl font-black tracking-tight text-white">
-                    Rizz Generator 😏
+                  <h2 className="mt-1 text-xl font-black tracking-tight text-[color:var(--app-text)]">
+                    Rizz Generator ??
                   </h2>
                 </div>
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="rounded-full border border-white/10 bg-white/[0.04] p-2 text-zinc-300 transition hover:bg-white/10 hover:text-white"
+                  className="absolute right-4 top-4 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-2 text-[color:var(--app-muted)] transition hover:bg-[color:var(--app-surface-2)] hover:text-[color:var(--app-text)]"
                   aria-label="Close rizz sidebar"
                 >
                   <X size={18} />
@@ -454,18 +700,18 @@ export default function RizzGeneratorSidebar({ isOpen, onOpenChange }) {
               </div>
 
               <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 custom-scrollbar">
-                <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-4 shadow-lg shadow-black/20">
+                <div className="rounded-[1.75rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-4 shadow-lg shadow-black/20 sm:p-5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <p className="text-[10px] uppercase tracking-[0.24em] text-zinc-500">
+                      <p className="text-[10px] uppercase tracking-[0.24em] text-[color:var(--app-muted)]">
                         Auto mode
                       </p>
-                      <p className="mt-1 text-sm text-zinc-300">
+                      <p className="mt-1 text-sm text-[color:var(--app-text)]">
                         A fresh line loads when the sidebar opens.
                       </p>
                     </div>
-                    <span className="inline-flex items-center gap-1 rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-100">
-                      <Sparkles size={12} />
+                    <span className="inline-flex items-center gap-1 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-text)]">
+                      <Sparkles size={12} className="text-[color:var(--app-accent-2)]" />
                       Ready
                     </span>
                   </div>
@@ -479,7 +725,7 @@ export default function RizzGeneratorSidebar({ isOpen, onOpenChange }) {
                         <select
                           value={selectedCategory}
                           onChange={(event) => setSelectedCategory(event.target.value)}
-                          className="w-full appearance-none rounded-2xl border border-white/10 bg-[#0d1220] px-4 py-3 pr-10 text-sm font-semibold text-white outline-none transition focus:border-fuchsia-400/40 focus:ring-2 focus:ring-fuchsia-500/20"
+                          className="w-full appearance-none rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] px-4 py-3 pr-10 text-sm font-semibold text-[color:var(--app-text)] outline-none transition focus:border-[color:var(--app-accent)]/45 focus:ring-2 focus:ring-[color:var(--app-glow)]"
                         >
                           {CATEGORY_OPTIONS.map((option) => (
                             <option key={option.key} value={option.key}>
@@ -494,21 +740,253 @@ export default function RizzGeneratorSidebar({ isOpen, onOpenChange }) {
                       </div>
                     </label>
 
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center rounded-full border border-[color:var(--app-accent)]/30 bg-[color:var(--app-accent)]/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-[color:var(--app-text)]">
+                        New
+                      </span>
+                      <span className="inline-flex items-center gap-2 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text)]">
+                        <Sparkles size={12} className="text-[color:var(--app-accent-2)]" />
+                        New feature introduced
+                      </span>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <span className="inline-flex items-center gap-1 rounded-full border border-[color:var(--app-accent)]/30 bg-[color:var(--app-accent)]/12 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-[color:var(--app-text)] shadow-[0_0_0_1px_rgba(139,92,246,0.12)]">
+                        <Sparkles size={10} className="text-[color:var(--app-accent-2)]" />
+                        New!
+                      </span>
+                    </div>
+
                     <button
                       type="button"
                       onClick={() => generateRizz({ preferApi: true })}
                       disabled={isGenerating}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-fuchsia-400/20 bg-gradient-to-r from-fuchsia-500/15 to-violet-500/15 px-4 py-3 text-sm font-semibold text-fuchsia-100 transition hover:from-fuchsia-500/25 hover:to-violet-500/25 disabled:cursor-not-allowed disabled:opacity-60"
+                      className={`relative inline-flex items-center justify-center gap-2 rounded-2xl border border-[color:var(--app-accent)]/20 bg-gradient-to-r from-[color:var(--app-accent)]/15 to-[color:var(--app-accent-2)]/15 px-4 py-3 text-sm font-semibold text-[color:var(--app-text)] transition hover:from-[color:var(--app-accent)]/25 hover:to-[color:var(--app-accent-2)]/25 disabled:cursor-not-allowed disabled:opacity-60 ${showIntroPulse ? "animate-pulse shadow-[0_0_0_1px_rgba(217,70,239,0.18),0_0_40px_rgba(139,92,246,0.28)]" : ""}`}
                     >
                       {isGenerating ? (
                         <Loader2 size={16} className="animate-spin" />
                       ) : (
-                        <RefreshCw size={16} />
+                        <RefreshCw size={16} className="text-[color:var(--app-accent-2)]" />
                       )}
-                      {isGenerating ? "Generating..." : "Generate Rizz"}
+                      <span>{isGenerating ? "Generating..." : "Generate Rizz"}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => (isKeywordSearchOpen ? closeKeywordSearch() : openKeywordSearch())}
+                      className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
+                        isKeywordSearchOpen
+                          ? "border-cyan-400/30 bg-[color:var(--app-accent)]/10 text-[color:var(--app-text)] hover:bg-cyan-500/20"
+                          : "border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] text-[color:var(--app-text)] hover:bg-[color:var(--app-surface)]"
+                      }`}
+                    >
+                      <Search size={16} />
+                      Search by keyword
+                      <ChevronDown
+                        size={14}
+                        className={`transition-transform ${isKeywordSearchOpen ? "rotate-180" : ""}`}
+                      />
                     </button>
                   </div>
                 </div>
+
+                <AnimatePresence initial={false}>
+                  {isKeywordSearchOpen ? (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0, y: -8 }}
+                      animate={{ height: "auto", opacity: 1, y: 0 }}
+                      exit={{ height: 0, opacity: 0, y: -8 }}
+                      transition={{ duration: 0.22, ease: "easeOut" }}
+                      className="mt-4 overflow-hidden rounded-[1.75rem] border border-cyan-400/20 bg-cyan-500/[0.06] p-4"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[color:var(--app-accent-2)]">
+                            Meme keyword search
+                          </p>
+                          <p className="mt-1 text-sm text-[color:var(--app-text)]">
+                            Search Reddit memes by keyword and keep the results inside this sidebar.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={closeKeywordSearch}
+                          className="rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-2 text-[color:var(--app-muted)] transition hover:bg-[color:var(--app-surface-2)] hover:text-[color:var(--app-text)]"
+                          aria-label="Close keyword search"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+
+                      <form className="mt-4 flex gap-2" onSubmit={handleKeywordSearchSubmit}>
+                        <div className="group relative flex-1 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)]">
+                          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500 group-focus-within:text-[color:var(--app-accent)]" />
+                          <input
+                            ref={keywordInputRef}
+                            type="text"
+                            value={keywordQuery}
+                            onChange={(event) => setKeywordQuery(event.target.value)}
+                            placeholder="Search memes (e.g. exam, love, coding...)"
+                            className="h-12 w-full rounded-2xl bg-transparent pl-11 pr-4 text-sm text-white outline-none placeholder:text-zinc-500"
+                          />
+                        </div>
+                        <button
+                          type="submit"
+                          disabled={keywordSearchLoading}
+                          className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-4 text-sm font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent)]/35 hover:bg-[color:var(--app-surface)] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {keywordSearchLoading ? "Searching..." : "Search"}
+                        </button>
+                        {keywordQuery ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (keywordSearchAbortRef.current) {
+                                keywordSearchAbortRef.current.abort();
+                                keywordSearchAbortRef.current = null;
+                              }
+                              setKeywordQuery("");
+                              setKeywordSearchResults([]);
+                              setKeywordSearchActiveQuery("");
+                              setKeywordSearchSource("idle");
+                              setKeywordSearchReason("");
+                              setKeywordSearchHasMore(false);
+                              setKeywordSearchAfter(null);
+                              setKeywordSearchPage(1);
+                              setKeywordSearchLoading(false);
+                              setKeywordSearchLoadingMore(false);
+                              setActionMessage("Keyword cleared");
+                            }}
+                            className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-4 text-sm font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface)]"
+                          >
+                            Clear
+                          </button>
+                        ) : null}
+                      </form>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {["exam", "love", "coding", "gym"].map((item) => (
+                          <button
+                            key={item}
+                            type="button"
+                            onClick={() => {
+                              setKeywordQuery(item);
+                              void loadKeywordMemeResults({ query: item, page: 1, after: null, append: false });
+                            }}
+                            className="rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent)]/30 hover:bg-[color:var(--app-surface)]"
+                          >
+                            #{item}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="mt-4">
+                        {keywordSearchLoading ? (
+                          <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)]/80 p-4 text-sm text-[color:var(--app-muted)]">
+                            <div className="flex items-center gap-3">
+                              <Loader2 size={16} className="animate-spin text-[color:var(--app-accent-2)]" />
+                              Searching Reddit memes...
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {!keywordSearchLoading && keywordSearchResults.length > 0 ? (
+                          <div className="grid gap-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[color:var(--app-muted)]">
+                                {keywordSearchActiveQuery || "Results"}
+                              </p>
+                              <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[color:var(--app-accent-2)]">
+                                {keywordSearchSource === "reddit" ? "Reddit" : "Fallback"}
+                              </span>
+                            </div>
+
+                            {keywordSearchResults.map((item, index) => {
+                              const link = item.postUrl || item.permalink || item.imageUrl;
+
+                              return (
+                                <a
+                                  key={`${item.id}-${index}`}
+                                  href={link}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="group overflow-hidden rounded-[1.25rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] transition hover:border-[color:var(--app-accent)]/30 hover:bg-[color:var(--app-surface)]"
+                                >
+                                  <div className="flex gap-3 p-3">
+                                    <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)]">
+                                      {item.imageUrl ? (
+                                        <img
+                                          src={item.imageUrl}
+                                          alt={item.title}
+                                          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                                          loading="lazy"
+                                          decoding="async"
+                                        />
+                                      ) : (
+                                        <div className="flex h-full w-full items-center justify-center text-zinc-600">
+                                          <ImageIcon size={18} />
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span className="truncate text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                                          {item.subreddit || "r/memes"}
+                                        </span>
+                                        <ExternalLink
+                                          size={14}
+                                          className="shrink-0 text-zinc-500 transition group-hover:text-[color:var(--app-accent-2)]"
+                                        />
+                                      </div>
+                                      <p className="mt-2 line-clamp-3 text-sm leading-6 text-white">
+                                        {item.title}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </a>
+                              );
+                            })}
+
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-[11px] text-zinc-500">
+                                Tap a result to open the meme on Reddit.
+                              </p>
+                              {keywordSearchHasMore ? (
+                                <button
+                                  type="button"
+                                  onClick={handleLoadMoreKeywordMemes}
+                                  disabled={keywordSearchLoadingMore}
+                                  className="inline-flex items-center gap-2 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface)] disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  {keywordSearchLoadingMore ? (
+                                    <Loader2 size={12} className="animate-spin text-[color:var(--app-accent-2)]" />
+                                  ) : null}
+                                  {keywordSearchLoadingMore ? "Loading..." : "Load more"}
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {!keywordSearchLoading && keywordSearchActiveQuery && keywordSearchResults.length === 0 ? (
+                          <div className="rounded-2xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-bg)]/80 p-4 text-sm text-[color:var(--app-muted)]">
+                            <div className="flex items-center gap-3">
+                              <ImageIcon size={16} className="text-[color:var(--app-muted)]" />
+                              {keywordSearchReason || "No memes found. Try another keyword."}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {!keywordSearchLoading && !keywordSearchActiveQuery ? (
+                          <div className="rounded-2xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-bg)]/80 p-4 text-sm text-[color:var(--app-muted)]">
+                            Enter a keyword and tap Search to pull memes from Reddit.
+                          </div>
+                        ) : null}
+                      </div>
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
 
                 <AnimatePresence mode="wait">
                   {currentText ? (
@@ -521,19 +999,19 @@ export default function RizzGeneratorSidebar({ isOpen, onOpenChange }) {
                       className="mt-4 rounded-[1.75rem] border border-fuchsia-400/20 bg-[radial-gradient(circle_at_top,rgba(236,72,153,0.14),rgba(13,18,32,0.96)_55%)] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.35)]"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-fuchsia-200">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[color:var(--app-accent-2)]">
                           Current Rizz
                         </p>
-                        <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-300">
+                        <span className="rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-text)]">
                           {currentCategoryLabel}
                         </span>
                       </div>
 
-                      <div className="mt-4 min-h-[120px] rounded-[1.5rem] border border-white/10 bg-black/25 p-4">
-                        <p className="whitespace-pre-wrap text-lg font-bold leading-8 text-white sm:text-xl">
+                      <div className="mt-4 min-h-[120px] rounded-[1.5rem] border border-[color:var(--app-border)] bg-[color:var(--app-bg)]/80 p-4">
+                        <p className="whitespace-pre-wrap text-lg font-bold leading-8 text-[color:var(--app-text)] sm:text-xl">
                           {typedText}
                           {typedText.length < currentText.length ? (
-                            <span className="ml-1 inline-block animate-pulse text-fuchsia-300">|</span>
+                            <span className="ml-1 inline-block animate-pulse text-[color:var(--app-accent-2)]">|</span>
                           ) : null}
                         </p>
                       </div>
@@ -542,7 +1020,7 @@ export default function RizzGeneratorSidebar({ isOpen, onOpenChange }) {
                         <button
                           type="button"
                           onClick={copyCurrent}
-                          className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm font-semibold text-zinc-200 transition hover:bg-white/10"
+                          className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-3 text-sm font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface)]"
                         >
                           <Copy size={16} />
                           Copy Rizz
@@ -551,7 +1029,7 @@ export default function RizzGeneratorSidebar({ isOpen, onOpenChange }) {
                           type="button"
                           onClick={() => generateRizz({ preferApi: true })}
                           disabled={isGenerating}
-                          className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm font-semibold text-zinc-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-3 text-sm font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface)] disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           <RefreshCw size={16} />
                           New Rizz
@@ -561,13 +1039,13 @@ export default function RizzGeneratorSidebar({ isOpen, onOpenChange }) {
                           onClick={toggleSaveCurrent}
                           className={`inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-sm font-semibold transition ${
                             isCurrentSaved
-                              ? "border-pink-400/30 bg-pink-500/10 text-pink-100 hover:bg-pink-500/20"
-                              : "border-white/10 bg-white/[0.04] text-zinc-200 hover:bg-white/10"
+                              ? "border-[color:var(--app-accent)]/30 bg-[color:var(--app-accent)]/10 text-[color:var(--app-text)] hover:bg-[color:var(--app-accent)]/20"
+                              : "border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] text-[color:var(--app-text)] hover:bg-[color:var(--app-surface)]"
                           }`}
                         >
                           <Heart
                             size={16}
-                            className={isCurrentSaved ? "fill-pink-500 text-pink-400" : ""}
+                            className={isCurrentSaved ? "fill-[color:var(--app-accent)] text-[color:var(--app-accent)]" : ""}
                           />
                           {isCurrentSaved ? "Saved" : "Save"}
                         </button>
@@ -581,7 +1059,7 @@ export default function RizzGeneratorSidebar({ isOpen, onOpenChange }) {
                   ) : null}
                 </AnimatePresence>
 
-                <div className="mt-4 rounded-[1.75rem] border border-white/10 bg-white/[0.03] p-4">
+                <div className="mt-4 rounded-[1.75rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-4">
                   <div className="flex items-center justify-between gap-2">
                     <div>
                       <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-zinc-500">
@@ -591,7 +1069,7 @@ export default function RizzGeneratorSidebar({ isOpen, onOpenChange }) {
                         Last {HISTORY_LIMIT} lines
                       </h3>
                     </div>
-                    <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-300">
+                    <span className="rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-text)]">
                       {history.length}
                     </span>
                   </div>
@@ -617,16 +1095,16 @@ export default function RizzGeneratorSidebar({ isOpen, onOpenChange }) {
                                 createdAt: item.createdAt,
                               })
                             }
-                            className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-left transition hover:border-fuchsia-400/30 hover:bg-white/[0.06]"
+                            className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] p-4 text-left transition hover:border-[color:var(--app-accent)]/30 hover:bg-[color:var(--app-surface)]"
                           >
                             <div className="flex items-center justify-between gap-2">
-                              <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                              <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[color:var(--app-muted)]">
                                 {item.category || "all"} / {item.source === GENERATED_SOURCE ? "api" : "fallback"}
                               </span>
                               {saved ? (
-                                <Heart size={14} className="fill-pink-500 text-pink-400" />
+                                <Heart size={14} className="fill-[color:var(--app-accent)] text-[color:var(--app-accent)]" />
                               ) : (
-                                <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-600">
+                                <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[color:var(--app-muted)]">
                                   tap to reuse
                                 </span>
                               )}
@@ -638,18 +1116,18 @@ export default function RizzGeneratorSidebar({ isOpen, onOpenChange }) {
                         );
                       })
                     ) : (
-                      <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm text-zinc-400">
+                      <div className="rounded-2xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-bg)]/80 p-4 text-sm text-[color:var(--app-muted)]">
                         Your recent rizz lines will appear here.
                       </div>
                     )}
                   </div>
                 </div>
 
-                <div className="mt-4 rounded-[1.75rem] border border-white/10 bg-gradient-to-br from-cyan-500/10 via-transparent to-fuchsia-500/10 p-4 text-sm text-zinc-300">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-300">
+                <div className="mt-4 rounded-[1.75rem] border border-[color:var(--app-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-4 text-sm text-[color:var(--app-text)]">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[color:var(--app-accent-2)]">
                     Quick tip
                   </p>
-                  <p className="mt-2 leading-6">
+                  <p className="mt-2 leading-6 text-[color:var(--app-muted)]">
                     Open the sidebar, generate a line, then copy or save the ones you like.
                     If the API is slow, the generator falls back to local rizz automatically.
                   </p>
@@ -662,3 +1140,6 @@ export default function RizzGeneratorSidebar({ isOpen, onOpenChange }) {
     </>
   );
 }
+
+
+
