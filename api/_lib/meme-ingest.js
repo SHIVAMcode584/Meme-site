@@ -1,6 +1,7 @@
 /* global process */
 
 import { createClient } from "@supabase/supabase-js";
+import { memes as localFallbackMemes } from "../../src/data/memes.js";
 
 const MEME_API_SOURCES = {
   all: {
@@ -318,6 +319,22 @@ function normalizeMemeBatch(payload, sourceKey = "all") {
     .filter((item) => item.title && item.imageUrl);
 }
 
+function buildLocalFallbackBatch(requestedLimit, sourceKey = "all") {
+  const shuffled = [...localFallbackMemes].sort(() => Math.random() - 0.5);
+  const localPayload = shuffled
+    .slice(0, Math.max(1, requestedLimit))
+    .map((item) => ({
+      title: item?.title || item?.name || "",
+      image: item?.image || item?.imageUrl || item?.url || "",
+      nsfw: false,
+    }));
+
+  return normalizeMemeBatch(localPayload, sourceKey).map((item) => ({
+    ...item,
+    originalSource: "local-library",
+  }));
+}
+
 function tokenizeForKeywords(value) {
   return normalizeWhitespace(String(value || "").toLowerCase())
     .replace(/['’]/g, "")
@@ -389,8 +406,13 @@ async function fetchMemeBatch(sourceKey = "all", requestedLimit = DEFAULT_LIMIT)
   const label = `Meme API (${source.label})`;
 
   if (normalizedSourceKey === "all") {
-    const payload = await fetchJson(source.urls[0], {}, label);
-    return normalizeMemeBatch(payload, normalizedSourceKey);
+    try {
+      const payload = await fetchJson(source.urls[0], {}, label);
+      const batch = normalizeMemeBatch(payload, normalizedSourceKey);
+      return batch.length > 0 ? batch : buildLocalFallbackBatch(requestedLimit, normalizedSourceKey);
+    } catch (error) {
+      return buildLocalFallbackBatch(requestedLimit, normalizedSourceKey);
+    }
   }
 
   const fetchCount = Math.max(1, requestedLimit);
@@ -398,10 +420,11 @@ async function fetchMemeBatch(sourceKey = "all", requestedLimit = DEFAULT_LIMIT)
     fetchJson(source.urls[0], {}, label).catch((error) => ({ __error: error }))
   );
   const payloads = await Promise.all(fetches);
-
-  return payloads
+  const batch = payloads
     .filter((item) => !item?.__error)
     .flatMap((payload) => normalizeMemeBatch(payload, normalizedSourceKey));
+
+  return batch.length > 0 ? batch : buildLocalFallbackBatch(requestedLimit, normalizedSourceKey);
 }
 
 async function fetchOcrText(imageUrl, ocrApiKey) {
@@ -524,6 +547,14 @@ async function loadExistingImageUrls(supabase, imageUrls) {
   }
 
   return new Set((data || []).map((row) => String(row.image_url || "").trim()));
+}
+
+async function loadExistingImageUrlsSafely(supabase, imageUrls) {
+  try {
+    return await loadExistingImageUrls(supabase, imageUrls);
+  } catch {
+    return new Set();
+  }
 }
 
 async function processPreparedMeme({
@@ -695,7 +726,7 @@ export async function getMemeSuggestions({ supabase, limit = 5, source = "all" }
   const requestedLimit = clampLimit(limit);
   const fetchedMemes = await fetchMemeBatch(source, requestedLimit);
   const preparedMemes = buildPreparedMemes(fetchedMemes, requestedLimit);
-  const existingUrls = await loadExistingImageUrls(
+  const existingUrls = await loadExistingImageUrlsSafely(
     supabase,
     preparedMemes.map((item) => item.imageUrl)
   );
@@ -724,10 +755,11 @@ export async function publishSelectedMemes({
         .filter((meme) => meme.title && meme.imageUrl && isAllowedImageUrl(meme.imageUrl))
     : [];
 
-  const existingUrls = await loadExistingImageUrls(
+  const existingUrls = await loadExistingImageUrlsSafely(
     supabase,
     normalizedMemes.map((item) => item.imageUrl)
   );
+  const safeExistingUrls = existingUrls instanceof Set ? existingUrls : new Set();
 
   const results = {
     ok: true,
@@ -742,7 +774,7 @@ export async function publishSelectedMemes({
     const batchResult = await processPreparedMeme({
       supabase,
       meme,
-      existingUrls,
+      existingUrls: safeExistingUrls,
       ocrApiKey,
       openAiApiKey,
       openAiModel,
@@ -786,7 +818,7 @@ export async function runMemeIngestion({
   }
 
   const imageUrls = preparedMemes.map((item) => item.imageUrl);
-  const existingUrls = await loadExistingImageUrls(supabase, imageUrls);
+  const existingUrls = await loadExistingImageUrlsSafely(supabase, imageUrls);
   const results = {
     ok: true,
     fetched: fetchedMemes.length,
