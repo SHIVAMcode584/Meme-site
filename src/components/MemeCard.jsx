@@ -42,7 +42,7 @@ export default function MemeCard({
       meme?.user_id &&
       String(meme.user_id) !== String(user.id)
   );
-  const canDelete = Boolean(isAdminUser && onDeleteMeme && meme?.user_id);
+  const canDelete = Boolean(isAdminUser && onDeleteMeme);
   const [liked, setLiked] = useState(false);
   const [localLikeCount, setLocalLikeCount] = useState(likeCount || 0);
   const [isLiking, setIsLiking] = useState(false);
@@ -261,11 +261,12 @@ export default function MemeCard({
         </button>
 
         {isAutoMeme ? (
-          <div className="absolute left-1/2 top-2 -translate-x-1/2 rounded-full border border-cyan-400/20 bg-cyan-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-100 shadow-lg backdrop-blur-md sm:top-4 sm:px-3 sm:text-[11px]">
-            <span className="inline-flex items-center gap-1">
-              <Sparkles className="h-3 w-3" />
-              Auto Meme
-            </span>
+          <div
+            className="absolute left-1/2 top-2 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full border border-cyan-400/20 bg-cyan-500/10 text-cyan-100 shadow-lg backdrop-blur-md sm:top-4 sm:h-9 sm:w-9"
+            title="Auto Meme"
+            aria-label="Auto Meme"
+          >
+            <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
           </div>
         ) : null}
       </div>
