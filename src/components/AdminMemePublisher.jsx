@@ -10,7 +10,7 @@ import {
   UploadCloud,
   X,
 } from "lucide-react";
-import { supabase } from "../lib/supabase";
+import { supabase, supabaseKey, supabaseUrl } from "../lib/supabase";
 
 function getMemeKey(meme) {
   return String(meme?.imageUrl || meme?.image_url || meme?.title || "");
@@ -189,6 +189,8 @@ export default function AdminMemePublisher({ user, onPublishedMemes, pushToast }
         {
           headers: {
             authorization: `Bearer ${token}`,
+            "x-supabase-url": supabaseUrl,
+            "x-supabase-anon-key": supabaseKey,
           },
         }
       );
@@ -243,6 +245,8 @@ export default function AdminMemePublisher({ user, onPublishedMemes, pushToast }
         headers: {
           "content-type": "application/json",
           authorization: `Bearer ${token}`,
+          "x-supabase-url": supabaseUrl,
+          "x-supabase-anon-key": supabaseKey,
         },
         body: JSON.stringify({
           memes: selectedCandidates,

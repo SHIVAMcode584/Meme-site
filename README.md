@@ -201,6 +201,8 @@ If the admin meme publisher returns 500, double-check:
 2. `public.profiles` has a `role` column.
 3. Your admin user's profile row is set to `role = 'admin'`.
 
+The service-role key is no longer required for the admin meme publisher route.
+
 For local testing, either:
 
 - Use `vercel dev`, or

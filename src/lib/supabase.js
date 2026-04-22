@@ -82,5 +82,6 @@ export const supabase = isSupabaseConfigured
   : createDisabledSupabaseClient();
 
 export const supabaseConfigured = isSupabaseConfigured;
+export { supabaseUrl, supabaseKey };
 
 export default supabase;

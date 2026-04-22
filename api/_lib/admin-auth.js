@@ -11,17 +11,34 @@ function getTokenFromRequest(req) {
   return String(req.headers["x-supabase-access-token"] || "").trim();
 }
 
-export function createAdminSupabaseClient() {
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
-  const supabaseKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+function resolveSupabaseConfig(options = {}) {
+  const supabaseUrl =
+    String(options.supabaseUrl || "").trim() ||
+    process.env.SUPABASE_URL ||
+    process.env.VITE_SUPABASE_URL ||
+    "";
+  const supabaseAnonKey =
+    String(options.supabaseAnonKey || "").trim() ||
     process.env.SUPABASE_ANON_KEY ||
     process.env.VITE_SUPABASE_ANON_KEY ||
     "";
+  const supabaseServiceRoleKey =
+    String(options.supabaseServiceRoleKey || "").trim() || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+
+  return {
+    supabaseUrl: String(supabaseUrl || "").trim(),
+    supabaseAnonKey: String(supabaseAnonKey || "").trim(),
+    supabaseServiceRoleKey: String(supabaseServiceRoleKey || "").trim(),
+  };
+}
+
+export function createAdminSupabaseClient(options = {}) {
+  const { supabaseUrl, supabaseServiceRoleKey } = resolveSupabaseConfig(options);
+  const supabaseKey = supabaseServiceRoleKey;
 
   if (!supabaseUrl || !supabaseKey) {
     throw new Error(
-      "Missing Supabase server env vars. Set SUPABASE_URL (or VITE_SUPABASE_URL) and SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY in Vercel."
+      "Missing Supabase config. Set SUPABASE_URL (or VITE_SUPABASE_URL) and SUPABASE_SERVICE_ROLE_KEY if you are using the service-role path."
     );
   }
 
@@ -33,13 +50,12 @@ export function createAdminSupabaseClient() {
   });
 }
 
-export function createAdminUserClient(token) {
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
-  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
+export function createAdminUserClient(token, options = {}) {
+  const { supabaseUrl, supabaseAnonKey } = resolveSupabaseConfig(options);
 
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error(
-      "Missing Supabase server env vars. Set SUPABASE_URL (or VITE_SUPABASE_URL) and SUPABASE_ANON_KEY (or VITE_SUPABASE_ANON_KEY) in Vercel."
+      "Missing Supabase config. Make sure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are available to the deployed frontend."
     );
   }
 
@@ -69,7 +85,10 @@ export async function requireAdminRequest(req) {
     throw error;
   }
 
-  const supabase = createAdminSupabaseClient();
+  const supabase = createAdminUserClient(token, {
+    supabaseUrl: req.headers["x-supabase-url"],
+    supabaseAnonKey: req.headers["x-supabase-anon-key"],
+  });
   const { data: userData, error: userError } = await supabase.auth.getUser(token);
 
   if (userError || !userData?.user) {
