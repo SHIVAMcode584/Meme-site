@@ -16,9 +16,30 @@ function getMemeKey(meme) {
   return String(meme?.imageUrl || meme?.image_url || meme?.title || "");
 }
 
+function isBrokenRefreshTokenError(error) {
+  const message = String(error?.message || error || "").toLowerCase();
+  return (
+    message.includes("invalid refresh token") ||
+    message.includes("refresh token not found") ||
+    message.includes("refresh token")
+  );
+}
+
 async function getAccessToken() {
   const { data, error } = await supabase.auth.getSession();
-  if (error) throw error;
+  if (error) {
+    if (isBrokenRefreshTokenError(error)) {
+      try {
+        await supabase.auth.signOut({ scope: "local" });
+      } catch {
+        // Ignore cleanup errors and surface the session problem to the user.
+      }
+
+      throw new Error("Your session expired. Please sign in again.");
+    }
+
+    throw error;
+  }
 
   const token = data?.session?.access_token || "";
   if (!token) {

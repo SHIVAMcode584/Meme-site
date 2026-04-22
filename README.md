@@ -181,6 +181,8 @@ Admin route:
 
 This route fetches random meme suggestions for admins. Select one or more memes in the admin panel, then publish them into `meme-table`.
 
+Make sure `SUPABASE_SERVICE_ROLE_KEY` is set in Vercel, because this route reads and writes `meme-table` through the server after admin authentication.
+
 Publishing uses the same OCR and keyword generation pipeline as regular uploads.
 
 ## Troubleshooting

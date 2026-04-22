@@ -4,7 +4,7 @@ import {
   parseRunLimit,
   publishSelectedMemes,
 } from "../_lib/meme-ingest.js";
-import { createAdminUserClient, requireAdminRequest } from "../_lib/admin-auth.js";
+import { createAdminSupabaseClient, requireAdminRequest } from "../_lib/admin-auth.js";
 
 function sendJson(res, status, body) {
   res.statusCode = status;
@@ -26,14 +26,14 @@ function readJsonBody(req) {
 
 export default async function handler(req, res) {
   try {
-    const { token, user } = await requireAdminRequest(req);
-    const userClient = createAdminUserClient(token);
+    const { user } = await requireAdminRequest(req);
+    const serviceClient = createAdminSupabaseClient();
 
     if (req.method === "GET") {
       const url = new URL(req.url || "/api/admin/meme-publisher", "http://localhost");
       const limit = parseRunLimit(url.searchParams.get("limit") || 5);
       const source = parseMemeApiSource(url.searchParams.get("source") || "all");
-      const candidates = await getMemeSuggestions({ supabase: userClient, limit, source });
+      const candidates = await getMemeSuggestions({ supabase: serviceClient, limit, source });
 
       return sendJson(res, 200, {
         ok: true,
@@ -53,7 +53,7 @@ export default async function handler(req, res) {
       }
 
       const result = await publishSelectedMemes({
-        supabase: userClient,
+        supabase: serviceClient,
         memes,
         userId: user?.id || null,
         openAiApiKey: "",
