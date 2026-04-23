@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import MemePreviewModal from "./MemePreviewModal";
+import { memes as localMemes } from "../data/memes";
 
 const TRENDING_KEYWORDS = ["sad", "happy", "angry", "love", "awkward", "roast"];
 const RECENT_KEYWORDS_STORAGE = "mood-meme-search-recent-v1";
@@ -43,6 +44,46 @@ function dedupeByImage(items) {
     seen.add(key);
     return true;
   });
+}
+
+function buildLocalFallbackResults(query, limit) {
+  const tokens = normalizeQuery(query)
+    .toLowerCase()
+    .split(/[\s-]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (tokens.length === 0) return [];
+
+  return localMemes
+    .map((meme) => {
+      const searchableText = [
+        meme?.title || "",
+        meme?.category || "",
+        meme?.mood || "",
+        ...(Array.isArray(meme?.keywords) ? meme.keywords : []),
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      const score = tokens.reduce((total, token) => {
+        return total + (searchableText.includes(token) ? 1 : 0);
+      }, 0);
+
+      return {
+        id: `local-${meme?.id || meme?.title || Math.random().toString(36).slice(2)}`,
+        title: meme?.title || "Local meme",
+        imageUrl: meme?.image || meme?.imageUrl || "",
+        subreddit: "r/memes",
+        permalink: "",
+        postUrl: "",
+        source: "local",
+        score,
+      };
+    })
+    .filter((item) => item.score > 0 && item.imageUrl)
+    .sort((left, right) => right.score - left.score)
+    .slice(0, limit);
 }
 
 async function readJsonResponse(response) {
@@ -216,6 +257,18 @@ export default function KeywordMemeSearch({ onUploadToRoastRiot }) {
         if (ignore || requestId !== requestIdRef.current) return;
 
         if (!response.ok || !payload?.ok) {
+          const fallbackResults = buildLocalFallbackResults(activeQuery, pageSize);
+          if (fallbackResults.length > 0) {
+            setResults(fallbackResults);
+            setSource("local");
+            setReason("Live search is unavailable right now. Showing local meme matches.");
+            setHasMore(false);
+            setNextAfter(null);
+            setNextPage(1);
+            setManualMessage("Live search is unavailable right now. Showing local meme matches.");
+            return;
+          }
+
           throw new Error(payload?.error || "Keyword meme search failed.");
         }
 
@@ -248,6 +301,18 @@ export default function KeywordMemeSearch({ onUploadToRoastRiot }) {
         });
       } catch (error) {
         if (ignore || requestId !== requestIdRef.current) return;
+        const fallbackResults = buildLocalFallbackResults(activeQuery, pageSize);
+        if (fallbackResults.length > 0) {
+          setResults(fallbackResults);
+          setSource("local");
+          setReason("Live search is unavailable right now. Showing local meme matches.");
+          setManualMessage("Live search is unavailable right now. Showing local meme matches.");
+          setHasMore(false);
+          setNextAfter(null);
+          setNextPage(1);
+          return;
+        }
+
         setResults([]);
         setSource("idle");
         setReason(error.message || "Search service unavailable.");
@@ -312,6 +377,18 @@ export default function KeywordMemeSearch({ onUploadToRoastRiot }) {
       if (requestId !== requestIdRef.current) return;
 
       if (!response.ok || !payload?.ok) {
+        const fallbackResults = buildLocalFallbackResults(activeQuery, pageSize);
+        const mergedResults = dedupeByImage([...results, ...fallbackResults]);
+        if (fallbackResults.length > 0) {
+          setResults(mergedResults);
+          setSource("local");
+          setReason("Live search is unavailable right now. Showing local meme matches.");
+          setManualMessage("Live search is unavailable right now. Showing local meme matches.");
+          setHasMore(false);
+          setNextAfter(null);
+          return;
+        }
+
         throw new Error(payload?.error || "Could not load more meme results.");
       }
 
@@ -340,6 +417,17 @@ export default function KeywordMemeSearch({ onUploadToRoastRiot }) {
       });
     } catch (error) {
       if (requestId !== requestIdRef.current) return;
+      const fallbackResults = buildLocalFallbackResults(activeQuery, pageSize);
+      if (fallbackResults.length > 0) {
+        setResults((current) => dedupeByImage([...current, ...fallbackResults]));
+        setSource("local");
+        setReason("Live search is unavailable right now. Showing local meme matches.");
+        setManualMessage("Live search is unavailable right now. Showing local meme matches.");
+        setHasMore(false);
+        setNextAfter(null);
+        return;
+      }
+
       setReason(error.message || "Could not load more meme results.");
       setManualMessage(error.message || "Could not load more meme results.");
       setHasMore(false);
@@ -388,6 +476,8 @@ export default function KeywordMemeSearch({ onUploadToRoastRiot }) {
   }
 
   const showEmptyState = !loading && activeQuery && results.length === 0;
+  const sourceLabelText =
+    source === "reddit" ? "Live results" : source === "local" ? "Local results" : sourceLabel;
 
   return (
     <section className="mt-8 rounded-[2rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-4 shadow-2xl shadow-black/15 backdrop-blur-xl sm:p-6">
@@ -407,7 +497,7 @@ export default function KeywordMemeSearch({ onUploadToRoastRiot }) {
 
         <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
           <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
-            {sourceLabel}
+            {sourceLabelText}
           </span>
           {reason ? (
             <span className="rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1.5 text-amber-200">
