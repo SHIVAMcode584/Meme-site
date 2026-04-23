@@ -5,7 +5,7 @@ import { memes as localFallbackMemes } from "../src/data/memes.js";
 const REDDIT_SEARCH_URL = "https://www.reddit.com/search.json";
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 20;
-const REDDIT_FETCH_TIMEOUT_MS = 8000;
+const REDDIT_FETCH_TIMEOUT_MS = 3000;
 const ALLOWED_IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png"]);
 const ALLOWED_IMAGE_HOSTS = new Set([
   "i.redd.it",
@@ -218,6 +218,19 @@ export default async function handler(req, res) {
       });
     }
 
+    const localResults = buildLocalFallbackResults(query, limit);
+    if (localResults.length > 0) {
+      return sendJson(res, 200, {
+        ok: true,
+        query,
+        source: "local",
+        reason: "Showing local meme matches while live search warms up.",
+        results: localResults,
+        after: null,
+        hasMore: false,
+      });
+    }
+
     try {
       const redditResults = await fetchRedditResults(query, limit, after || null);
 
@@ -228,34 +241,7 @@ export default async function handler(req, res) {
           ...redditResults,
         });
       }
-
-      const localResults = buildLocalFallbackResults(query, limit);
-      if (localResults.length > 0) {
-        return sendJson(res, 200, {
-          ok: true,
-          query,
-          source: "local",
-          reason: "Live search returned no matches. Showing local meme results instead.",
-          results: localResults,
-          after: null,
-          hasMore: false,
-        });
-      }
     } catch (redditError) {
-      const localResults = buildLocalFallbackResults(query, limit);
-      if (localResults.length > 0) {
-        return sendJson(res, 200, {
-          ok: true,
-          query,
-          source: "local",
-          reason:
-            redditError.message || "Live search source returned an unexpected response.",
-          results: localResults,
-          after: null,
-          hasMore: false,
-        });
-      }
-
       return sendJson(res, 200, {
         ok: true,
         query,

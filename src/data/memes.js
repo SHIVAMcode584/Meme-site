@@ -1,8 +1,3 @@
-
-import { keyframes } from "framer-motion";
-
-
-
 export const memes = [
   {
     id: 1,
