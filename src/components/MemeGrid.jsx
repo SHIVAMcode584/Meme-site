@@ -14,10 +14,10 @@ function isIpadLikeDevice() {
 
 function getItemsPerPageForViewport() {
   if (typeof window === "undefined") return 6;
-  if (isIpadLikeDevice()) return 6;
-  if (window.innerWidth >= 1280) return 8;
-  if (window.innerWidth >= 640) return 6;
-  return 4;
+  if (isIpadLikeDevice()) return 9;
+  if (window.innerWidth >= 1280) return 12;
+  if (window.innerWidth >= 640) return 9;
+  return 6;
 }
 
 export default function MemeGrid({
