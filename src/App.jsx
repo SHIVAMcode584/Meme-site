@@ -127,6 +127,57 @@ const getBadge = (pts) => {
 const SEMANTIC_MIN_QUERY_LENGTH = 2;
 const SEMANTIC_DEBOUNCE_MS = 450;
 const SEMANTIC_API_URL = import.meta.env.VITE_SEMANTIC_API_URL || "/api/semantic-search";
+const GLOBAL_MEMES_API_URL = "/api/memes";
+
+async function readJsonResponse(response) {
+  const contentType = response.headers.get("content-type") || "";
+
+  if (contentType.includes("application/json")) {
+    return response.json();
+  }
+
+  const text = await response.text();
+  if (!text) return {};
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
+}
+
+async function fetchGlobalMemesFromApi() {
+  const response = await fetch(GLOBAL_MEMES_API_URL);
+  const payload = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(payload?.error || `Global meme feed returned ${response.status}.`);
+  }
+
+  return Array.isArray(payload?.memes) ? payload.memes : [];
+}
+
+async function fetchGlobalMemesFromSupabase() {
+  const primary = await supabase
+    .from("meme-table")
+    .select("*, profiles(username)")
+    .order("created_at", { ascending: false });
+
+  if (!primary.error) {
+    return Array.isArray(primary.data) ? primary.data : [];
+  }
+
+  const fallback = await supabase
+    .from("meme-table")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (fallback.error) {
+    throw primary.error;
+  }
+
+  return Array.isArray(fallback.data) ? fallback.data : [];
+}
 
 export default function App() {
   const [loading, setLoading] = useState(true);
@@ -1169,17 +1220,24 @@ export default function App() {
       setLoading(true);
 
       try {
-        const { data, error } = await supabase
-          .from("meme-table")
-          .select("*, profiles(username)")
-          .order("created_at", { ascending: false });
+        let nextMemes = [];
 
-        if (error) {
-          console.error("Error fetching memes:", error);
-          return;
+        try {
+          nextMemes = await fetchGlobalMemesFromApi();
+        } catch (apiError) {
+          console.warn("Global meme API unavailable, falling back to Supabase:", apiError);
         }
 
-        const formatted = data.map((m) => normalizeMeme(m));
+        if (nextMemes.length === 0) {
+          try {
+            nextMemes = await fetchGlobalMemesFromSupabase();
+          } catch (dbError) {
+            console.error("Error fetching memes:", dbError);
+            return;
+          }
+        }
+
+        const formatted = nextMemes.map((m) => normalizeMeme(m));
         setDbMemes(formatted);
       } finally {
         const elapsed = Date.now() - startedAt;
