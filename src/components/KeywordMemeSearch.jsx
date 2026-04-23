@@ -161,7 +161,7 @@ export default function KeywordMemeSearch({ onUploadToRoastRiot }) {
   const cacheRef = useRef(new Map());
 
   const sourceLabel = useMemo(() => {
-    if (source === "reddit") return "Live results";
+    if (source === "reddit" || source === "supabase") return "Live results";
     if (source === "local") return "Local results";
     if (source === "empty") return "No query";
     return "Live search";
@@ -273,7 +273,7 @@ export default function KeywordMemeSearch({ onUploadToRoastRiot }) {
         }
 
         const nextResults = dedupeByImage(Array.isArray(payload?.results) ? payload.results : []);
-        const nextSource = payload?.source || "reddit";
+        const nextSource = payload?.source || "supabase";
         const nextReason = payload?.reason || "";
         const nextHasMore = Boolean(payload?.hasMore);
         const nextAfterValue = payload?.after || null;
