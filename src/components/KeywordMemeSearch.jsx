@@ -11,7 +11,6 @@ import {
   X,
 } from "lucide-react";
 import MemePreviewModal from "./MemePreviewModal";
-import { memes as localFallbackMemes } from "../data/memes";
 
 const TRENDING_KEYWORDS = ["sad", "happy", "angry", "love", "awkward", "roast"];
 const RECENT_KEYWORDS_STORAGE = "mood-meme-search-recent-v1";
@@ -24,74 +23,6 @@ function normalizeQuery(value) {
 
 function normalizeKey(value) {
   return normalizeQuery(value).toLowerCase();
-}
-
-function buildSearchWords(query) {
-  return normalizeKey(query)
-    .split(/\s+/)
-    .map((word) => word.trim())
-    .filter(Boolean);
-}
-
-function sanitizeVisibleMessage(value) {
-  return String(value || "").replace(/\bReddit\b/gi, "the search service").trim();
-}
-
-function normalizeSearchStatus(value, source) {
-  const message = sanitizeVisibleMessage(value);
-  if (!message) return "";
-
-  const lower = message.toLowerCase();
-  const looksLikeFailure =
-    lower.includes("temporarily unavailable") ||
-    lower.includes("unavailable") ||
-    lower.includes("unexpected response") ||
-    lower.includes("having trouble") ||
-    lower.includes("acting up");
-
-  if (looksLikeFailure) {
-    return source === "fallback" ? "Showing local meme results for now." : "Search is retrying right now.";
-  }
-
-  return message;
-}
-
-function searchLocalFallback(query, limit, page = 1) {
-  const words = buildSearchWords(query);
-  const normalizedQuery = normalizeKey(query);
-  const matched = localFallbackMemes
-    .filter((meme) => {
-      const haystack = [
-        meme.title,
-        meme.category,
-        meme.mood,
-        Array.isArray(meme.keywords) ? meme.keywords.join(" ") : "",
-      ]
-        .join(" ")
-        .toLowerCase();
-
-      if (!normalizedQuery) return false;
-      return words.every((word) => haystack.includes(word)) || haystack.includes(normalizedQuery);
-    })
-    .filter((meme) => Boolean(meme.image || meme.imageUrl || meme.url));
-
-  const start = Math.max(0, (Math.max(1, page) - 1) * limit);
-  const sliced = matched.slice(start, start + limit);
-
-  return {
-    source: "fallback",
-    results: sliced.map((meme, index) => ({
-      id: `local-${meme.id || start + index}`,
-      title: meme.title || "Meme",
-      imageUrl: meme.image || meme.imageUrl || meme.url || "",
-      subreddit: meme.category || "local-fallback",
-      permalink: "",
-      postUrl: "",
-      source: "fallback",
-    })),
-    after: null,
-    hasMore: start + limit < matched.length,
-  };
 }
 
 function getRowBatchSize() {
@@ -147,7 +78,7 @@ function ResultCard({ item, onOpen }) {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
         <div className="absolute left-3 top-3 rounded-full border border-white/10 bg-black/40 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-white backdrop-blur-md">
-          {item.source === "fallback" ? "Local fallback" : "Search result"}
+          Search result
         </div>
         <div className="absolute right-3 top-3 rounded-full border border-fuchsia-400/20 bg-fuchsia-500/15 p-2 text-fuchsia-100 backdrop-blur-md">
           <Sparkles size={14} />
@@ -162,7 +93,7 @@ function ResultCard({ item, onOpen }) {
           {item.title}
         </h3>
         <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
-          {item.source === "fallback" ? "Local fallback" : "Tap to preview"}
+          Tap to preview
         </p>
       </div>
     </button>
@@ -189,10 +120,9 @@ export default function KeywordMemeSearch({ onUploadToRoastRiot }) {
   const cacheRef = useRef(new Map());
 
   const sourceLabel = useMemo(() => {
-    if (source === "reddit") return "Search results";
-    if (source === "fallback") return "Local fallback";
+    if (source === "reddit") return "Live results";
     if (source === "empty") return "No query";
-    return "Ready";
+    return "Live search";
   }, [source]);
 
   useEffect(() => {
@@ -250,11 +180,11 @@ export default function KeywordMemeSearch({ onUploadToRoastRiot }) {
     if (cacheEntry) {
       setResults(cacheEntry.results);
       setSource(cacheEntry.source);
-      setReason(normalizeSearchStatus(cacheEntry.reason || "", cacheEntry.source || "fallback"));
+      setReason(cacheEntry.reason || "");
       setHasMore(cacheEntry.hasMore);
       setNextAfter(cacheEntry.nextAfter || null);
       setNextPage(cacheEntry.nextPage || 1);
-      setManualMessage(normalizeSearchStatus(cacheEntry.reason || "", cacheEntry.source || "fallback"));
+      setManualMessage(cacheEntry.reason || "");
       return undefined;
     }
 
@@ -296,11 +226,11 @@ export default function KeywordMemeSearch({ onUploadToRoastRiot }) {
 
         setResults(nextResults);
         setSource(nextSource);
-        setReason(normalizeSearchStatus(nextReason, nextSource));
+        setReason(nextReason);
         setHasMore(nextHasMore);
         setNextAfter(nextAfterValue);
         setNextPage(2);
-        setManualMessage(normalizeSearchStatus(nextReason || "", nextSource));
+        setManualMessage(nextReason || "");
 
         cacheRef.current.set(`${nextKey}|1|`, {
           results: nextResults,
@@ -317,22 +247,13 @@ export default function KeywordMemeSearch({ onUploadToRoastRiot }) {
         });
       } catch (error) {
         if (ignore || requestId !== requestIdRef.current) return;
-        const fallbackResults = searchLocalFallback(activeQuery, pageSize, 1);
-        setResults(fallbackResults.results);
-        setSource(fallbackResults.source);
-        setReason(
-          fallbackResults.results.length > 0
-            ? "Search is offline right now, so local meme results are shown."
-            : "Search is offline right now."
-        );
-        setManualMessage(
-          fallbackResults.results.length > 0
-            ? "Search is offline right now, so local meme results are shown."
-            : "Search is offline right now."
-        );
-        setHasMore(fallbackResults.hasMore);
-        setNextAfter(fallbackResults.after);
-        setNextPage(2);
+        setResults([]);
+        setSource("idle");
+        setReason(error.message || "Search service unavailable.");
+        setManualMessage(error.message || "Search service unavailable.");
+        setHasMore(false);
+        setNextAfter(null);
+        setNextPage(1);
       } finally {
         if (!(ignore || requestId !== requestIdRef.current)) {
           setLoading(false);
@@ -358,42 +279,11 @@ export default function KeywordMemeSearch({ onUploadToRoastRiot }) {
     if (cached) {
       setResults((current) => dedupeByImage([...current, ...cached.results]));
       setSource(cached.source);
-      setReason(normalizeSearchStatus(cached.reason || "", cached.source || source));
+      setReason(cached.reason || "");
       setHasMore(cached.hasMore);
       setNextAfter(cached.nextAfter || null);
       setNextPage(cached.nextPage || nextPage + 1);
-      setManualMessage(normalizeSearchStatus(cached.reason || "", cached.source || source));
-      return;
-    }
-
-    if (source === "fallback") {
-      const fallbackResults = searchLocalFallback(activeQuery, pageSize, nextPage);
-      setResults((current) => dedupeByImage([...current, ...fallbackResults.results]));
-      setSource(fallbackResults.source);
-      setReason(
-        fallbackResults.results.length > 0
-          ? "Search is offline right now, so local meme results are shown."
-          : "Search is offline right now."
-      );
-      setManualMessage(
-        fallbackResults.results.length > 0
-          ? "Search is offline right now, so local meme results are shown."
-          : "Search is offline right now."
-      );
-      setHasMore(fallbackResults.hasMore);
-      setNextAfter(fallbackResults.after);
-      setNextPage(nextPage + 1);
-      cacheRef.current.set(cacheKey, {
-        results: fallbackResults.results,
-        source: fallbackResults.source,
-        reason:
-          fallbackResults.results.length > 0
-            ? "Search is offline right now, so local meme results are shown."
-            : "Search is offline right now.",
-        hasMore: fallbackResults.hasMore,
-        nextAfter: fallbackResults.after,
-        nextPage: nextPage + 1,
-      });
+      setManualMessage(cached.reason || "");
       return;
     }
 
@@ -433,11 +323,11 @@ export default function KeywordMemeSearch({ onUploadToRoastRiot }) {
 
       setResults((current) => dedupeByImage([...current, ...additionalResults]));
       setSource(nextSource);
-      setReason(normalizeSearchStatus(nextReason, nextSource));
+      setReason(nextReason);
       setHasMore(nextHasMore);
       setNextAfter(nextAfterValue);
       setNextPage(nextPageValue);
-      setManualMessage(normalizeSearchStatus(nextReason || "", nextSource));
+      setManualMessage(nextReason || "");
 
       cacheRef.current.set(cacheKey, {
         results: additionalResults,
@@ -449,9 +339,8 @@ export default function KeywordMemeSearch({ onUploadToRoastRiot }) {
       });
     } catch (error) {
       if (requestId !== requestIdRef.current) return;
-      const fallbackMessage = normalizeSearchStatus(error.message || "Could not load more meme results.", source);
-      setReason(fallbackMessage);
-      setManualMessage(fallbackMessage);
+      setReason(error.message || "Could not load more meme results.");
+      setManualMessage(error.message || "Could not load more meme results.");
       setHasMore(false);
     } finally {
       if (requestId === requestIdRef.current) {
@@ -619,7 +508,7 @@ export default function KeywordMemeSearch({ onUploadToRoastRiot }) {
               {results.length === 1 ? "" : "s"}
             </div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
-              {source === "fallback" ? "Local fallback" : "Search results"}
+              Live results
             </div>
           </div>
 

@@ -1,7 +1,5 @@
 /* global process */
 
-import { memes as localFallbackMemes } from "../src/data/memes.js";
-
 const REDDIT_SEARCH_URL = "https://www.reddit.com/search.json";
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 20;
@@ -36,20 +34,6 @@ async function readJsonResponse(response) {
   }
 }
 
-function getFriendlyFallbackReason(errorMessage, hasLocalResults = false) {
-  if (hasLocalResults) {
-    return "Showing local meme results for now.";
-  }
-
-  const normalized = String(errorMessage || "").toLowerCase();
-
-  if (normalized.includes("invalid json") || normalized.includes("unexpected response")) {
-    return "Showing local meme results for now.";
-  }
-
-  return "Showing local meme results for now.";
-}
-
 function clampLimit(value) {
   const parsed = Number.parseInt(String(value || ""), 10);
   if (!Number.isFinite(parsed)) return DEFAULT_LIMIT;
@@ -60,10 +44,6 @@ function normalizeQuery(value) {
   return String(value || "")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-function normalizeWord(value) {
-  return normalizeQuery(value).toLowerCase();
 }
 
 function isAllowedImageUrl(url) {
@@ -104,51 +84,6 @@ function extractRedditImageUrl(post) {
     .filter(Boolean);
 
   return candidates.find((candidate) => isAllowedImageUrl(candidate)) || "";
-}
-
-function buildSearchWords(query) {
-  return normalizeWord(query)
-    .split(/\s+/)
-    .map((word) => word.trim())
-    .filter(Boolean);
-}
-
-function searchLocalFallback(query, limit, page = 1) {
-  const words = buildSearchWords(query);
-  const normalizedQuery = normalizeWord(query);
-  const matched = localFallbackMemes
-    .filter((meme) => {
-      const haystack = [
-        meme.title,
-        meme.category,
-        meme.mood,
-        Array.isArray(meme.keywords) ? meme.keywords.join(" ") : "",
-      ]
-        .join(" ")
-        .toLowerCase();
-
-      if (!normalizedQuery) return false;
-      return words.every((word) => haystack.includes(word)) || haystack.includes(normalizedQuery);
-    })
-    .filter((meme) => isAllowedImageUrl(meme.image || meme.imageUrl || meme.url || ""));
-
-  const start = Math.max(0, (Math.max(1, page) - 1) * limit);
-  const sliced = matched.slice(start, start + limit);
-
-  return {
-    source: "fallback",
-    results: sliced.map((meme, index) => ({
-      id: `local-${meme.id || start + index}`,
-      title: meme.title || "Meme",
-      imageUrl: meme.image || meme.imageUrl || meme.url || "",
-      subreddit: meme.category || "local-fallback",
-      permalink: "",
-      postUrl: "",
-      source: "fallback",
-    })),
-    after: null,
-    hasMore: start + limit < matched.length,
-  };
 }
 
 function mapRedditPost(post) {
@@ -223,8 +158,6 @@ export default async function handler(req, res) {
     const query = normalizeQuery(url.searchParams.get("q") || "");
     const limit = clampLimit(url.searchParams.get("limit") || DEFAULT_LIMIT);
     const after = normalizeQuery(url.searchParams.get("after") || "");
-    const page = Math.max(1, Number.parseInt(url.searchParams.get("page") || "1", 10) || 1);
-
     if (!query) {
       return sendJson(res, 200, {
         ok: true,
@@ -246,24 +179,19 @@ export default async function handler(req, res) {
         });
       }
     } catch (redditError) {
-      const fallbackResults = searchLocalFallback(query, limit, page);
-      return sendJson(res, 200, {
-        ok: true,
-        query,
-        ...fallbackResults,
-        reason: getFriendlyFallbackReason(redditError.message, fallbackResults.results.length > 0),
+      return sendJson(res, 503, {
+        ok: false,
+        error: redditError.message || "Live search is temporarily unavailable.",
       });
     }
 
-    const fallbackResults = searchLocalFallback(query, limit, page);
     return sendJson(res, 200, {
       ok: true,
       query,
-      ...fallbackResults,
-      reason:
-        fallbackResults.results.length > 0
-          ? "Showing local meme results for now."
-          : "No memes matched this mood yet.",
+      source: "reddit",
+      results: [],
+      after: null,
+      hasMore: false,
     });
   } catch (error) {
     return sendJson(res, 500, {
