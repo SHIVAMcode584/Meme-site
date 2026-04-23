@@ -29,10 +29,10 @@ async function readJsonResponse(response) {
   } catch {
     const contentType = response.headers.get("content-type") || "";
     if (contentType.includes("application/json")) {
-      throw new Error("Reddit search is temporarily unavailable");
+      throw new Error("Live search source returned an unexpected response.");
     }
 
-    throw new Error("Reddit search is temporarily unavailable");
+    throw new Error("Live search source returned an unexpected response.");
   }
 }
 
@@ -44,10 +44,10 @@ function getFriendlyFallbackReason(errorMessage, hasLocalResults = false) {
   const normalized = String(errorMessage || "").toLowerCase();
 
   if (normalized.includes("invalid json") || normalized.includes("unexpected response")) {
-    return "The live search source is having trouble right now.";
+    return "Showing local meme results for now.";
   }
 
-  return errorMessage || "The live search source is temporarily unavailable.";
+  return "Showing local meme results for now.";
 }
 
 function clampLimit(value) {
