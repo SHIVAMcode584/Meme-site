@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion as Motion } from "framer-motion";
 import { supabase } from "../lib/supabase";
 import {
   AlertTriangle,
@@ -21,6 +21,7 @@ import {
 import Toast from "./Toast";
 import Footer from "./Footer";
 import AdminMemePublisher from "./AdminMemePublisher";
+import { prepareMemeDeletion } from "../utils/memeDeletion";
 
 function formatDate(value) {
   if (!value) return "Unknown date";
@@ -95,6 +96,7 @@ export default function AdminModeration({ user, onBack, onMemeDeleted, onMemePub
   const [expandedWarningUserId, setExpandedWarningUserId] = useState(null);
   const [selectedReportId, setSelectedReportId] = useState(null);
   const [pendingDeleteReport, setPendingDeleteReport] = useState(null);
+  const [pendingDeleteCountdown, setPendingDeleteCountdown] = useState(0);
   const [pendingAction, setPendingAction] = useState(null);
   const [pendingActionCountdown, setPendingActionCountdown] = useState(0);
   const [toast, setToast] = useState(null);
@@ -124,6 +126,21 @@ export default function AdminModeration({ user, onBack, onMemeDeleted, onMemePub
 
     return () => window.clearTimeout(timer);
   }, [pendingAction, pendingActionCountdown]);
+
+  useEffect(() => {
+    if (!pendingDeleteReport) {
+      setPendingDeleteCountdown(0);
+      return undefined;
+    }
+
+    if (pendingDeleteCountdown <= 0) return undefined;
+
+    const timer = window.setTimeout(() => {
+      setPendingDeleteCountdown((current) => Math.max(0, current - 1));
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [pendingDeleteReport, pendingDeleteCountdown]);
 
   const pushToast = useCallback((nextToast) => {
     setToast({ ...nextToast, onClose: clearToast });
@@ -300,77 +317,43 @@ export default function AdminModeration({ user, onBack, onMemeDeleted, onMemePub
     if (!report?.meme_id) return;
 
     const memeId = report.meme_id;
-
-    const { data: relatedReports, error: reportLookupError } = await supabase
-      .from("reports")
-      .select("id")
-      .eq("meme_id", memeId);
-
-    if (reportLookupError) {
-      console.error("Loading related reports failed:", reportLookupError);
+    try {
+      await prepareMemeDeletion(supabase, memeId);
+    } catch (error) {
+      console.error("Loading related meme cleanup data failed:", error);
       pushToast({
         type: "error",
         title: "Action failed",
-        message: reportLookupError.message || "Could not load related reports.",
+        message: error.message || "Could not prepare the meme for deletion.",
       });
       return;
-    }
-
-    const reportIds = (relatedReports || []).map((item) => item.id);
-    let reportStatusFailed = false;
-
-    const { error } = await supabase.from("meme-table").delete().eq("id", memeId);
-
-    if (error) {
-      console.error("Delete meme failed:", error);
-      pushToast({
-        type: "error",
-        title: "Delete failed",
-        message: error.message || "The meme could not be deleted.",
-      });
-      return;
-    }
-
-    if (reportIds.length > 0) {
-      const { error: reportStatusError } = await supabase
-        .from("reports")
-        .update({ status: "removed" })
-        .in("id", reportIds);
-
-      if (reportStatusError) {
-        console.error("Marking reports removed failed:", reportStatusError);
-        reportStatusFailed = true;
-        pushToast({
-          type: "error",
-          title: "Meme deleted",
-          message: "The meme was deleted, but some report statuses could not be updated.",
-        });
-      }
     }
 
     onMemeDeleted?.(memeId);
     await fetchReports();
-    if (!reportStatusFailed) {
-      pushToast({
-        type: "success",
-        title: "Meme removed",
-        message: "The meme was deleted and its reports were marked removed.",
-      });
-    }
+    pushToast({
+      type: "success",
+      title: "Meme removed",
+      message: "The meme was deleted and its reports were marked removed.",
+    });
   };
 
   const openDeleteConfirm = (report) => {
     if (!report?.meme_id) return;
     setPendingDeleteReport(report);
+    setPendingDeleteCountdown(3);
   };
 
   const closeDeleteConfirm = () => {
     setPendingDeleteReport(null);
+    setPendingDeleteCountdown(0);
   };
 
   const confirmDeleteMeme = async () => {
+    if (pendingDeleteCountdown > 0) return;
     const report = pendingDeleteReport;
     setPendingDeleteReport(null);
+    setPendingDeleteCountdown(0);
     if (!report) return;
     await handleDeleteMeme(report);
   };
@@ -1309,7 +1292,7 @@ export default function AdminModeration({ user, onBack, onMemeDeleted, onMemePub
                 </div>
 
                 <div className="flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                  <motion.div
+                  <Motion.div
                     className="relative flex h-36 w-36 items-center justify-center"
                     animate={
                       pendingActionCountdown > 0
@@ -1330,7 +1313,7 @@ export default function AdminModeration({ user, onBack, onMemeDeleted, onMemePub
                         </linearGradient>
                       </defs>
                       <circle cx="60" cy="60" r="46" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" />
-                      <motion.circle
+                      <Motion.circle
                         cx="60"
                         cy="60"
                         r="46"
@@ -1349,7 +1332,7 @@ export default function AdminModeration({ user, onBack, onMemeDeleted, onMemePub
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                       <AnimatePresence mode="wait" initial={false}>
                         {pendingActionCountdown > 0 ? (
-                          <motion.span
+                          <Motion.span
                             key={`admin-action-count-${pendingActionCountdown}`}
                             initial={{ scale: 0.75, opacity: 0, filter: "blur(4px)" }}
                             animate={{ scale: 1, opacity: 1, filter: "blur(0px)" }}
@@ -1358,9 +1341,9 @@ export default function AdminModeration({ user, onBack, onMemeDeleted, onMemePub
                             className="text-4xl font-black tracking-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]"
                           >
                             {pendingActionCountdown}
-                          </motion.span>
+                          </Motion.span>
                         ) : (
-                          <motion.span
+                          <Motion.span
                             key="admin-action-ready"
                             initial={{ scale: 0.75, opacity: 0, filter: "blur(4px)" }}
                             animate={{ scale: 1, opacity: 1, filter: "blur(0px)" }}
@@ -1368,14 +1351,14 @@ export default function AdminModeration({ user, onBack, onMemeDeleted, onMemePub
                             className="text-sm font-black uppercase tracking-[0.24em] text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]"
                           >
                             Ready
-                          </motion.span>
+                          </Motion.span>
                         )}
                       </AnimatePresence>
                       <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-300/90">
                         Hold to confirm
                       </p>
                     </div>
-                  </motion.div>
+                  </Motion.div>
                 </div>
               </div>
 
@@ -1436,27 +1419,106 @@ export default function AdminModeration({ user, onBack, onMemeDeleted, onMemePub
                     </span>
                   </p>
                 </div>
+
+                <div className="mt-4 flex justify-center">
+                  <Motion.div
+                    className="relative flex h-28 w-28 items-center justify-center sm:h-32 sm:w-32"
+                    animate={
+                      pendingDeleteCountdown > 0
+                        ? { scale: [1, 1.03, 1], rotate: [0, 1.5, -1.5, 0] }
+                        : { scale: 1, rotate: 0 }
+                    }
+                    transition={
+                      pendingDeleteCountdown > 0
+                        ? { duration: 1.4, repeat: Infinity, ease: "easeInOut" }
+                        : { duration: 0.2 }
+                    }
+                  >
+                    <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
+                      <defs>
+                        <linearGradient id="deleteConfirmTimerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#ef4444" />
+                          <stop offset="55%" stopColor="#fb923c" />
+                          <stop offset="100%" stopColor="#fbbf24" />
+                        </linearGradient>
+                      </defs>
+                      <circle
+                        cx="60"
+                        cy="60"
+                        r="46"
+                        fill="none"
+                        stroke="rgba(255,255,255,0.08)"
+                        strokeWidth="10"
+                      />
+                      <Motion.circle
+                        cx="60"
+                        cy="60"
+                        r="46"
+                        fill="none"
+                        stroke="url(#deleteConfirmTimerGradient)"
+                        strokeWidth="10"
+                        strokeLinecap="round"
+                        strokeDasharray={289}
+                        animate={{
+                          strokeDashoffset: 289 - 289 * Math.max(0, Math.min(1, (3 - pendingDeleteCountdown) / 3)),
+                        }}
+                        transition={{ type: "spring", stiffness: 90, damping: 18 }}
+                      />
+                    </svg>
+
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <AnimatePresence mode="wait" initial={false}>
+                        {pendingDeleteCountdown > 0 ? (
+                          <Motion.span
+                            key={`delete-count-${pendingDeleteCountdown}`}
+                            initial={{ scale: 0.75, opacity: 0, filter: "blur(4px)" }}
+                            animate={{ scale: 1, opacity: 1, filter: "blur(0px)" }}
+                            exit={{ scale: 1.1, opacity: 0, filter: "blur(4px)" }}
+                            transition={{ duration: 0.22, ease: "easeOut" }}
+                            className="text-4xl font-black tracking-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]"
+                          >
+                            {pendingDeleteCountdown}
+                          </Motion.span>
+                        ) : (
+                          <Motion.span
+                            key="delete-ready"
+                            initial={{ scale: 0.75, opacity: 0, filter: "blur(4px)" }}
+                            animate={{ scale: 1, opacity: 1, filter: "blur(0px)" }}
+                            transition={{ duration: 0.22, ease: "easeOut" }}
+                            className="text-sm font-black uppercase tracking-[0.24em] text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]"
+                          >
+                            Ready
+                          </Motion.span>
+                        )}
+                      </AnimatePresence>
+                      <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-300/90">
+                        Confirm delete
+                      </p>
+                    </div>
+                  </Motion.div>
+                </div>
               </div>
             </div>
 
-            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                onClick={closeDeleteConfirm}
-                className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-zinc-200 transition hover:bg-white/10"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={confirmDeleteMeme}
-                className="inline-flex items-center justify-center rounded-2xl border border-red-500/20 bg-red-500/10 px-5 py-3 text-sm font-semibold text-red-300 transition hover:bg-red-500/20"
-              >
-                Yes, delete it
-              </button>
+              <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={closeDeleteConfirm}
+                  className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-zinc-200 transition hover:bg-white/10"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDeleteMeme}
+                  disabled={pendingDeleteCountdown > 0}
+                  className="inline-flex items-center justify-center rounded-2xl border border-red-500/20 bg-red-500/10 px-5 py-3 text-sm font-semibold text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {pendingDeleteCountdown > 0 ? `Wait ${pendingDeleteCountdown}s` : "Yes, delete it"}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
       ) : null}
     </div>
   );

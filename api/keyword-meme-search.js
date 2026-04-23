@@ -20,6 +20,32 @@ function sendJson(res, status, body) {
   res.end(JSON.stringify(body));
 }
 
+async function readJsonResponse(response) {
+  const rawText = await response.text();
+  if (!rawText) return {};
+
+  try {
+    return JSON.parse(rawText);
+  } catch {
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      throw new Error("Reddit search is temporarily unavailable");
+    }
+
+    throw new Error("Reddit search is temporarily unavailable");
+  }
+}
+
+function getFriendlyFallbackReason(errorMessage) {
+  const normalized = String(errorMessage || "").toLowerCase();
+
+  if (normalized.includes("invalid json") || normalized.includes("unexpected response")) {
+    return "Reddit is acting up right now, so local meme results are shown instead.";
+  }
+
+  return errorMessage || "Reddit search is temporarily unavailable";
+}
+
 function clampLimit(value) {
   const parsed = Number.parseInt(String(value || ""), 10);
   if (!Number.isFinite(parsed)) return DEFAULT_LIMIT;
@@ -160,7 +186,7 @@ async function fetchRedditResults(query, limit, after) {
       },
     });
 
-    const payload = await response.json();
+    const payload = await readJsonResponse(response);
     if (!response.ok) {
       const message = payload?.message || payload?.reason || `Reddit search failed (${response.status})`;
       throw new Error(message);
@@ -221,7 +247,7 @@ export default async function handler(req, res) {
         ok: true,
         query,
         ...fallbackResults,
-        reason: redditError.message || "Reddit search failed",
+        reason: getFriendlyFallbackReason(redditError.message),
       });
     }
 

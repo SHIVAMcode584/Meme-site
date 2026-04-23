@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion as Motion } from "framer-motion";
 import { Search } from "lucide-react";
 
 const FALLBACK_PLACEHOLDERS = [
@@ -11,20 +11,32 @@ const FALLBACK_PLACEHOLDERS = [
 export default function SearchBar({ search, setSearch, placeholderTitles = [] }) {
   const placeholders = placeholderTitles.length > 0 ? placeholderTitles : FALLBACK_PLACEHOLDERS;
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    setPlaceholderIndex(0);
-
     if (placeholders.length <= 1) return undefined;
 
     const intervalId = window.setInterval(() => {
       setPlaceholderIndex((currentIndex) => (currentIndex + 1) % placeholders.length);
-    }, 3000);
+    }, 4200);
 
     return () => window.clearInterval(intervalId);
   }, [placeholders]);
 
-  const activePlaceholder = placeholders[placeholderIndex] || FALLBACK_PLACEHOLDERS[0];
+  useEffect(() => {
+    const updateIsMobile = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+
+    updateIsMobile();
+    window.addEventListener("resize", updateIsMobile);
+
+    return () => window.removeEventListener("resize", updateIsMobile);
+  }, []);
+
+  const activePlaceholder = placeholders[placeholderIndex % placeholders.length] || FALLBACK_PLACEHOLDERS[0];
+  const mobilePrompt = `Search (e.g. ${activePlaceholder})`;
+  const desktopPrompt = `Type your situation (e.g. ${activePlaceholder})`;
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -33,16 +45,16 @@ export default function SearchBar({ search, setSearch, placeholderTitles = [] })
         {!search ? (
           <div className="pointer-events-none absolute inset-y-0 left-14 right-5 flex items-center overflow-hidden">
             <AnimatePresence mode="wait">
-              <motion.span
-                key={activePlaceholder}
+              <Motion.span
+                key={isMobile ? mobilePrompt : desktopPrompt}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.35, ease: "easeInOut" }}
-                className="truncate text-[color:var(--app-muted)] opacity-85"
+                transition={{ duration: 0.6, ease: "easeOut" }}
+                className="truncate whitespace-nowrap text-[color:var(--app-muted)] opacity-85"
               >
-                Type your situation (e.g. {activePlaceholder})
-              </motion.span>
+                {isMobile ? mobilePrompt : desktopPrompt}
+              </Motion.span>
             </AnimatePresence>
           </div>
         ) : null}

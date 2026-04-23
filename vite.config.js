@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { getMemeSuggestions, parseMemeApiSource, publishSelectedMemes } from './api/_lib/meme-ingest.js'
 import { createAdminUserClient, requireAdminRequest } from './api/_lib/admin-auth.js'
+import keywordMemeSearchHandler from './api/keyword-meme-search.js'
 
 const process = globalThis.process
 const OCR_API_URL = 'https://api.ocr.space/parse/image'
@@ -174,6 +175,30 @@ function adminMemePublisherDevPlugin() {
   }
 }
 
+function keywordMemeSearchDevPlugin() {
+  return {
+    name: 'keyword-meme-search-dev-route',
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        const pathname = new URL(req.url || '/', 'http://localhost').pathname
+
+        if (pathname !== '/api/keyword-meme-search' || req.method !== 'GET') {
+          return next()
+        }
+
+        try {
+          await keywordMemeSearchHandler(req, res)
+        } catch (error) {
+          sendJson(res, 500, {
+            ok: false,
+            error: error.message || 'Keyword meme search failed',
+          })
+        }
+      })
+    },
+  }
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
@@ -185,6 +210,6 @@ export default defineConfig(({ mode }) => {
   process.env.OCR_SPACE_API_KEY ||= env.OCR_SPACE_API_KEY || ''
 
   return {
-    plugins: [react(), tailwindcss(), ocrKeywordsDevPlugin(), adminMemePublisherDevPlugin()],
+    plugins: [react(), tailwindcss(), ocrKeywordsDevPlugin(), adminMemePublisherDevPlugin(), keywordMemeSearchDevPlugin()],
   }
 })

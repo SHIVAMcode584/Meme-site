@@ -3,15 +3,13 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   ChevronDown,
   Copy,
-  ExternalLink,
   Heart,
-  Image as ImageIcon,
   Loader2,
   RefreshCw,
-  Search,
   Sparkles,
   X,
 } from "lucide-react";
+import { supabase } from "../lib/supabase";
 
 const RIZZ_API_URLS = [
   "https://rizzapi.vercel.app/random",
@@ -22,7 +20,6 @@ const STORAGE_KEY = "rizz-generator-saved-v1";
 const HISTORY_LIMIT = 5;
 const GENERATED_SOURCE = "api";
 const FALLBACK_SOURCE = "local";
-const KEYWORD_SEARCH_LIMIT = 20;
 const GENERATE_COOLDOWN_MS = 900;
 const TYPE_SPEED_MS = 18;
 
@@ -187,35 +184,100 @@ function dedupeRizzItems(items = []) {
   });
 }
 
-export default function RizzGeneratorSidebar({ isOpen, onOpenChange }) {
+function readLocalSavedRizz() {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+
+    if (!Array.isArray(parsed)) return [];
+
+    return dedupeRizzItems(
+      parsed
+        .map((item) => ({
+          text: normalizeText(item?.text || ""),
+          category: item?.category || "all",
+          source: item?.source || GENERATED_SOURCE,
+          createdAt: item?.createdAt || new Date().toISOString(),
+        }))
+        .filter((item) => item.text)
+    );
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalSavedRizz(items) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  } catch {
+    // Keep the feature usable even if storage is blocked.
+  }
+}
+
+function toSavedRizzRecord(item) {
+  const text = normalizeText(item?.text || "");
+
+  return {
+    text,
+    textKey: text.toLowerCase(),
+    category: item?.category || "all",
+    source: item?.source || GENERATED_SOURCE,
+    createdAt: item?.createdAt || item?.created_at || new Date().toISOString(),
+  };
+}
+
+function mergeSavedRizz(items = []) {
+  return dedupeRizzItems(items.map(toSavedRizzRecord).filter((item) => item.text));
+}
+
+function toSupabaseSavedRizzRow(item, userId) {
+  const record = toSavedRizzRecord(item);
+
+  return {
+    user_id: userId,
+    text: record.text,
+    category: record.category,
+    source: record.source,
+  };
+}
+
+async function syncSavedRizzRow(row) {
+  const { error: deleteError } = await supabase
+    .from("saved_rizz")
+    .delete()
+    .eq("user_id", row.user_id)
+    .eq("text", row.text);
+
+  if (deleteError) {
+    throw deleteError;
+  }
+
+  const { error: insertError } = await supabase.from("saved_rizz").insert(row);
+
+  if (insertError) {
+    throw insertError;
+  }
+}
+
+export default function RizzGeneratorSidebar({ isOpen, onOpenChange, user }) {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [currentRizz, setCurrentRizz] = useState(null);
   const [history, setHistory] = useState([]);
   const [savedRizz, setSavedRizz] = useState([]);
-  const [isKeywordSearchOpen, setIsKeywordSearchOpen] = useState(false);
-  const [keywordQuery, setKeywordQuery] = useState("");
-  const [keywordSearchResults, setKeywordSearchResults] = useState([]);
-  const [keywordSearchActiveQuery, setKeywordSearchActiveQuery] = useState("");
-  const [keywordSearchSource, setKeywordSearchSource] = useState("idle");
-  const [keywordSearchReason, setKeywordSearchReason] = useState("");
-  const [keywordSearchHasMore, setKeywordSearchHasMore] = useState(false);
-  const [keywordSearchAfter, setKeywordSearchAfter] = useState(null);
-  const [keywordSearchPage, setKeywordSearchPage] = useState(1);
-  const [keywordSearchLoading, setKeywordSearchLoading] = useState(false);
-  const [keywordSearchLoadingMore, setKeywordSearchLoadingMore] = useState(false);
+  const [isLikedRizzOpen, setIsLikedRizzOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [copyStatus, setCopyStatus] = useState("");
   const [typedText, setTypedText] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [touchStartX, setTouchStartX] = useState(null);
   const [showIntroPulse, setShowIntroPulse] = useState(false);
-  const keywordInputRef = useRef(null);
   const lastGenerateAtRef = useRef(0);
   const didOpenRef = useRef(false);
   const didShowIntroRef = useRef(false);
-  const keywordSearchAbortRef = useRef(null);
-  const keywordSearchRequestIdRef = useRef(0);
-  const keywordSearchCacheRef = useRef(new Map());
 
   const currentText = currentRizz?.text || "";
 
@@ -230,31 +292,68 @@ export default function RizzGeneratorSidebar({ isOpen, onOpenChange }) {
   }, [currentText, savedRizz]);
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      const parsed = raw ? JSON.parse(raw) : [];
-      if (Array.isArray(parsed)) {
-        setSavedRizz(
-          parsed
-            .map((item) => ({
-              text: normalizeText(item?.text || ""),
-              category: item?.category || "all",
-              createdAt: item?.createdAt || new Date().toISOString(),
-            }))
-            .filter((item) => item.text)
-        );
+    let isCancelled = false;
+
+    const loadSavedRizz = async () => {
+      const localSaved = readLocalSavedRizz();
+
+      if (!user?.id) {
+        if (!isCancelled) {
+          setSavedRizz(localSaved);
+        }
+        return;
       }
-    } catch {
-      setSavedRizz([]);
-    }
-  }, []);
+
+      try {
+        const { data, error } = await supabase
+          .from("saved_rizz")
+          .select("text, category, source, created_at")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+
+        if (error) throw error;
+
+        const remoteSaved = Array.isArray(data)
+          ? data.map((item) =>
+              toSavedRizzRecord({
+                text: item?.text || "",
+                category: item?.category || "all",
+                source: item?.source || GENERATED_SOURCE,
+                createdAt: item?.created_at || new Date().toISOString(),
+              })
+            )
+          : [];
+
+        const merged = mergeSavedRizz([...remoteSaved, ...localSaved]);
+
+        if (!isCancelled) {
+          setSavedRizz(merged);
+        }
+
+        const remoteKeys = new Set(remoteSaved.map((item) => item.textKey));
+        const localOnly = localSaved.filter((item) => !remoteKeys.has(item.text.toLowerCase()));
+
+        if (localOnly.length > 0) {
+          for (const item of localOnly) {
+            await syncSavedRizzRow(toSupabaseSavedRizzRow(item, user.id));
+          }
+        }
+      } catch {
+        if (!isCancelled) {
+          setSavedRizz(localSaved);
+        }
+      }
+    };
+
+    void loadSavedRizz();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [user?.id]);
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRizz));
-    } catch {
-      // Keep the feature usable even if storage is blocked.
-    }
+    writeLocalSavedRizz(savedRizz);
   }, [savedRizz]);
 
   useEffect(() => {
@@ -318,25 +417,6 @@ export default function RizzGeneratorSidebar({ isOpen, onOpenChange }) {
     const timer = window.setTimeout(() => setActionMessage(""), 1800);
     return () => window.clearTimeout(timer);
   }, [actionMessage]);
-
-  useEffect(() => {
-    if (!isKeywordSearchOpen) return undefined;
-
-    const timer = window.setTimeout(() => {
-      keywordInputRef.current?.focus();
-    }, 50);
-
-    return () => window.clearTimeout(timer);
-  }, [isKeywordSearchOpen]);
-
-  useEffect(() => {
-    return () => {
-      if (keywordSearchAbortRef.current) {
-        keywordSearchAbortRef.current.abort();
-        keywordSearchAbortRef.current = null;
-      }
-    };
-  }, []);
 
   const pushHistory = (nextRizz) => {
     if (!nextRizz?.text) return;
@@ -417,179 +497,58 @@ export default function RizzGeneratorSidebar({ isOpen, onOpenChange }) {
     }
   }
 
-  const toggleSaveCurrent = () => {
+  const toggleSaveCurrent = async () => {
     if (!currentText) return;
 
     const normalizedCurrent = normalizeText(currentText).toLowerCase();
+    const currentRecord = {
+      text: normalizeText(currentText),
+      category: selectedCategory,
+      createdAt: new Date().toISOString(),
+      source: currentRizz?.source || GENERATED_SOURCE,
+    };
+    const exists = savedRizz.some((item) => normalizeText(item.text).toLowerCase() === normalizedCurrent);
+
+    if (user?.id) {
+      try {
+        if (exists) {
+          const { error } = await supabase
+            .from("saved_rizz")
+            .delete()
+            .eq("user_id", user.id)
+            .eq("text", normalizeText(currentText));
+
+          if (error) throw error;
+
+          setSavedRizz((current) =>
+            current.filter((item) => normalizeText(item.text).toLowerCase() !== normalizedCurrent)
+          );
+          setActionMessage("Removed from liked");
+          return;
+        }
+
+        await syncSavedRizzRow(toSupabaseSavedRizzRow(currentRecord, user.id));
+
+        setSavedRizz((current) => dedupeRizzItems([currentRecord, ...current]));
+        setActionMessage("Saved to Supabase");
+        return;
+      } catch (error) {
+        console.error("Saved rizz sync failed:", error);
+        setActionMessage(error?.message ? `Save failed: ${error.message}` : "Save failed");
+        return;
+      }
+    }
 
     setSavedRizz((current) => {
-      const exists = current.some((item) => normalizeText(item.text).toLowerCase() === normalizedCurrent);
-
       if (exists) {
         setActionMessage("Removed from saved");
         return current.filter((item) => normalizeText(item.text).toLowerCase() !== normalizedCurrent);
       }
 
       setActionMessage("Saved");
-      return [
-        {
-          text: normalizeText(currentText),
-          category: selectedCategory,
-          createdAt: new Date().toISOString(),
-          source: currentRizz?.source || GENERATED_SOURCE,
-        },
-        ...current,
-      ];
+      return dedupeRizzItems([currentRecord, ...current]);
     });
   };
-
-  const openKeywordSearch = () => {
-    setIsKeywordSearchOpen(true);
-    setActionMessage("Search opened");
-  };
-
-  const closeKeywordSearch = () => {
-    setIsKeywordSearchOpen(false);
-  };
-
-  async function loadKeywordMemeResults({ query, page = 1, after = null, append = false } = {}) {
-    const normalizedQuery = normalizeText(query);
-    if (!normalizedQuery) return;
-
-    const cacheKey = `${normalizedQuery.toLowerCase()}|${page}|${after || ""}`;
-    const cached = keywordSearchCacheRef.current.get(cacheKey);
-    if (cached) {
-      if (append) {
-        setKeywordSearchResults((current) => dedupeByImage([...current, ...cached.results]));
-      } else {
-        setKeywordSearchResults(cached.results);
-      }
-      setKeywordSearchSource(cached.source);
-      setKeywordSearchReason(cached.reason || "");
-      setKeywordSearchHasMore(cached.hasMore);
-      setKeywordSearchAfter(cached.after);
-      setKeywordSearchPage(cached.nextPage);
-      setKeywordSearchActiveQuery(normalizedQuery);
-      setKeywordSearchLoading(false);
-      setKeywordSearchLoadingMore(false);
-      return;
-    }
-
-    keywordSearchRequestIdRef.current += 1;
-    const requestId = keywordSearchRequestIdRef.current;
-
-    if (keywordSearchAbortRef.current) {
-      keywordSearchAbortRef.current.abort();
-    }
-
-    const controller = new AbortController();
-    keywordSearchAbortRef.current = controller;
-
-    if (append) {
-      setKeywordSearchLoadingMore(true);
-    } else {
-      setKeywordSearchLoading(true);
-    }
-    setKeywordSearchReason("");
-    let requestTimeoutId = null;
-
-    try {
-      const url = new URL("/api/keyword-meme-search", window.location.origin);
-      url.searchParams.set("q", normalizedQuery);
-      url.searchParams.set("limit", String(KEYWORD_SEARCH_LIMIT));
-      url.searchParams.set("page", String(page));
-      if (after) {
-        url.searchParams.set("after", after);
-      }
-
-      if (requestId !== keywordSearchRequestIdRef.current) return;
-
-      requestTimeoutId = window.setTimeout(() => controller.abort(), 12000);
-
-      const response = await fetch(url.toString(), {
-        signal: controller.signal,
-      });
-      const payload = await response.json();
-
-      if (requestId !== keywordSearchRequestIdRef.current) return;
-
-      if (!response.ok || !payload?.ok) {
-        throw new Error(payload?.error || "Keyword meme search failed.");
-      }
-
-      const nextResults = dedupeByImage(Array.isArray(payload?.results) ? payload.results : []);
-      const nextSource = payload?.source || "reddit";
-      const nextReason = payload?.reason || "";
-      const nextHasMore = Boolean(payload?.hasMore);
-      const nextAfter = payload?.after || null;
-      const nextPage = page + 1;
-
-      setKeywordSearchResults((current) =>
-        append ? dedupeByImage([...current, ...nextResults]) : nextResults
-      );
-      setKeywordSearchSource(nextSource);
-      setKeywordSearchReason(nextReason);
-      setKeywordSearchHasMore(nextHasMore);
-      setKeywordSearchAfter(nextAfter);
-      setKeywordSearchPage(nextPage);
-      setKeywordSearchActiveQuery(normalizedQuery);
-      setActionMessage(nextResults.length > 0 ? `Found ${nextResults.length} memes` : "No memes found");
-
-      keywordSearchCacheRef.current.set(cacheKey, {
-        results: nextResults,
-        source: nextSource,
-        reason: nextReason,
-        hasMore: nextHasMore,
-        after: nextAfter,
-        nextPage,
-      });
-    } catch (error) {
-      if (requestId !== keywordSearchRequestIdRef.current) return;
-      setKeywordSearchResults([]);
-      setKeywordSearchSource("idle");
-      setKeywordSearchReason(
-        error?.name === "AbortError"
-          ? "Search timed out. Try another keyword."
-          : error.message || "Keyword meme search failed."
-      );
-      setKeywordSearchHasMore(false);
-      setKeywordSearchAfter(null);
-      setKeywordSearchPage(1);
-      setActionMessage(
-        error?.name === "AbortError"
-          ? "Search timed out"
-          : error.message || "Keyword meme search failed."
-      );
-    } finally {
-      if (requestTimeoutId) {
-        window.clearTimeout(requestTimeoutId);
-      }
-      if (requestId !== keywordSearchRequestIdRef.current) return;
-      if (append) {
-        setKeywordSearchLoadingMore(false);
-      } else {
-        setKeywordSearchLoading(false);
-      }
-    }
-  }
-
-  function handleKeywordSearchSubmit(event) {
-    event.preventDefault();
-    void loadKeywordMemeResults({ query: keywordQuery, page: 1, after: null, append: false });
-  }
-
-  function handleLoadMoreKeywordMemes() {
-    if (!keywordSearchActiveQuery || keywordSearchLoading || keywordSearchLoadingMore || !keywordSearchHasMore) {
-      return;
-    }
-
-    void loadKeywordMemeResults({
-      query: keywordSearchActiveQuery,
-      page: keywordSearchPage,
-      after: keywordSearchAfter,
-      append: true,
-    });
-  }
 
   const copyCurrent = async () => {
     if (!currentText) return;
@@ -771,223 +730,8 @@ export default function RizzGeneratorSidebar({ isOpen, onOpenChange }) {
                       <span>{isGenerating ? "Generating..." : "Generate Rizz"}</span>
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={() => (isKeywordSearchOpen ? closeKeywordSearch() : openKeywordSearch())}
-                      className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
-                        isKeywordSearchOpen
-                          ? "border-cyan-400/30 bg-[color:var(--app-accent)]/10 text-[color:var(--app-text)] hover:bg-cyan-500/20"
-                          : "border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] text-[color:var(--app-text)] hover:bg-[color:var(--app-surface)]"
-                      }`}
-                    >
-                      <Search size={16} />
-                      Search by keyword
-                      <ChevronDown
-                        size={14}
-                        className={`transition-transform ${isKeywordSearchOpen ? "rotate-180" : ""}`}
-                      />
-                    </button>
                   </div>
                 </div>
-
-                <AnimatePresence initial={false}>
-                  {isKeywordSearchOpen ? (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0, y: -8 }}
-                      animate={{ height: "auto", opacity: 1, y: 0 }}
-                      exit={{ height: 0, opacity: 0, y: -8 }}
-                      transition={{ duration: 0.22, ease: "easeOut" }}
-                      className="mt-4 overflow-hidden rounded-[1.75rem] border border-cyan-400/20 bg-cyan-500/[0.06] p-4"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[color:var(--app-accent-2)]">
-                            Meme keyword search
-                          </p>
-                          <p className="mt-1 text-sm text-[color:var(--app-text)]">
-                            Search Reddit memes by keyword and keep the results inside this sidebar.
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={closeKeywordSearch}
-                          className="rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-2 text-[color:var(--app-muted)] transition hover:bg-[color:var(--app-surface-2)] hover:text-[color:var(--app-text)]"
-                          aria-label="Close keyword search"
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
-
-                      <form className="mt-4 flex gap-2" onSubmit={handleKeywordSearchSubmit}>
-                        <div className="group relative flex-1 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)]">
-                          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500 group-focus-within:text-[color:var(--app-accent)]" />
-                          <input
-                            ref={keywordInputRef}
-                            type="text"
-                            value={keywordQuery}
-                            onChange={(event) => setKeywordQuery(event.target.value)}
-                            placeholder="Search memes (e.g. exam, love, coding...)"
-                            className="h-12 w-full rounded-2xl bg-transparent pl-11 pr-4 text-sm text-white outline-none placeholder:text-zinc-500"
-                          />
-                        </div>
-                        <button
-                          type="submit"
-                          disabled={keywordSearchLoading}
-                          className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-4 text-sm font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent)]/35 hover:bg-[color:var(--app-surface)] disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {keywordSearchLoading ? "Searching..." : "Search"}
-                        </button>
-                        {keywordQuery ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (keywordSearchAbortRef.current) {
-                                keywordSearchAbortRef.current.abort();
-                                keywordSearchAbortRef.current = null;
-                              }
-                              setKeywordQuery("");
-                              setKeywordSearchResults([]);
-                              setKeywordSearchActiveQuery("");
-                              setKeywordSearchSource("idle");
-                              setKeywordSearchReason("");
-                              setKeywordSearchHasMore(false);
-                              setKeywordSearchAfter(null);
-                              setKeywordSearchPage(1);
-                              setKeywordSearchLoading(false);
-                              setKeywordSearchLoadingMore(false);
-                              setActionMessage("Keyword cleared");
-                            }}
-                            className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-4 text-sm font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface)]"
-                          >
-                            Clear
-                          </button>
-                        ) : null}
-                      </form>
-
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {["exam", "love", "coding", "gym"].map((item) => (
-                          <button
-                            key={item}
-                            type="button"
-                            onClick={() => {
-                              setKeywordQuery(item);
-                              void loadKeywordMemeResults({ query: item, page: 1, after: null, append: false });
-                            }}
-                            className="rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent)]/30 hover:bg-[color:var(--app-surface)]"
-                          >
-                            #{item}
-                          </button>
-                        ))}
-                      </div>
-
-                      <div className="mt-4">
-                        {keywordSearchLoading ? (
-                          <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)]/80 p-4 text-sm text-[color:var(--app-muted)]">
-                            <div className="flex items-center gap-3">
-                              <Loader2 size={16} className="animate-spin text-[color:var(--app-accent-2)]" />
-                              Searching Reddit memes...
-                            </div>
-                          </div>
-                        ) : null}
-
-                        {!keywordSearchLoading && keywordSearchResults.length > 0 ? (
-                          <div className="grid gap-3">
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[color:var(--app-muted)]">
-                                {keywordSearchActiveQuery || "Results"}
-                              </p>
-                              <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[color:var(--app-accent-2)]">
-                                {keywordSearchSource === "reddit" ? "Reddit" : "Fallback"}
-                              </span>
-                            </div>
-
-                            {keywordSearchResults.map((item, index) => {
-                              const link = item.postUrl || item.permalink || item.imageUrl;
-
-                              return (
-                                <a
-                                  key={`${item.id}-${index}`}
-                                  href={link}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="group overflow-hidden rounded-[1.25rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] transition hover:border-[color:var(--app-accent)]/30 hover:bg-[color:var(--app-surface)]"
-                                >
-                                  <div className="flex gap-3 p-3">
-                                    <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)]">
-                                      {item.imageUrl ? (
-                                        <img
-                                          src={item.imageUrl}
-                                          alt={item.title}
-                                          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                                          loading="lazy"
-                                          decoding="async"
-                                        />
-                                      ) : (
-                                        <div className="flex h-full w-full items-center justify-center text-zinc-600">
-                                          <ImageIcon size={18} />
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    <div className="min-w-0 flex-1">
-                                      <div className="flex items-center justify-between gap-2">
-                                        <span className="truncate text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
-                                          {item.subreddit || "r/memes"}
-                                        </span>
-                                        <ExternalLink
-                                          size={14}
-                                          className="shrink-0 text-zinc-500 transition group-hover:text-[color:var(--app-accent-2)]"
-                                        />
-                                      </div>
-                                      <p className="mt-2 line-clamp-3 text-sm leading-6 text-white">
-                                        {item.title}
-                                      </p>
-                                    </div>
-                                  </div>
-                                </a>
-                              );
-                            })}
-
-                            <div className="flex items-center justify-between gap-3">
-                              <p className="text-[11px] text-zinc-500">
-                                Tap a result to open the meme on Reddit.
-                              </p>
-                              {keywordSearchHasMore ? (
-                                <button
-                                  type="button"
-                                  onClick={handleLoadMoreKeywordMemes}
-                                  disabled={keywordSearchLoadingMore}
-                                  className="inline-flex items-center gap-2 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface)] disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                  {keywordSearchLoadingMore ? (
-                                    <Loader2 size={12} className="animate-spin text-[color:var(--app-accent-2)]" />
-                                  ) : null}
-                                  {keywordSearchLoadingMore ? "Loading..." : "Load more"}
-                                </button>
-                              ) : null}
-                            </div>
-                          </div>
-                        ) : null}
-
-                        {!keywordSearchLoading && keywordSearchActiveQuery && keywordSearchResults.length === 0 ? (
-                          <div className="rounded-2xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-bg)]/80 p-4 text-sm text-[color:var(--app-muted)]">
-                            <div className="flex items-center gap-3">
-                              <ImageIcon size={16} className="text-[color:var(--app-muted)]" />
-                              {keywordSearchReason || "No memes found. Try another keyword."}
-                            </div>
-                          </div>
-                        ) : null}
-
-                        {!keywordSearchLoading && !keywordSearchActiveQuery ? (
-                          <div className="rounded-2xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-bg)]/80 p-4 text-sm text-[color:var(--app-muted)]">
-                            Enter a keyword and tap Search to pull memes from Reddit.
-                          </div>
-                        ) : null}
-                      </div>
-                    </motion.div>
-                  ) : null}
-                </AnimatePresence>
-
                 <AnimatePresence mode="wait">
                   {currentText ? (
                     <motion.div
@@ -1051,9 +795,95 @@ export default function RizzGeneratorSidebar({ isOpen, onOpenChange }) {
                         </button>
                       </div>
 
+                      <button
+                        type="button"
+                        onClick={() => setIsLikedRizzOpen((current) => !current)}
+                        className={`mt-3 inline-flex w-full items-center justify-between gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
+                          isLikedRizzOpen
+                            ? "border-[color:var(--app-accent)]/30 bg-[color:var(--app-accent)]/10 text-[color:var(--app-text)] hover:bg-[color:var(--app-accent)]/20"
+                            : "border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] text-[color:var(--app-text)] hover:bg-[color:var(--app-surface)]"
+                        }`}
+                      >
+                        <span className="inline-flex items-center gap-2">
+                          <Heart
+                            size={16}
+                            className={isLikedRizzOpen ? "fill-[color:var(--app-accent)] text-[color:var(--app-accent)]" : ""}
+                          />
+                          Liked Rizz
+                        </span>
+                        <span className="rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-bg)]/70 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em]">
+                          {savedRizz.length}
+                        </span>
+                      </button>
+
                       <div className="mt-3 flex items-center justify-between gap-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
                         <span>{currentRizz?.source === GENERATED_SOURCE ? "API line" : "Fallback line"}</span>
                         <span>{copyStatus || actionMessage || "Fresh"}</span>
+                      </div>
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
+
+                <AnimatePresence initial={false}>
+                  {isLikedRizzOpen ? (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0, y: -8 }}
+                      animate={{ height: "auto", opacity: 1, y: 0 }}
+                      exit={{ height: 0, opacity: 0, y: -8 }}
+                      transition={{ duration: 0.22, ease: "easeOut" }}
+                      className="mt-4 overflow-hidden rounded-[1.75rem] border border-[color:var(--app-accent)]/20 bg-[color:var(--app-surface)] p-4"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[color:var(--app-accent-2)]">
+                            Liked Rizz
+                          </p>
+                          <h3 className="mt-1 text-sm font-bold text-white">
+                            Your saved lines
+                          </h3>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsLikedRizzOpen(false)}
+                          className="rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] p-2 text-[color:var(--app-muted)] transition hover:bg-[color:var(--app-surface)] hover:text-[color:var(--app-text)]"
+                          aria-label="Close liked rizz"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+
+                      <div className="mt-4 grid gap-3">
+                        {savedRizz.length > 0 ? (
+                          savedRizz.map((item, index) => (
+                            <button
+                              key={`${item.createdAt}-${index}`}
+                              type="button"
+                              onClick={() =>
+                                setCurrentRizz({
+                                  text: item.text,
+                                  source: item.source || GENERATED_SOURCE,
+                                  category: item.category || selectedCategory,
+                                  createdAt: item.createdAt,
+                                })
+                              }
+                              className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] p-4 text-left transition hover:border-[color:var(--app-accent)]/30 hover:bg-[color:var(--app-surface)]"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[color:var(--app-muted)]">
+                                  {item.category || "all"} / {item.source === GENERATED_SOURCE ? "api" : "fallback"}
+                                </span>
+                                <Heart size={14} className="fill-[color:var(--app-accent)] text-[color:var(--app-accent)]" />
+                              </div>
+                              <p className="mt-2 line-clamp-3 text-sm leading-6 text-zinc-200">
+                                {item.text}
+                              </p>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="rounded-2xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-bg)]/80 p-4 text-sm text-[color:var(--app-muted)]">
+                            Save a rizz line first, then it will appear here.
+                          </div>
+                        )}
                       </div>
                     </motion.div>
                   ) : null}

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import {
   buildKeywordSuggestions,
@@ -24,7 +24,14 @@ import {
 } from "lucide-react";
 import { buildMemeSlug, insertMemeWithSlugFallback } from "../utils/memePersistence";
 
-export default function UploadMeme({ onUpload, onSuccess, isBlockedUser = false }) {
+export default function UploadMeme({
+  onUpload,
+  onSuccess,
+  isBlockedUser = false,
+  initialImageUrl = "",
+  initialTitle = "",
+  initialSelectionKey = "",
+}) {
   const fileInputRef = useRef(null);
   const [file, setFile] = useState(null);
   const [imageUrl, setImageUrl] = useState("");
@@ -73,6 +80,23 @@ export default function UploadMeme({ onUpload, onSuccess, isBlockedUser = false 
     setKeywordVariant("balanced");
     setIsKeywordPanelOpen(true);
   };
+
+  useEffect(() => {
+    const nextImageUrl = String(initialImageUrl || "").trim();
+    const nextTitle = String(initialTitle || "").trim();
+
+    if (!nextImageUrl && !nextTitle) return;
+
+    setFile(null);
+    setImageUrl(nextImageUrl);
+    setImageSource(nextImageUrl);
+    setTitle(nextTitle);
+    clearKeywordSuggestions();
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }, [initialImageUrl, initialSelectionKey, initialTitle]);
 
   const isProbablyImageFile = (nextFile) => {
     if (!nextFile) return false;

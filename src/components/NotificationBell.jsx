@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion as Motion } from "framer-motion";
 import { Bell } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import Toast from "./Toast";
@@ -9,7 +9,6 @@ import NotificationsPage from "./NotificationsPage";
 export default function NotificationBell({ user }) {
   const [notifications, setNotifications] = useState([]);
   const [toast, setToast] = useState(null);
-  const [badgePulse, setBadgePulse] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
 
   const unreadCount = useMemo(
@@ -65,59 +64,27 @@ export default function NotificationBell({ user }) {
     }
 
     fetchNotifications();
+    const pollTimer = window.setInterval(() => {
+      fetchNotifications();
+    }, 30_000);
 
-    const channel = supabase
-      .channel(`notifications-${user.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "notifications",
-          filter: `user_id=eq.${user.id}`,
-        },
-        async (payload) => {
-          const inserted = payload.new;
-          const [hydrated] = await hydrateNotifications([inserted]);
-          setNotifications((current) => [hydrated, ...current].slice(0, 20));
-          setBadgePulse((current) => current + 1);
+    const handleFocus = () => {
+      fetchNotifications();
+    };
 
-          setToast({
-            type: hydrated.type === "warning" ? "warning" : "success",
-            title: hydrated.type === "warning" ? "Warning received" : "New notification",
-            message: hydrated.message,
-            onClose: clearToast,
-          });
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "notifications",
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload) => {
-          setNotifications((current) =>
-            current.map((notification) =>
-              notification.id === payload.new.id ? { ...notification, ...payload.new } : notification
-            )
-          );
-        }
-      )
-      .subscribe();
+    window.addEventListener("focus", handleFocus);
 
     return () => {
-      supabase.removeChannel(channel);
+      window.clearInterval(pollTimer);
+      window.removeEventListener("focus", handleFocus);
     };
-  }, [clearToast, fetchNotifications, hydrateNotifications, user?.id]);
+  }, [fetchNotifications, user?.id]);
 
   if (!user?.id) return null;
 
   return (
     <div className="relative shrink-0">
-      <motion.button
+      <Motion.button
         type="button"
         whileTap={{ scale: 0.95 }}
         onClick={() => setIsOpen((current) => !current)}
@@ -127,17 +94,17 @@ export default function NotificationBell({ user }) {
         <Bell className={`h-5 w-5 ${unreadCount > 0 ? "fill-current" : ""}`} />
         {unreadCount > 0 ? (
           <>
-            <motion.span
-              key={badgePulse}
+            <Motion.span
+              key={unreadCount}
               initial={{ scale: 0.75, opacity: 0 }}
               animate={{ scale: [1, 1.16, 1], opacity: 1 }}
               transition={{ duration: 0.38, ease: "easeOut" }}
               className="absolute -right-1 -top-1 min-w-5 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-black text-white shadow-lg shadow-red-500/30"
             >
               {unreadCount > 9 ? "9+" : unreadCount}
-            </motion.span>
-            <motion.span
-              key={`${badgePulse}-ring`}
+            </Motion.span>
+            <Motion.span
+              key={`${unreadCount}-ring`}
               aria-hidden="true"
               initial={{ opacity: 0.35, scale: 1 }}
               animate={{ opacity: 0, scale: 1.45 }}
@@ -147,7 +114,7 @@ export default function NotificationBell({ user }) {
           </>
         ) : null}
         {unreadCount > 0 ? <span className="absolute inset-0 rounded-2xl bg-red-500/10 animate-pulse" /> : null}
-      </motion.button>
+      </Motion.button>
 
       <AnimatePresence>
         {isOpen ? (

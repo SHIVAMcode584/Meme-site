@@ -1,6 +1,6 @@
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion as Motion } from "framer-motion";
 import { AlertTriangle, Bell, CheckCheck, Heart, Loader2, MessageCircle, RefreshCw, Sparkles, X } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import Toast from "./Toast";
@@ -127,44 +127,21 @@ export default function NotificationsPage({ user, onBack }) {
     }
 
     fetchNotifications();
+    const pollTimer = window.setInterval(() => {
+      fetchNotifications();
+    }, 30_000);
 
-    const channel = supabase
-      .channel(`notifications-page-${user.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "notifications",
-          filter: `user_id=eq.${user.id}`,
-        },
-        async (payload) => {
-          const [hydrated] = await hydrateNotifications([payload.new]);
-          setNotifications((current) => [hydrated, ...current].slice(0, 20));
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "notifications",
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload) => {
-          setNotifications((current) =>
-            current.map((notification) =>
-              notification.id === payload.new.id ? { ...notification, ...payload.new } : notification
-            )
-          );
-        }
-      )
-      .subscribe();
+    const handleFocus = () => {
+      fetchNotifications();
+    };
+
+    window.addEventListener("focus", handleFocus);
 
     return () => {
-      supabase.removeChannel(channel);
+      window.clearInterval(pollTimer);
+      window.removeEventListener("focus", handleFocus);
     };
-  }, [fetchNotifications, hydrateNotifications, user?.id]);
+  }, [fetchNotifications, user?.id]);
 
   useEffect(() => {
     if (notifications.some((notification) => !notification.is_read)) {
@@ -183,7 +160,7 @@ export default function NotificationsPage({ user, onBack }) {
     return notifications;
   }, [filter, notifications]);
   const body = (
-    <motion.div
+    <Motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -196,7 +173,7 @@ export default function NotificationsPage({ user, onBack }) {
         className="absolute inset-0 bg-black/75 backdrop-blur-md"
       />
 
-      <motion.div
+      <Motion.div
         initial={{ opacity: 0, y: 14, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 14, scale: 0.98 }}
@@ -306,7 +283,7 @@ export default function NotificationsPage({ user, onBack }) {
                   const Icon = tone.icon;
 
                   return (
-                    <motion.article
+                    <Motion.article
                       key={notification.id}
                       layout
                       initial={{ opacity: 0, y: 10 }}
@@ -343,7 +320,7 @@ export default function NotificationsPage({ user, onBack }) {
                           </div>
                         </div>
                       </div>
-                    </motion.article>
+                    </Motion.article>
                   );
                 })
               )}
@@ -382,8 +359,8 @@ export default function NotificationsPage({ user, onBack }) {
         <div className="pointer-events-none fixed right-4 top-4 z-[260] w-[calc(100vw-2rem)] sm:w-auto">
           <Toast toast={toast} className="ml-auto pointer-events-auto" />
         </div>
-      </motion.div>
-    </motion.div>
+      </Motion.div>
+    </Motion.div>
   );
 
   if (typeof document === "undefined") {

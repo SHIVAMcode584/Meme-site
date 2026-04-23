@@ -39,12 +39,14 @@ import Hero from "./components/Hero";
 import Loader from "./components/Loader";
 import MemeGrid from "./components/MemeGrid";
 import NotificationBell from "./components/NotificationBell";
+import MoodMemeSearchPage from "./components/MoodMemeSearchPage";
 import RizzGeneratorSidebar from "./components/RizzGeneratorSidebar";
 import ThemeSwitcher from "./components/ThemeSwitcher";
 import SearchBar from "./components/SearchBar";
 import { memes } from "./data/memes";
 import { categories, smartSearch, suggestions } from "./utils/helpers";
 import { getAllOwnerLikeCounts, getOwnerLikedMemeIdsForUser } from "./utils/likes";
+import { prepareMemeDeletion } from "./utils/memeDeletion";
 import {
   DEFAULT_AVATAR_ID,
   getAvatarChoiceFromMetadata,
@@ -138,6 +140,7 @@ export default function App() {
   const [isThemeSwitcherOpen, setIsThemeSwitcherOpen] = useState(false);
   const [isEditorModalOpen, setIsEditorModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [uploadDraft, setUploadDraft] = useState(null);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isRizzOpen, setIsRizzOpen] = useState(false);
@@ -165,6 +168,7 @@ export default function App() {
   const [dismissInstallBanner, setDismissInstallBanner] = useState(false);
   const [showIosInstallModal, setShowIosInstallModal] = useState(false);
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
+  const [isMobileHeaderCompact, setIsMobileHeaderCompact] = useState(false);
   const [selectedAvatarId, setSelectedAvatarId] = useState(DEFAULT_AVATAR_ID);
   const [isSavingAvatar, setIsSavingAvatar] = useState(false);
   const [isUsernameModalOpen, setIsUsernameModalOpen] = useState(false);
@@ -183,6 +187,7 @@ export default function App() {
   );
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const path = currentPath;
+  const isMoodSearchPage = path === "/mood-search";
   const isOverlayOpen = Boolean(
     isSidebarOpen ||
       isThemeSwitcherOpen ||
@@ -314,6 +319,30 @@ export default function App() {
       window.removeEventListener("appinstalled", onAppInstalled);
     };
   }, []);
+
+  useEffect(() => {
+    const updateHeaderMode = () => {
+      const isMobile = window.innerWidth < 640;
+      const shouldCompact = path === "/" && isMobile && window.scrollY > 24;
+      setIsMobileHeaderCompact(shouldCompact);
+    };
+
+    let frameId = 0;
+    const handleScroll = () => {
+      window.cancelAnimationFrame(frameId);
+      frameId = window.requestAnimationFrame(updateHeaderMode);
+    };
+
+    updateHeaderMode();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", updateHeaderMode);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", updateHeaderMode);
+    };
+  }, [path]);
 
   useEffect(() => {
     const fetchLikeCounts = async () => {
@@ -995,6 +1024,19 @@ export default function App() {
     fetchLeaderboard();
   };
 
+  const handleOpenUploadFromSearch = useCallback((meme) => {
+    if (!meme?.imageUrl) return;
+
+    const nextDraft = {
+      imageUrl: meme.imageUrl,
+      title: String(meme.title || "Mood meme").trim() || "Mood meme",
+      selectionKey: `${meme.id || meme.imageUrl || "mood-meme"}-${Date.now()}`,
+    };
+
+    setUploadDraft(nextDraft);
+    setIsUploadModalOpen(true);
+  }, []);
+
   const handleAdminMemePublished = useCallback(
     (memesToAdd = []) => {
       const nextMemes = Array.isArray(memesToAdd) ? memesToAdd : [];
@@ -1064,30 +1106,7 @@ export default function App() {
       if (!memeId) return false;
 
       try {
-        const { data: relatedReports, error: reportLookupError } = await supabase
-          .from("reports")
-          .select("id")
-          .eq("meme_id", memeId);
-
-        if (reportLookupError) {
-          throw reportLookupError;
-        }
-
-        const reportIds = (relatedReports || []).map((report) => report.id);
-
-        const { error } = await supabase.from("meme-table").delete().eq("id", memeId);
-        if (error) throw error;
-
-        if (reportIds.length > 0) {
-          const { error: reportStatusError } = await supabase
-            .from("reports")
-            .update({ status: "removed" })
-            .in("id", reportIds);
-
-          if (reportStatusError) {
-            console.warn("Could not mark related reports as removed:", reportStatusError);
-          }
-        }
+        await prepareMemeDeletion(supabase, memeId);
 
         handleMemeDeleted(memeId);
         setNotification({
@@ -1204,8 +1223,9 @@ export default function App() {
       <nav className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-1 min-h-0">
         <SidebarLink 
           icon={<Home size={20}/>} 
-          label="Memes" 
+          label="Home" 
           onClick={() => { 
+            navigateTo("/");
             setViewMode("all"); 
             setIsSidebarOpen(false); 
             setIsEditorModalOpen(false);
@@ -1237,6 +1257,18 @@ export default function App() {
             setIsUploadModalOpen(false);
             closeModal();
             setIsRizzOpen(true);
+          }}
+        />
+        <SidebarLink
+          icon={<Search size={20} />}
+          label="Global Meme"
+          onClick={() => {
+            setIsSidebarOpen(false);
+            setIsEditorModalOpen(false);
+            setIsUploadModalOpen(false);
+            closeModal();
+            navigateTo("/mood-search");
+            window.scrollTo({ top: 0, behavior: "smooth" });
           }}
         />
         {user && (
@@ -1299,6 +1331,7 @@ export default function App() {
             setIsSidebarOpen(false); 
             setIsEditorModalOpen(false);
             closeModal();
+            setUploadDraft(null);
             user ? setIsUploadModalOpen(true) : setIsLoginModalOpen(true); 
           }} 
         />
@@ -1379,7 +1412,7 @@ export default function App() {
   return (
     <>
       <AnimatePresence>{showLoader ? <Loader /> : null}</AnimatePresence>
-      <RizzGeneratorSidebar isOpen={isRizzOpen} onOpenChange={setIsRizzOpen} />
+      <RizzGeneratorSidebar isOpen={isRizzOpen} onOpenChange={setIsRizzOpen} user={user} />
       <div className="min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] flex">
       {/* Desktop Sidebar (Persistent) */}
       <aside className="hidden lg:block fixed top-0 left-0 z-[110] h-screen w-64 bg-[var(--app-surface)] border-r border-[color:var(--app-border)] p-6 shadow-2xl overflow-y-auto">
@@ -1414,97 +1447,176 @@ export default function App() {
         <div className="relative isolate overflow-x-clip">
           <header className="sticky top-0 z-[105] border-b border-[color:var(--app-border)] bg-[color:var(--app-bg)]/92 backdrop-blur-xl transition-all">
             <div className="mx-auto max-w-6xl px-3 py-2 sm:px-6 sm:py-3">
-              <div className="flex flex-col gap-2.5 rounded-[1.6rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-3 py-2.5 shadow-[0_18px_60px_rgba(2,6,23,0.12)] sm:gap-3 sm:px-5 sm:py-3 sm:rounded-[2rem] md:flex-row md:items-center md:justify-between md:gap-3 md:px-4 md:py-2.5">
-                <div className="flex items-center justify-between gap-2 md:gap-3 lg:gap-4">
-                  <div className="flex min-w-0 items-center gap-2 md:gap-3 lg:gap-4">
-                    <button
-                      onClick={() => setIsSidebarOpen(true)}
-                      className="shrink-0 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] p-2 transition hover:scale-[1.03] hover:bg-[color:var(--app-surface)] lg:hidden"
-                    >
-                      <Menu size={20} />
-                    </button>
-                    <img
-                      src={logo}
-                      alt="RoastRiot Logo"
-                      className="h-8 w-8 shrink-0 object-contain sm:h-10 sm:w-10"
-                    />
-                  </div>
+              <AnimatePresence mode="wait" initial={false}>
+                {isMobileHeaderCompact ? (
+                  <motion.div
+                    key="compact-header"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.22, ease: "easeOut" }}
+                    className="flex items-center justify-between gap-2 rounded-[1.6rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-3 py-2 shadow-[0_18px_60px_rgba(2,6,23,0.12)] sm:rounded-[2rem] sm:px-4 sm:py-3"
+                  >
+                    <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                      <button
+                        onClick={() => setIsSidebarOpen(true)}
+                        className="shrink-0 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] p-2 transition hover:scale-[1.03] hover:bg-[color:var(--app-surface)]"
+                      >
+                        <Menu size={20} />
+                      </button>
+                      <img
+                        src={logo}
+                        alt="RoastRiot Logo"
+                        className="h-8 w-8 shrink-0 object-contain sm:h-9 sm:w-9"
+                      />
+                    </div>
 
-                  <div className="flex shrink-0 items-center gap-1.5 sm:gap-3 md:gap-2">
-                    <ThemeSwitcher
-                      isOpen={isThemeSwitcherOpen}
-                      onOpenChange={setIsThemeSwitcherOpen}
-                    />
-                    {profile ? (
-                      <div className="flex shrink-0 items-center gap-1 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-2 py-1 sm:gap-1.5 sm:px-4 sm:py-2 md:px-2.5 md:py-1.5">
-                        <Award size={13} className="text-[color:var(--app-accent)] sm:w-4 sm:h-4" />
-                        <span className="text-[9px] font-bold sm:text-sm md:text-[11px]">
-                          {profile.points} pts
-                        </span>
+                      <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+                        <ThemeSwitcher
+                          isOpen={isThemeSwitcherOpen}
+                          onOpenChange={setIsThemeSwitcherOpen}
+                        />
+                      {profile ? (
+                        <div className="flex shrink-0 items-center gap-1 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-2 py-1">
+                          <Award size={13} className="text-[color:var(--app-accent)]" />
+                            <span className="text-[10px] font-bold">
+                              {profile.points}
+                            </span>
+                          </div>
+                        ) : null}
+                        <button
+                          onClick={() => {
+                            setViewMode(viewMode === "favorites" ? "all" : "favorites");
+                            window.scrollTo({ top: 0, behavior: "smooth" });
+                          }}
+                          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-2 py-1 text-[10px] font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface)]"
+                          aria-label="Saved memes"
+                        >
+                          <Bookmark size={13} className={viewMode === "favorites" ? "fill-violet-400" : ""} />
+                          <span>{favorites.length}</span>
+                        </button>
+                        <NotificationBell user={user} />
+                        {!user ? (
+                          <button
+                            onClick={() => setIsLoginModalOpen(true)}
+                            className="inline-flex items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] p-2 text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface)]"
+                            aria-label="Login"
+                        >
+                          <LogIn size={16} />
+                        </button>
+                      ) : null}
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="expanded-header"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.22, ease: "easeOut" }}
+                    className="flex flex-col gap-2.5 rounded-[1.6rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-3 py-2.5 shadow-[0_18px_60px_rgba(2,6,23,0.12)] sm:gap-3 sm:rounded-[2rem] sm:px-5 sm:py-3 md:flex-row md:items-center md:justify-between md:gap-3 md:px-4 md:py-2.5"
+                  >
+                    <div className="flex items-center justify-between gap-2 md:gap-3 lg:gap-4">
+                      <div className="flex min-w-0 items-center gap-2 md:gap-3 lg:gap-4">
+                        <button
+                          onClick={() => setIsSidebarOpen(true)}
+                          className="shrink-0 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] p-2 transition hover:scale-[1.03] hover:bg-[color:var(--app-surface)] lg:hidden"
+                        >
+                          <Menu size={20} />
+                        </button>
+                        <img
+                          src={logo}
+                          alt="RoastRiot Logo"
+                          className="h-8 w-8 shrink-0 object-contain sm:h-10 sm:w-10"
+                        />
                       </div>
-                    ) : null}
-                    <NotificationBell user={user} />
-                  </div>
-                </div>
 
-                <div className="flex w-full flex-wrap items-center justify-end gap-1.5 border-t border-[color:var(--app-border)]/60 pt-2.5 sm:gap-2 sm:pt-3 md:w-auto md:flex-nowrap md:border-t-0 md:pt-0 md:gap-2 lg:gap-2.5">
-                  {!user ? (
-                    <button
-                      onClick={() => setIsLoginModalOpen(true)}
-                      className="shrink-0 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-2.5 py-1.5 text-[11px] font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface)] sm:px-4 sm:py-2 sm:text-sm md:px-2.5 md:py-1.5 md:text-[11px]"
-                    >
-                      Login
-                    </button>
-                  ) : null}
-                  <button
-                    onClick={handleRandomMeme}
-                    className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-lg shadow-fuchsia-500/20 transition hover:scale-105 active:scale-95 sm:gap-2 sm:px-4 sm:py-2 sm:text-sm md:gap-1 md:px-2.5 md:py-1.5 md:text-[11px]"
-                  >
-                    <Sparkles size={14} />
-                    <span className="hidden sm:inline">Get Random Meme</span>
-                    <span className="sm:hidden">Random</span>
-                  </button>
-                  {!isStandaloneMode && (isInstallable || showIosInstallHint) ? (
-                    <button
-                      onClick={handleInstallApp}
-                      className="shrink-0 inline-flex items-center gap-1 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-2.5 py-1.5 text-[11px] font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface)] sm:gap-2 sm:px-4 sm:py-2 sm:text-sm md:gap-1 md:px-2.5 md:py-1.5 md:text-[11px]"
-                    >
-                      <Download size={14} />
-                      <span className="hidden sm:inline">Install App</span>
-                    </button>
-                  ) : null}
-                  <button
-                    onClick={() => {
-                      setViewMode(viewMode === "favorites" ? "all" : "favorites");
-                      window.scrollTo({ top: 0, behavior: "smooth" });
-                    }}
-                    className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] font-semibold transition-all sm:gap-2 sm:px-4 sm:py-2 sm:text-sm md:gap-1 md:px-2.5 md:py-1.5 md:text-[11px] ${
-                      viewMode === "favorites"
-                        ? "border-[color:var(--app-accent)] bg-[color:var(--app-surface-2)] text-[color:var(--app-text)]"
-                        : "border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] text-[color:var(--app-text)] hover:bg-[color:var(--app-surface)]"
-                    }`}
-                  >
-                    <Bookmark size={14} className={viewMode === "favorites" ? "fill-violet-400" : ""} />
-                    <span className="hidden xs:inline">Bookmarks:</span>
-                    <span>{favorites.length}</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setViewMode(viewMode === "auto" ? "all" : "auto");
-                      window.scrollTo({ top: 0, behavior: "smooth" });
-                    }}
-                    className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] font-semibold transition-all sm:gap-2 sm:px-4 sm:py-2 sm:text-sm md:gap-1 md:px-2.5 md:py-1.5 md:text-[11px] ${
-                      viewMode === "auto"
-                        ? "border-cyan-400/40 bg-cyan-500/10 text-cyan-100"
-                        : "border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] text-[color:var(--app-text)] hover:bg-[color:var(--app-surface)]"
-                    }`}
-                  >
-                    <Sparkles size={14} className={viewMode === "auto" ? "text-cyan-300" : ""} />
-                    <span className="hidden xs:inline">Auto:</span>
-                    <span>{autoMemesCount}</span>
-                  </button>
-                </div>
-              </div>
+                      <div className="flex shrink-0 items-center gap-1.5 sm:gap-3 md:gap-2">
+                        <ThemeSwitcher
+                          isOpen={isThemeSwitcherOpen}
+                          onOpenChange={setIsThemeSwitcherOpen}
+                        />
+                        {profile ? (
+                          <div className="flex shrink-0 items-center gap-1 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-2 py-1 sm:gap-1.5 sm:px-4 sm:py-2 md:px-2.5 md:py-1.5">
+                            <Award size={13} className="text-[color:var(--app-accent)] sm:w-4 sm:h-4" />
+                            <span className="text-[9px] font-bold sm:text-sm md:text-[11px]">
+                              {profile.points} pts
+                            </span>
+                        </div>
+                      ) : null}
+                      </div>
+                    </div>
+
+                    <AnimatePresence initial={false}>
+                      <motion.div
+                        key="expanded-actions"
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ duration: 0.2, ease: "easeOut" }}
+                        className="flex w-full flex-wrap items-center justify-end gap-1.5 border-t border-[color:var(--app-border)]/60 pt-2.5 sm:gap-2 sm:pt-3 md:w-auto md:flex-nowrap md:border-t-0 md:pt-0 md:gap-2 lg:gap-2.5"
+                      >
+                        {!user ? (
+                          <button
+                            onClick={() => setIsLoginModalOpen(true)}
+                            className="shrink-0 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-2.5 py-1.5 text-[11px] font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface)] sm:px-4 sm:py-2 sm:text-sm md:px-2.5 md:py-1.5 md:text-[11px]"
+                          >
+                            Login
+                          </button>
+                        ) : null}
+                        <button
+                          onClick={handleRandomMeme}
+                          className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-lg shadow-fuchsia-500/20 transition hover:scale-105 active:scale-95 sm:gap-2 sm:px-4 sm:py-2 sm:text-sm md:gap-1 md:px-2.5 md:py-1.5 md:text-[11px]"
+                        >
+                          <Sparkles size={14} />
+                          <span className="hidden sm:inline">Get Random Meme</span>
+                          <span className="sm:hidden">Random</span>
+                        </button>
+                        {!isStandaloneMode && (isInstallable || showIosInstallHint) ? (
+                          <button
+                            onClick={handleInstallApp}
+                            className="shrink-0 inline-flex items-center gap-1 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-2.5 py-1.5 text-[11px] font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface)] sm:gap-2 sm:px-4 sm:py-2 sm:text-sm md:gap-1 md:px-2.5 md:py-1.5 md:text-[11px]"
+                          >
+                            <Download size={14} />
+                            <span className="hidden sm:inline">Install App</span>
+                          </button>
+                        ) : null}
+                        <button
+                          onClick={() => {
+                            setViewMode(viewMode === "favorites" ? "all" : "favorites");
+                            window.scrollTo({ top: 0, behavior: "smooth" });
+                          }}
+                          className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] font-semibold transition-all sm:gap-2 sm:px-4 sm:py-2 sm:text-sm md:gap-1 md:px-2.5 md:py-1.5 md:text-[11px] ${
+                            viewMode === "favorites"
+                              ? "border-[color:var(--app-accent)] bg-[color:var(--app-surface-2)] text-[color:var(--app-text)]"
+                              : "border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] text-[color:var(--app-text)] hover:bg-[color:var(--app-surface)]"
+                          }`}
+                        >
+                          <Bookmark size={14} className={viewMode === "favorites" ? "fill-violet-400" : ""} />
+                          <span className="hidden xs:inline">Bookmarks:</span>
+                          <span>{favorites.length}</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setViewMode(viewMode === "auto" ? "all" : "auto");
+                            window.scrollTo({ top: 0, behavior: "smooth" });
+                          }}
+                          className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] font-semibold transition-all sm:gap-2 sm:px-4 sm:py-2 sm:text-sm md:gap-1 md:px-2.5 md:py-1.5 md:text-[11px] ${
+                            viewMode === "auto"
+                              ? "border-cyan-400/40 bg-cyan-500/10 text-cyan-100"
+                              : "border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] text-[color:var(--app-text)] hover:bg-[color:var(--app-surface)]"
+                          }`}
+                        >
+                          <Sparkles size={14} className={viewMode === "auto" ? "text-cyan-300" : ""} />
+                          <span className="hidden xs:inline">Auto:</span>
+                          <span>{autoMemesCount}</span>
+                        </button>
+                        <NotificationBell user={user} />
+                      </motion.div>
+                    </AnimatePresence>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </header>
 
@@ -1706,72 +1818,81 @@ export default function App() {
             </motion.section>
           ) : (
             <>
-              <Hero />
-              <section className="-mt-16 relative z-20 rounded-[2rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-5 shadow-2xl shadow-black/20 backdrop-blur-xl sm:p-8">
-                <SearchBar
-                  search={search}
-                  setSearch={setSearch}
-                  placeholderTitles={searchPlaceholderTitles}
+              {isMoodSearchPage ? (
+                <MoodMemeSearchPage
+                  onBackHome={() => navigateTo("/")}
+                  onUploadToRoastRiot={handleOpenUploadFromSearch}
                 />
-                <CategoryFilter categories={categories} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} />
-              </section>
+              ) : (
+                <>
+                  <Hero />
+                  <section className="-mt-16 relative z-20 rounded-[2rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-5 shadow-2xl shadow-black/20 backdrop-blur-xl sm:p-8">
+                    <SearchBar
+                      search={search}
+                      setSearch={setSearch}
+                      placeholderTitles={searchPlaceholderTitles}
+                    />
+                    <CategoryFilter categories={categories} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} />
+                  </section>
 
-              <section className="mt-10">
-                <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                  <div>
-                    <h2 className="text-2xl font-bold sm:text-3xl">
-                      {viewMode === "uploads"
-                        ? "My Uploaded Memes"
-                        : viewMode === "favorites"
-                        ? "My Bookmarked Memes"
-                        : viewMode === "liked"
-                        ? "My Liked Memes"
-                        : viewMode === "auto"
-                        ? "Auto-Ingested Memes"
-                        : "Meme Results"}
-                    </h2>
-                    <p className="text-zinc-400">
-                      {filteredMemes.length} meme{filteredMemes.length === 1 ? "" : "s"} found
-                    </p>
-                    {viewMode === "all" && debouncedSearch.length >= SEMANTIC_MIN_QUERY_LENGTH ? (
-                      <p className="mt-1 text-xs text-zinc-500">
-                        {semanticStatus === "searching"
-                          ? "Understanding your intent..."
-                          : semanticStatus === "semantic"
-                          ? "AI semantic search active"
-                          : semanticStatus === "fallback"
-                          ? "Keyword fallback active"
-                          : semanticStatus === "failed"
-                          ? "AI search unavailable, showing keyword results"
-                          : null}
-                      </p>
-                    ) : null}
-                    {semanticError && semanticStatus !== "searching" ? (
-                      <p className="mt-1 text-[11px] text-amber-300/80">{semanticError}</p>
-                    ) : null}
-                  </div>
+                  <section className="mt-10">
+                    <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                      <div>
+                        <h2 className="text-2xl font-bold sm:text-3xl">
+                          {viewMode === "uploads"
+                            ? "My Uploaded Memes"
+                            : viewMode === "favorites"
+                            ? "My Bookmarked Memes"
+                            : viewMode === "liked"
+                            ? "My Liked Memes"
+                            : viewMode === "auto"
+                            ? "Auto-Ingested Memes"
+                            : "Meme Results"}
+                        </h2>
+                        <p className="text-zinc-400">
+                          {filteredMemes.length} meme{filteredMemes.length === 1 ? "" : "s"} found
+                        </p>
+                        {viewMode === "all" && debouncedSearch.length >= SEMANTIC_MIN_QUERY_LENGTH ? (
+                          <p className="mt-1 text-xs text-zinc-500">
+                            {semanticStatus === "searching"
+                              ? "Understanding your intent..."
+                              : semanticStatus === "semantic"
+                              ? "AI semantic search active"
+                              : semanticStatus === "fallback"
+                              ? "Keyword fallback active"
+                              : semanticStatus === "failed"
+                              ? "AI search unavailable, showing keyword results"
+                              : null}
+                          </p>
+                        ) : null}
+                        {semanticError && semanticStatus !== "searching" ? (
+                          <p className="mt-1 text-[11px] text-amber-300/80">{semanticError}</p>
+                        ) : null}
+                      </div>
 
-                  {search ? (
-                    <button onClick={() => setSearch("")} className="h-11 rounded-2xl border border-white/10 bg-white/5 px-4 text-sm text-zinc-300 transition hover:bg-white/10">
-                      Clear search
-                    </button>
-                  ) : null}
-                </div>
-                <MemeGrid 
-                  memes={filteredMemes} 
-                  onOpen={openMeme} 
-                  toggleFavorite={toggleFavorite} 
-                  favorites={favorites} 
-                  setSearch={setSearch}
-                  user={user}
-                  isAdminUser={isAdminUser}
-                  isBlockedUser={isBlockedUser}
-                  onDeleteMeme={handleDeleteMeme}
-                  likeCounts={allLikeCounts}
-                  onLikeCountChange={handleLikeCountChange}
-                  onLikeStateChange={handleLikeStateChange}
-                />
-              </section>
+                      {search ? (
+                        <button onClick={() => setSearch("")} className="h-11 rounded-2xl border border-white/10 bg-white/5 px-4 text-sm text-zinc-300 transition hover:bg-white/10">
+                          Clear search
+                        </button>
+                      ) : null}
+                    </div>
+                    <MemeGrid 
+                      memes={filteredMemes} 
+                      onOpen={openMeme} 
+                      toggleFavorite={toggleFavorite} 
+                      favorites={favorites} 
+                      setSearch={setSearch}
+                      user={user}
+                      isAdminUser={isAdminUser}
+                      isBlockedUser={isBlockedUser}
+                      onDeleteMeme={handleDeleteMeme}
+                      likeCounts={allLikeCounts}
+                      onLikeCountChange={handleLikeCountChange}
+                      onLikeStateChange={handleLikeStateChange}
+                    />
+                  </section>
+                </>
+              )}
             </>
           )}
 
@@ -1872,7 +1993,10 @@ export default function App() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                onClick={() => setIsUploadModalOpen(false)}
+                onClick={() => {
+                  setIsUploadModalOpen(false);
+                  setUploadDraft(null);
+                }}
                 className="fixed inset-0 bg-black/80 backdrop-blur-md"
               />
               <motion.div
@@ -1890,7 +2014,10 @@ export default function App() {
                       <h2 className="mt-1 text-2xl font-bold">Upload Meme</h2>
                     </div>
                     <button
-                      onClick={() => setIsUploadModalOpen(false)}
+                      onClick={() => {
+                        setIsUploadModalOpen(false);
+                        setUploadDraft(null);
+                      }}
                       className="rounded-full border border-white/10 bg-white/5 p-2 transition hover:bg-white/10"
                     >
                       <X size={20} />
@@ -1910,9 +2037,13 @@ export default function App() {
                       onUpload={handleUploadMeme}
                       onSuccess={(msg) => {
                         setIsUploadModalOpen(false);
+                        setUploadDraft(null);
                         setNotification({ type: 'success', message: msg });
                       }}
                       isBlockedUser={isBlockedUser}
+                      initialImageUrl={uploadDraft?.imageUrl || ""}
+                      initialTitle={uploadDraft?.title || ""}
+                      initialSelectionKey={uploadDraft?.selectionKey || ""}
                     />
                   </Suspense>
                 </div>
