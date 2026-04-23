@@ -121,6 +121,7 @@ export default function KeywordMemeSearch({ onUploadToRoastRiot }) {
 
   const sourceLabel = useMemo(() => {
     if (source === "reddit") return "Live results";
+    if (source === "local") return "Local results";
     if (source === "empty") return "No query";
     return "Live search";
   }, [source]);

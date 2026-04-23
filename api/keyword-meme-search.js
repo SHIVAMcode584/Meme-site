@@ -1,5 +1,7 @@
 /* global process */
 
+import { memes as localFallbackMemes } from "../src/data/memes.js";
+
 const REDDIT_SEARCH_URL = "https://www.reddit.com/search.json";
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 20;
@@ -44,6 +46,14 @@ function normalizeQuery(value) {
   return String(value || "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function tokenizeQuery(value) {
+  return normalizeQuery(value)
+    .toLowerCase()
+    .split(/[\s-]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function isAllowedImageUrl(url) {
@@ -148,6 +158,46 @@ async function fetchRedditResults(query, limit, after) {
   }
 }
 
+function buildLocalFallbackResults(query, limit) {
+  const tokens = tokenizeQuery(query);
+  if (tokens.length === 0) return [];
+
+  const ranked = localFallbackMemes
+    .map((meme) => {
+      const searchableText = [
+        meme?.title || "",
+        meme?.category || "",
+        meme?.mood || "",
+        ...(Array.isArray(meme?.keywords) ? meme.keywords : []),
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      const score = tokens.reduce((total, token) => {
+        if (!token) return total;
+        return total + (searchableText.includes(token) ? 2 : 0);
+      }, 0);
+
+      return { meme, score };
+    })
+    .filter(({ score }) => score > 0)
+    .sort((left, right) => {
+      if (right.score !== left.score) return right.score - left.score;
+      return String(left.meme?.title || "").localeCompare(String(right.meme?.title || ""));
+    })
+    .slice(0, limit);
+
+  return ranked.map(({ meme }, index) => ({
+    id: `local-${meme?.id || index}`,
+    title: meme?.title || "Local meme",
+    imageUrl: meme?.image || meme?.imageUrl || "",
+    subreddit: "r/memes",
+    permalink: "",
+    postUrl: "",
+    source: "local",
+  }));
+}
+
 export default async function handler(req, res) {
   try {
     if (req.method !== "GET") {
@@ -178,17 +228,51 @@ export default async function handler(req, res) {
           ...redditResults,
         });
       }
+
+      const localResults = buildLocalFallbackResults(query, limit);
+      if (localResults.length > 0) {
+        return sendJson(res, 200, {
+          ok: true,
+          query,
+          source: "local",
+          reason: "Live search returned no matches. Showing local meme results instead.",
+          results: localResults,
+          after: null,
+          hasMore: false,
+        });
+      }
     } catch (redditError) {
-      return sendJson(res, 503, {
-        ok: false,
-        error: redditError.message || "Live search is temporarily unavailable.",
+      const localResults = buildLocalFallbackResults(query, limit);
+      if (localResults.length > 0) {
+        return sendJson(res, 200, {
+          ok: true,
+          query,
+          source: "local",
+          reason:
+            redditError.message || "Live search source returned an unexpected response.",
+          results: localResults,
+          after: null,
+          hasMore: false,
+        });
+      }
+
+      return sendJson(res, 200, {
+        ok: true,
+        query,
+        source: "empty",
+        reason:
+          redditError.message || "Live search source returned an unexpected response.",
+        results: [],
+        after: null,
+        hasMore: false,
       });
     }
 
     return sendJson(res, 200, {
       ok: true,
       query,
-      source: "reddit",
+      source: "empty",
+      reason: "No live matches were found.",
       results: [],
       after: null,
       hasMore: false,
