@@ -36,14 +36,18 @@ async function readJsonResponse(response) {
   }
 }
 
-function getFriendlyFallbackReason(errorMessage) {
+function getFriendlyFallbackReason(errorMessage, hasLocalResults = false) {
+  if (hasLocalResults) {
+    return "Showing local meme results for now.";
+  }
+
   const normalized = String(errorMessage || "").toLowerCase();
 
   if (normalized.includes("invalid json") || normalized.includes("unexpected response")) {
-    return "Reddit is acting up right now, so local meme results are shown instead.";
+    return "The live search source is having trouble right now.";
   }
 
-  return errorMessage || "Reddit search is temporarily unavailable";
+  return errorMessage || "The live search source is temporarily unavailable.";
 }
 
 function clampLimit(value) {
@@ -247,7 +251,7 @@ export default async function handler(req, res) {
         ok: true,
         query,
         ...fallbackResults,
-        reason: getFriendlyFallbackReason(redditError.message),
+        reason: getFriendlyFallbackReason(redditError.message, fallbackResults.results.length > 0),
       });
     }
 
@@ -256,7 +260,10 @@ export default async function handler(req, res) {
       ok: true,
       query,
       ...fallbackResults,
-      reason: "No Reddit image results found",
+      reason:
+        fallbackResults.results.length > 0
+          ? "Showing local meme results for now."
+          : "No memes matched this mood yet.",
     });
   } catch (error) {
     return sendJson(res, 500, {
