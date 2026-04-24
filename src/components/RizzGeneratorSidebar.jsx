@@ -22,6 +22,9 @@ const GENERATED_SOURCE = "api";
 const FALLBACK_SOURCE = "local";
 const GENERATE_COOLDOWN_MS = 900;
 const TYPE_SPEED_MS = 18;
+const DEFAULT_DRAWER_WIDTH = 760;
+const MIN_DRAWER_WIDTH = 560;
+const MAX_DRAWER_WIDTH = 1040;
 
 const CATEGORY_OPTIONS = [
   { key: "all", label: "All Vibes", emoji: "✨" },
@@ -273,11 +276,18 @@ export default function RizzGeneratorSidebar({ isOpen, onOpenChange, user }) {
   const [copyStatus, setCopyStatus] = useState("");
   const [typedText, setTypedText] = useState("");
   const [actionMessage, setActionMessage] = useState("");
-  const [touchStartX, setTouchStartX] = useState(null);
+  const [touchStartY, setTouchStartY] = useState(null);
   const [showIntroPulse, setShowIntroPulse] = useState(false);
+  const [drawerWidth, setDrawerWidth] = useState(DEFAULT_DRAWER_WIDTH);
+  const [isDesktopLayout, setIsDesktopLayout] = useState(false);
+  const [isResizingWidth, setIsResizingWidth] = useState(false);
   const lastGenerateAtRef = useRef(0);
   const didOpenRef = useRef(false);
   const didShowIntroRef = useRef(false);
+  const resizeStateRef = useRef({
+    startX: 0,
+    startWidth: DEFAULT_DRAWER_WIDTH,
+  });
 
   const currentText = currentRizz?.text || "";
 
@@ -417,6 +427,80 @@ export default function RizzGeneratorSidebar({ isOpen, onOpenChange, user }) {
     const timer = window.setTimeout(() => setActionMessage(""), 1800);
     return () => window.clearTimeout(timer);
   }, [actionMessage]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const clampWidth = (value) => {
+      const viewportWidth = window.innerWidth;
+      const maxWidth = Math.min(MAX_DRAWER_WIDTH, Math.max(MIN_DRAWER_WIDTH, viewportWidth - 48));
+      return Math.min(Math.max(value, MIN_DRAWER_WIDTH), maxWidth);
+    };
+
+    const updateLayoutMode = () => {
+      const desktop = window.innerWidth >= 768;
+      setIsDesktopLayout(desktop);
+      setDrawerWidth((current) => (desktop ? clampWidth(current) : current));
+    };
+
+    updateLayoutMode();
+    window.addEventListener("resize", updateLayoutMode);
+
+    return () => window.removeEventListener("resize", updateLayoutMode);
+  }, []);
+
+  useEffect(() => {
+    if (!isResizingWidth) return undefined;
+
+    const clampWidth = (value) => {
+      const viewportWidth = window.innerWidth;
+      const maxWidth = Math.min(MAX_DRAWER_WIDTH, Math.max(MIN_DRAWER_WIDTH, viewportWidth - 48));
+      return Math.min(Math.max(value, DEFAULT_DRAWER_WIDTH), maxWidth);
+    };
+
+    window.document.body.style.cursor = "ew-resize";
+    window.document.documentElement.style.cursor = "ew-resize";
+    window.document.body.style.userSelect = "none";
+    window.document.documentElement.style.userSelect = "none";
+
+    const handlePointerMove = (event) => {
+      const deltaX = event.clientX - resizeStateRef.current.startX;
+      const nextWidth = clampWidth(resizeStateRef.current.startWidth + deltaX);
+      setDrawerWidth(nextWidth);
+    };
+
+    const handlePointerUp = () => {
+      setIsResizingWidth(false);
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
+      window.document.body.style.cursor = "";
+      window.document.documentElement.style.cursor = "";
+      window.document.body.style.userSelect = "";
+      window.document.documentElement.style.userSelect = "";
+    };
+  }, [isResizingWidth]);
+
+  const handleResizePointerDown = (event) => {
+    if (!isDesktopLayout) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    resizeStateRef.current = {
+      startX: event.clientX,
+      startWidth: drawerWidth,
+    };
+
+    setIsResizingWidth(true);
+  };
 
   const pushHistory = (nextRizz) => {
     if (!nextRizz?.text) return;
@@ -564,20 +648,20 @@ export default function RizzGeneratorSidebar({ isOpen, onOpenChange, user }) {
   const handleClose = () => onOpenChange?.(false);
 
   const handleTouchStart = (event) => {
-    setTouchStartX(event.touches?.[0]?.clientX ?? null);
+    setTouchStartY(event.touches?.[0]?.clientY ?? null);
   };
 
   const handleTouchEnd = (event) => {
-    if (touchStartX == null) return;
+    if (touchStartY == null) return;
 
-    const endX = event.changedTouches?.[0]?.clientX ?? touchStartX;
-    const deltaX = endX - touchStartX;
+    const endY = event.changedTouches?.[0]?.clientY ?? touchStartY;
+    const deltaY = endY - touchStartY;
 
-    if (deltaX > 70) {
+    if (deltaY > 70) {
       handleClose();
     }
 
-    setTouchStartX(null);
+    setTouchStartY(null);
   };
 
   return (
@@ -622,24 +706,43 @@ export default function RizzGeneratorSidebar({ isOpen, onOpenChange, user }) {
             />
 
             <motion.aside
-              initial={{ x: 420, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: 420, opacity: 0 }}
+              initial={{ y: 120, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 120, opacity: 0 }}
               transition={{ type: "spring", damping: 26, stiffness: 220 }}
-              drag="x"
+              drag={isResizingWidth ? false : "y"}
               dragDirectionLock
               dragElastic={0.08}
               dragMomentum={false}
               onDragEnd={(_, info) => {
-                if (info.offset.x > 90 || info.velocity.x > 700) {
+                if (info.offset.y > 90 || info.velocity.y > 700) {
                   handleClose();
                 }
               }}
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
-              className="fixed inset-y-0 right-0 z-[185] flex h-[100dvh] w-full max-w-[460px] flex-col border-l border-[color:var(--app-border)] bg-[color:var(--app-bg)]/96 shadow-[0_30px_100px_rgba(0,0,0,0.55)] backdrop-blur-2xl sm:rounded-l-[2rem]"
+              style={
+                isDesktopLayout
+                  ? {
+                      left: `calc(50% - ${drawerWidth / 2}px)`,
+                      top: "5dvh",
+                      right: "auto",
+                      bottom: "auto",
+                      width: `${drawerWidth}px`,
+                    }
+                  : undefined
+              }
+              className="fixed inset-x-0 bottom-0 z-[185] mx-auto flex h-[100dvh] w-full max-w-none flex-col overflow-hidden border-t border-[color:var(--app-border)] bg-[color:var(--app-bg)]/96 shadow-[0_-24px_100px_rgba(0,0,0,0.55)] backdrop-blur-2xl md:bottom-auto md:h-[90dvh] md:rounded-[2rem]"
             >
-              <div className="relative overflow-hidden border-b border-[color:var(--app-border)] px-4 py-4 sm:px-6">
+              {isDesktopLayout ? (
+                <div
+                  role="presentation"
+                  onPointerDown={handleResizePointerDown}
+                  className="absolute right-0 top-0 z-20 hidden h-full w-4 cursor-ew-resize bg-transparent md:block"
+                />
+              ) : null}
+              <div className="relative overflow-hidden border-b border-[color:var(--app-border)] px-4 pb-4 pt-3 sm:px-6">
+                <div className="mx-auto mb-3 h-1.5 w-14 rounded-full bg-[color:var(--app-border)]/90 md:hidden" />
                 <div className="min-w-0">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[color:var(--app-accent-2)]">
                     Sidebar tool

@@ -10,6 +10,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
+import { supabase } from "../lib/supabase";
 import MemePreviewModal from "./MemePreviewModal";
 import { memes as localMemes } from "../data/memes";
 
@@ -24,6 +25,60 @@ function normalizeQuery(value) {
 
 function normalizeKey(value) {
   return normalizeQuery(value).toLowerCase();
+}
+
+function normalizeKeywords(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeQuery(item)).filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    return value
+      .replace(/[\[\]"']/g, " ")
+      .split(/[,|\n]+/)
+      .map((item) => normalizeQuery(item))
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+function buildSearchText(item) {
+  return [
+    item?.title || "",
+    item?.category || "",
+    item?.mood || "",
+    ...(Array.isArray(item?.keywords) ? item.keywords : []),
+    item?.subreddit || "",
+  ]
+    .join(" ")
+    .toLowerCase();
+}
+
+function scoreMatches(items, query) {
+  const tokens = normalizeQuery(query)
+    .toLowerCase()
+    .split(/[\s-]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (tokens.length === 0) return [];
+
+  return items
+    .map((item) => {
+      const text = buildSearchText(item);
+      const score = tokens.reduce((total, token) => {
+        return total + (text.includes(token) ? 1 : 0);
+      }, 0);
+
+      return { item, score };
+    })
+    .filter(({ score }) => score > 0)
+    .sort((left, right) => {
+      if (right.score !== left.score) return right.score - left.score;
+      return String(left.item?.title || "").localeCompare(String(right.item?.title || ""));
+    })
+    .map(({ item }) => item);
 }
 
 function getRowBatchSize() {
@@ -84,6 +139,51 @@ function buildLocalFallbackResults(query, limit) {
     .filter((item) => item.score > 0 && item.imageUrl)
     .sort((left, right) => right.score - left.score)
     .slice(0, limit);
+}
+
+function normalizeSupabaseRow(row) {
+  const profileData = Array.isArray(row?.profiles) ? row.profiles[0] : row?.profiles;
+  const imageUrl = String(row?.image_url || row?.imageUrl || row?.image || "").trim();
+
+  return {
+    id: String(row?.id || row?.slug || `supabase-${String(row?.title || "meme")}`),
+    title: String(row?.title || row?.name || "Meme"),
+    imageUrl,
+    subreddit: profileData?.username ? `@${profileData.username}` : "r/memes",
+    permalink: row?.slug ? `/meme/${encodeURIComponent(String(row.slug))}` : "",
+    postUrl: row?.slug ? `/meme/${encodeURIComponent(String(row.slug))}` : "",
+    category: row?.category || "",
+    mood: row?.mood || "",
+    keywords: normalizeKeywords(row?.keywords),
+    source: "supabase",
+    created_at: row?.created_at || "",
+  };
+}
+
+async function buildSupabaseFallbackResults(query, limit) {
+  const primary = await supabase
+    .from("meme-table")
+    .select("id, title, image_url, category, mood, keywords, slug, created_at, profiles(username)")
+    .order("created_at", { ascending: false })
+    .limit(250);
+
+  let rows = Array.isArray(primary.data) ? primary.data : [];
+
+  if (primary.error) {
+    const fallback = await supabase
+      .from("meme-table")
+      .select("id, title, image_url, category, mood, keywords, slug, created_at")
+      .order("created_at", { ascending: false })
+      .limit(250);
+
+    if (!fallback.error) {
+      rows = Array.isArray(fallback.data) ? fallback.data : [];
+    } else {
+      rows = [];
+    }
+  }
+
+  return scoreMatches(rows.map(normalizeSupabaseRow), query).slice(0, limit);
 }
 
 async function readJsonResponse(response) {
@@ -257,6 +357,18 @@ export default function KeywordMemeSearch({ onUploadToRoastRiot }) {
         if (ignore || requestId !== requestIdRef.current) return;
 
         if (!response.ok || !payload?.ok) {
+          const supabaseResults = await buildSupabaseFallbackResults(activeQuery, pageSize);
+          if (supabaseResults.length > 0) {
+            setResults(supabaseResults);
+            setSource("supabase");
+            setReason("Showing live meme matches.");
+            setHasMore(false);
+            setNextAfter(null);
+            setNextPage(1);
+            setManualMessage("Showing live meme matches.");
+            return;
+          }
+
           const fallbackResults = buildLocalFallbackResults(activeQuery, pageSize);
           if (fallbackResults.length > 0) {
             setResults(fallbackResults);
@@ -301,6 +413,18 @@ export default function KeywordMemeSearch({ onUploadToRoastRiot }) {
         });
       } catch (error) {
         if (ignore || requestId !== requestIdRef.current) return;
+        const supabaseResults = await buildSupabaseFallbackResults(activeQuery, pageSize);
+        if (supabaseResults.length > 0) {
+          setResults(supabaseResults);
+          setSource("supabase");
+          setReason("Showing live meme matches.");
+          setManualMessage("Showing live meme matches.");
+          setHasMore(false);
+          setNextAfter(null);
+          setNextPage(1);
+          return;
+        }
+
         const fallbackResults = buildLocalFallbackResults(activeQuery, pageSize);
         if (fallbackResults.length > 0) {
           setResults(fallbackResults);
@@ -377,6 +501,17 @@ export default function KeywordMemeSearch({ onUploadToRoastRiot }) {
       if (requestId !== requestIdRef.current) return;
 
       if (!response.ok || !payload?.ok) {
+        const supabaseResults = await buildSupabaseFallbackResults(activeQuery, pageSize);
+        if (supabaseResults.length > 0) {
+          setResults((current) => dedupeByImage([...current, ...supabaseResults]));
+          setSource("supabase");
+          setReason("Showing live meme matches.");
+          setManualMessage("Showing live meme matches.");
+          setHasMore(false);
+          setNextAfter(null);
+          return;
+        }
+
         const fallbackResults = buildLocalFallbackResults(activeQuery, pageSize);
         const mergedResults = dedupeByImage([...results, ...fallbackResults]);
         if (fallbackResults.length > 0) {
@@ -417,6 +552,17 @@ export default function KeywordMemeSearch({ onUploadToRoastRiot }) {
       });
     } catch (error) {
       if (requestId !== requestIdRef.current) return;
+      const supabaseResults = await buildSupabaseFallbackResults(activeQuery, pageSize);
+      if (supabaseResults.length > 0) {
+        setResults((current) => dedupeByImage([...current, ...supabaseResults]));
+        setSource("supabase");
+        setReason("Showing live meme matches.");
+        setManualMessage("Showing live meme matches.");
+        setHasMore(false);
+        setNextAfter(null);
+        return;
+      }
+
       const fallbackResults = buildLocalFallbackResults(activeQuery, pageSize);
       if (fallbackResults.length > 0) {
         setResults((current) => dedupeByImage([...current, ...fallbackResults]));

@@ -18,6 +18,7 @@ import {
   Heart, 
   User as UserIcon, 
   ChevronRight, 
+  ChevronDown,
   ArrowLeft,
   KeyRound, 
   CheckCircle2,
@@ -29,6 +30,7 @@ import {
   Trash2,
   AlertTriangle,
   Clock3,
+  Globe,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import CategoryFilter from "./components/CategoryFilter";
@@ -71,6 +73,61 @@ function getInitialFavorites() {
   } catch {
     return [];
   }
+}
+
+const RIZZ_STORAGE_KEY = "rizz-generator-saved-v1";
+
+function normalizeRizzText(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function dedupeRizzItems(items = []) {
+  const seen = new Set();
+
+  return items.filter((item) => {
+    const key = normalizeRizzText(item?.text || "").toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function readLocalSavedRizz() {
+  try {
+    const saved = localStorage.getItem(RIZZ_STORAGE_KEY);
+    const parsed = saved ? JSON.parse(saved) : [];
+
+    if (!Array.isArray(parsed)) return [];
+
+    return dedupeRizzItems(
+      parsed
+        .map((item) => ({
+          text: normalizeRizzText(item?.text || ""),
+          category: item?.category || "all",
+          source: item?.source || "api",
+          createdAt: item?.createdAt || new Date().toISOString(),
+        }))
+        .filter((item) => item.text)
+    );
+  } catch {
+    return [];
+  }
+}
+
+function toSavedRizzRecord(item) {
+  const text = normalizeRizzText(item?.text || "");
+
+  return {
+    text,
+    textKey: text.toLowerCase(),
+    category: item?.category || "all",
+    source: item?.source || "api",
+    createdAt: item?.createdAt || item?.created_at || new Date().toISOString(),
+  };
+}
+
+function mergeSavedRizz(items = []) {
+  return dedupeRizzItems(items.map(toSavedRizzRecord).filter((item) => item.text));
 }
 
 // Helper to ensure data from any source matches the component expectations
@@ -187,6 +244,7 @@ export default function App() {
   const [favorites, setFavorites] = useState(getInitialFavorites);
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [savedRizz, setSavedRizz] = useState([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isThemeSwitcherOpen, setIsThemeSwitcherOpen] = useState(false);
   const [isEditorModalOpen, setIsEditorModalOpen] = useState(false);
@@ -195,6 +253,7 @@ export default function App() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isRizzOpen, setIsRizzOpen] = useState(false);
+  const [isSavedRizzOpen, setIsSavedRizzOpen] = useState(false);
   const [viewMode, setViewMode] = useState("all");
   const [isBottomEditorVisible, setIsBottomEditorVisible] = useState(false);
   const [dbMemes, setDbMemes] = useState([]);
@@ -263,13 +322,20 @@ export default function App() {
     }
     setCurrentPath(nextPath);
   }, []);
-  const SidebarLink = ({ icon, label, onClick }) => (
+  const SidebarLink = ({ icon, label, onClick, rightIcon }) => (
     <button
       onClick={onClick}
-      className="flex items-center gap-3 sm:gap-4 w-full p-3 sm:p-4 rounded-xl sm:rounded-2xl hover:bg-white/5 text-zinc-400 hover:text-white transition-all group"
+      className="flex w-full items-center justify-between gap-3 rounded-xl p-3 text-zinc-400 transition-all group hover:bg-white/5 hover:text-white sm:gap-4 sm:rounded-2xl sm:p-4"
     >
-      <div className="group-hover:scale-110 transition-transform text-violet-400 scale-90 sm:scale-100">{icon}</div>
-      <span className="font-medium">{label}</span>
+      <span className="flex min-w-0 items-center gap-3 sm:gap-4">
+        <div className="scale-90 text-violet-400 transition-transform group-hover:scale-110 sm:scale-100">{icon}</div>
+        <span className="truncate font-medium">{label}</span>
+      </span>
+      {rightIcon ? (
+        <span className="flex items-center justify-center text-zinc-500 transition group-hover:text-white">
+          {rightIcon}
+        </span>
+      ) : null}
     </button>
   );
 
@@ -282,10 +348,63 @@ export default function App() {
   }, [favorites]);
 
   useEffect(() => {
+    let isCancelled = false;
+
+    const loadSavedRizz = async () => {
+      const localSaved = readLocalSavedRizz();
+
+      if (!user?.id) {
+        if (!isCancelled) {
+          setSavedRizz(localSaved);
+        }
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from("saved_rizz")
+          .select("text, category, source, created_at")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+
+        if (error) throw error;
+
+        const remoteSaved = Array.isArray(data)
+          ? data.map((item) =>
+              toSavedRizzRecord({
+                text: item?.text || "",
+                category: item?.category || "all",
+                source: item?.source || "api",
+                createdAt: item?.created_at || new Date().toISOString(),
+              })
+            )
+          : [];
+
+        const merged = mergeSavedRizz([...remoteSaved, ...localSaved]);
+
+        if (!isCancelled) {
+          setSavedRizz(merged);
+        }
+      } catch {
+        if (!isCancelled) {
+          setSavedRizz(localSaved);
+        }
+      }
+    };
+
+    void loadSavedRizz();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
     const handlePopState = () => setCurrentPath(window.location.pathname);
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
+
 
   useEffect(() => {
     if (!allMemesNormalized.length) return;
@@ -1320,6 +1439,7 @@ export default function App() {
         <SidebarLink
           icon={<Search size={20} />}
           label="Global Meme"
+          rightIcon={<Globe size={18} className="text-cyan-400" />}
           onClick={() => {
             setIsSidebarOpen(false);
             setIsEditorModalOpen(false);
@@ -1473,7 +1593,7 @@ export default function App() {
       <RizzGeneratorSidebar isOpen={isRizzOpen} onOpenChange={setIsRizzOpen} user={user} />
       <div className="min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] flex">
       {/* Desktop Sidebar (Persistent) */}
-      <aside className="hidden lg:block fixed top-0 left-0 z-[110] h-screen w-64 bg-[var(--app-surface)] border-r border-[color:var(--app-border)] p-6 shadow-2xl overflow-y-auto">
+      <aside className="hidden lg:block fixed top-0 left-0 z-[110] h-screen w-72 bg-[var(--app-surface)] border-r border-[color:var(--app-border)] p-6 shadow-2xl overflow-y-auto">
         <SidebarContent />
       </aside>
 
@@ -1501,7 +1621,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <div className="flex-1 lg:pl-64 min-w-0">
+      <div className="flex-1 lg:pl-72 min-w-0">
         <div className="relative isolate overflow-x-clip">
           <header className="sticky top-0 z-[105] border-b border-[color:var(--app-border)] bg-[color:var(--app-bg)]/92 backdrop-blur-xl transition-all">
             <div className="mx-auto max-w-6xl px-3 py-2 sm:px-6 sm:py-3">
@@ -1847,6 +1967,81 @@ export default function App() {
                   </div>
                 </div>
 
+                <div className="rounded-[2rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] p-4 sm:p-5">
+                  <button
+                    type="button"
+                    onClick={() => setIsSavedRizzOpen((current) => !current)}
+                    className="flex w-full items-center justify-between gap-3 text-left"
+                    aria-expanded={isSavedRizzOpen}
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Sparkles size={18} className="text-fuchsia-400" />
+                        <h3 className="font-semibold">Saved Rizz</h3>
+                      </div>
+                      <p className="mt-1 text-xs text-zinc-500">
+                        Your saved pickup lines from the rizz drawer.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-bg)] px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-[color:var(--app-text)]">
+                        {savedRizz.length}
+                      </span>
+                      <ChevronDown
+                        size={18}
+                        className={`text-zinc-500 transition-transform duration-200 ${isSavedRizzOpen ? "rotate-180" : ""}`}
+                      />
+                    </div>
+                  </button>
+
+                  <AnimatePresence initial={false}>
+                    {isSavedRizzOpen ? (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0, y: -6 }}
+                        animate={{ height: "auto", opacity: 1, y: 0 }}
+                        exit={{ height: 0, opacity: 0, y: -6 }}
+                        transition={{ duration: 0.22, ease: "easeOut" }}
+                        className="overflow-hidden"
+                      >
+                        <div className="mt-4 space-y-3">
+                          {savedRizz.length > 0 ? (
+                            savedRizz.slice(0, 3).map((item, index) => (
+                              <button
+                                key={`${item.createdAt}-${index}`}
+                                type="button"
+                                onClick={() => setIsRizzOpen(true)}
+                                className="w-full rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] p-4 text-left transition hover:border-[color:var(--app-accent)]/30 hover:bg-[color:var(--app-surface)]"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[color:var(--app-muted)]">
+                                    {item.category || "all"} / {item.source === "api" ? "api" : "fallback"}
+                                  </span>
+                                  <Heart size={14} className="fill-[color:var(--app-accent)] text-[color:var(--app-accent)]" />
+                                </div>
+                                <p className="mt-2 line-clamp-2 text-sm leading-6 text-[color:var(--app-text)]">
+                                  {item.text}
+                                </p>
+                              </button>
+                            ))
+                          ) : (
+                            <div className="rounded-2xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-bg)] p-4 text-sm text-zinc-500">
+                              Save a line in the rizz drawer and it will show up here.
+                            </div>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => setIsRizzOpen(true)}
+                            className="w-full rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 px-4 py-3 text-sm font-bold text-white transition hover:scale-[1.01]"
+                          >
+                            Open Rizz Generator
+                          </button>
+                        </div>
+                      </motion.div>
+                    ) : null}
+                  </AnimatePresence>
+                </div>
+
                 <button 
                   onClick={() => setIsResetConfirmOpen(true)}
                   className="w-full p-4 rounded-2xl bg-[color:var(--app-surface-2)] border border-[color:var(--app-border)] hover:bg-[color:var(--app-surface)] transition-all flex items-center justify-between group"
@@ -2005,7 +2200,7 @@ export default function App() {
         {/* Editor Popup Modal */}
         <AnimatePresence>
           {isEditorModalOpen && (
-        <div className="fixed inset-0 z-[150] flex items-start justify-center overflow-y-auto p-1.5 sm:p-5 lg:pl-72 lg:pr-6">
+            <div className="fixed inset-0 z-[150] flex items-start justify-center overflow-y-auto p-1.5 sm:p-5 lg:pl-72 lg:pr-6">
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -2046,7 +2241,7 @@ export default function App() {
         {/* Upload Popup Modal */}
         <AnimatePresence>
           {isUploadModalOpen && (
-            <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 lg:pl-64">
+            <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 lg:pl-72">
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -2112,7 +2307,7 @@ export default function App() {
         {/* Avatar Picker Modal */}
         <AnimatePresence>
           {isAvatarModalOpen && user && (
-            <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 lg:pl-64">
+            <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 lg:pl-72">
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -2178,7 +2373,7 @@ export default function App() {
 
         <AnimatePresence>
           {isUsernameModalOpen && user && (
-            <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 lg:pl-64">
+            <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 lg:pl-72">
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -2242,7 +2437,7 @@ export default function App() {
 
         <AnimatePresence>
           {isUsernameConfirmOpen && user && (
-            <div className="fixed inset-0 z-[170] flex items-center justify-center p-4 lg:pl-64">
+            <div className="fixed inset-0 z-[170] flex items-center justify-center p-4 lg:pl-72">
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -2307,7 +2502,7 @@ export default function App() {
         {/* Logout Confirmation Modal */}
         <AnimatePresence>
           {isLogoutConfirmOpen && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 lg:pl-64">
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 lg:pl-72">
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsLogoutConfirmOpen(false)} className="fixed inset-0 bg-black/80 backdrop-blur-sm" />
               <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-[#0d1220] border border-white/10 p-8 rounded-[2.5rem] max-w-sm w-full shadow-2xl text-center">
                 <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -2327,7 +2522,7 @@ export default function App() {
         {/* Password Reset Confirmation Modal */}
         <AnimatePresence>
           {isResetConfirmOpen && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 lg:pl-64">
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 lg:pl-72">
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsResetConfirmOpen(false)} className="fixed inset-0 bg-black/80 backdrop-blur-sm" />
               <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-[#0d1220] border border-white/10 p-8 rounded-[2.5rem] max-w-sm w-full shadow-2xl text-center">
                 <div className="w-16 h-16 bg-violet-500/10 text-violet-500 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -2354,7 +2549,7 @@ export default function App() {
       {/* Password Reset Result/Status Modal */}
       <AnimatePresence>
         {resetStatus && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 lg:pl-64">
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 lg:pl-72">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setResetStatus(null)} className="fixed inset-0 bg-black/80 backdrop-blur-sm" />
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-[#0d1220] border border-white/10 p-8 rounded-[2.5rem] max-w-sm w-full shadow-2xl text-center z-10">
               <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
@@ -2380,7 +2575,7 @@ export default function App() {
       {/* Success/Notification Popup Modal */}
       <AnimatePresence>
         {notification && (
-          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 lg:pl-64">
+          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 lg:pl-72">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setNotification(null)} className="fixed inset-0 bg-black/80 backdrop-blur-sm" />
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-[#0d1220] border border-white/10 p-8 rounded-[2.5rem] max-w-sm w-full shadow-2xl text-center z-10">
               <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
@@ -2448,7 +2643,7 @@ export default function App() {
 
       <AnimatePresence>
         {showIosInstallModal && (
-          <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 lg:pl-64">
+          <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 lg:pl-72">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -2481,7 +2676,7 @@ export default function App() {
 
       <AnimatePresence>
         {pendingMemeDelete ? (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 lg:pl-64">
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 lg:pl-72">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
