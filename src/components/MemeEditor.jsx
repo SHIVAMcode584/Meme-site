@@ -278,6 +278,8 @@ export default function MemeEditor({
 
   useEffect(() => {
     const nextSource = initialMeme?.image_url || initialMeme?.image || "";
+    const nextTopText = String(initialMeme?.top_text || initialMeme?.topText || "").trim();
+    const nextBottomText = String(initialMeme?.bottom_text || initialMeme?.bottomText || "").trim();
 
     setSourceUrl(nextSource);
     setFile(null);
@@ -293,8 +295,8 @@ export default function MemeEditor({
     setKeywords(formatStoredKeywords(initialMeme?.keywords));
     customLayerCountRef.current = 0;
     setTextLayers([
-      buildLayer("top", { text: "" }),
-      buildLayer("bottom", { text: "" }),
+      buildLayer("top", { text: nextTopText }),
+      buildLayer("bottom", { text: nextBottomText }),
     ]);
     setSelectedLayerId("top");
     setIsSourceLoading(Boolean(nextSource));
@@ -554,10 +556,22 @@ export default function MemeEditor({
         category: category.trim(),
         mood: mood.trim(),
         keywords: normalizeKeywords(keywords).join(", "),
-        top_text: textLayers.find((layer) => layer.id === "top")?.text?.trim() || null,
-        bottom_text: textLayers.find((layer) => layer.id === "bottom")?.text?.trim() || null,
-        original_meme_id: originalMemeId,
       };
+
+      const topText = textLayers.find((layer) => layer.id === "top")?.text?.trim() || "";
+      const bottomText = textLayers.find((layer) => layer.id === "bottom")?.text?.trim() || "";
+
+      if (topText) {
+        payload.top_text = topText;
+      }
+
+      if (bottomText) {
+        payload.bottom_text = bottomText;
+      }
+
+      if (originalMemeId != null) {
+        payload.original_meme_id = originalMemeId;
+      }
 
       const { data: savedMeme, error } = await insertMemeWithSlugFallback(
         supabase,
