@@ -4,41 +4,85 @@ import { AnimatePresence, motion as Motion } from "framer-motion";
 import { AlertTriangle, Bell, CheckCheck, Heart, Loader2, MessageCircle, RefreshCw, Sparkles, X } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import Toast from "./Toast";
-import { formatRelativeTime, resolveSenderUsernames } from "../utils/notifications";
+import {
+  formatRelativeTime,
+  resolveMemePreviewsByIds,
+  resolveSenderUsernames,
+} from "../utils/notifications";
 
 function getNotificationTone(type) {
+  if (type === "meme") {
+    return {
+      card: "border-violet-400/25 bg-[linear-gradient(180deg,rgba(139,92,246,0.14),rgba(13,18,32,0.95))]",
+      cardHover: "hover:border-violet-300/45 hover:bg-[linear-gradient(180deg,rgba(139,92,246,0.18),rgba(13,18,32,0.98))]",
+      preview: "border-violet-400/20 bg-violet-500/10 text-violet-200",
+      badge: "border-violet-400/20 bg-violet-500/10 text-violet-200",
+      icon: Sparkles,
+      iconColor: "text-violet-200",
+      chip: "border-violet-400/20 bg-violet-500/10 text-violet-200",
+    };
+  }
+
+  if (type === "like") {
+    return {
+      card: "border-sky-400/25 bg-[linear-gradient(180deg,rgba(56,189,248,0.10),rgba(13,18,32,0.95))]",
+      cardHover: "hover:border-sky-300/45 hover:bg-[linear-gradient(180deg,rgba(56,189,248,0.14),rgba(13,18,32,0.98))]",
+      preview: "border-sky-400/20 bg-sky-500/10 text-sky-200",
+      badge: "border-sky-400/20 bg-sky-500/10 text-sky-200",
+      icon: Heart,
+      iconColor: "text-sky-200",
+      chip: "border-sky-400/20 bg-sky-500/10 text-sky-200",
+    };
+  }
+
   if (type === "comment") {
     return {
-      badge: "border-cyan-500/20 bg-cyan-500/10 text-cyan-200",
+      card: "border-blue-400/25 bg-[linear-gradient(180deg,rgba(59,130,246,0.10),rgba(13,18,32,0.95))]",
+      cardHover: "hover:border-blue-300/45 hover:bg-[linear-gradient(180deg,rgba(59,130,246,0.14),rgba(13,18,32,0.98))]",
+      preview: "border-blue-400/20 bg-blue-500/10 text-blue-200",
+      badge: "border-blue-400/20 bg-blue-500/10 text-blue-200",
       icon: MessageCircle,
-      iconColor: "text-cyan-200",
+      iconColor: "text-blue-200",
+      chip: "border-blue-400/20 bg-blue-500/10 text-blue-200",
     };
   }
 
   if (type === "warning") {
     return {
-      badge: "border-amber-500/20 bg-amber-500/10 text-amber-200",
+      card: "border-rose-400/25 bg-[linear-gradient(180deg,rgba(251,113,133,0.12),rgba(13,18,32,0.95))]",
+      cardHover: "hover:border-rose-300/45 hover:bg-[linear-gradient(180deg,rgba(251,113,133,0.16),rgba(13,18,32,0.98))]",
+      preview: "border-rose-400/20 bg-rose-500/10 text-rose-200",
+      badge: "border-rose-500/20 bg-rose-500/10 text-rose-200",
       icon: AlertTriangle,
-      iconColor: "text-amber-200",
+      iconColor: "text-rose-200",
+      chip: "border-rose-400/20 bg-rose-500/10 text-rose-200",
     };
   }
 
-  if (type === "moderation") {
+  if (type === "moderation" || type === "report" || type === "alert") {
     return {
-      badge: "border-amber-500/20 bg-amber-500/10 text-amber-200",
+      card: "border-red-400/25 bg-[linear-gradient(180deg,rgba(248,113,113,0.12),rgba(13,18,32,0.95))]",
+      cardHover: "hover:border-red-300/45 hover:bg-[linear-gradient(180deg,rgba(248,113,113,0.16),rgba(13,18,32,0.98))]",
+      preview: "border-red-400/20 bg-red-500/10 text-red-200",
+      badge: "border-red-500/20 bg-red-500/10 text-red-200",
       icon: AlertTriangle,
-      iconColor: "text-amber-200",
+      iconColor: "text-red-200",
+      chip: "border-red-400/20 bg-red-500/10 text-red-200",
     };
   }
 
   return {
-    badge: "border-red-500/20 bg-red-500/10 text-red-200",
+    card: "border-white/10 bg-[#0d1220]",
+    cardHover: "hover:border-white/20 hover:bg-[#11182a]",
+    preview: "border-white/10 bg-white/[0.03] text-zinc-300",
+    badge: "border-white/10 bg-white/[0.04] text-zinc-200",
     icon: Heart,
-    iconColor: "text-red-200",
+    iconColor: "text-pink-200",
+    chip: "border-white/10 bg-white/[0.03] text-zinc-300",
   };
 }
 
-export default function NotificationsPage({ user, onBack }) {
+export default function NotificationsPage({ user, onBack, onOpenMeme }) {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(Date.now());
@@ -86,7 +130,24 @@ export default function NotificationsPage({ user, onBack }) {
       if (error) throw error;
 
       const hydrated = await hydrateNotifications(data || []);
-      setNotifications(hydrated);
+      let memeLookup = {};
+      try {
+        memeLookup = await resolveMemePreviewsByIds(
+          hydrated.map((notification) => notification.meme_id),
+          supabase
+        );
+      } catch (previewError) {
+        console.warn("Notification meme preview lookup failed:", previewError);
+      }
+
+      setNotifications(
+        hydrated.map((notification) => ({
+          ...notification,
+          meme_title: memeLookup[String(notification.meme_id)]?.title || "",
+          meme_image_url: memeLookup[String(notification.meme_id)]?.image_url || "",
+          meme_slug: memeLookup[String(notification.meme_id)]?.slug || "",
+        }))
+      );
     } catch (error) {
       console.error("Notification page load error:", error);
       setToast({
@@ -159,6 +220,21 @@ export default function NotificationsPage({ user, onBack }) {
     if (filter === "read") return notifications.filter((notification) => notification.is_read);
     return notifications;
   }, [filter, notifications]);
+
+  const handleNotificationClick = useCallback(
+    async (notification) => {
+      if (!notification?.meme_id || typeof onOpenMeme !== "function") return;
+
+      if (!notification.is_read) {
+        void markAsRead();
+      }
+
+      onBack?.();
+      window.setTimeout(() => onOpenMeme(notification.meme_id), 0);
+    },
+    [markAsRead, onBack, onOpenMeme]
+  );
+
   const body = (
     <Motion.div
       initial={{ opacity: 0 }}
@@ -282,23 +358,37 @@ export default function NotificationsPage({ user, onBack }) {
                   const tone = getNotificationTone(notification.type);
                   const Icon = tone.icon;
 
+                  const clickable = Boolean(notification.meme_id && onOpenMeme);
+
                   return (
-                    <Motion.article
+                    <Motion.button
                       key={notification.id}
+                      type="button"
                       layout
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.18, ease: "easeOut" }}
-                      className={`rounded-[1.35rem] border p-4 shadow-lg shadow-black/10 transition sm:p-5 ${
-                        notification.is_read
-                          ? "border-white/10 bg-[#0d1220]"
-                          : "border-violet-400/20 bg-violet-500/[0.05]"
-                      }`}
+                      onClick={() => handleNotificationClick(notification)}
+                      disabled={!clickable}
+                      className={`w-full rounded-[1.35rem] border p-4 text-left shadow-lg shadow-black/10 transition sm:p-5 ${
+                        notification.is_read ? tone.card : `${tone.card} ring-1 ring-inset ring-white/5`
+                      } ${clickable ? `${tone.cardHover} cursor-pointer` : "cursor-default"}`}
                     >
                       <div className="flex items-start gap-3 sm:gap-4">
-                        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border sm:h-12 sm:w-12 ${tone.badge}`}>
-                          <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${tone.iconColor}`} />
-                        </div>
+                        {notification.type === "meme" && notification.meme_image_url ? (
+                          <div className="h-11 w-11 shrink-0 overflow-hidden rounded-2xl border border-violet-400/25 bg-violet-500/10 shadow-inner shadow-black/20 sm:h-12 sm:w-12">
+                            <img
+                              src={notification.meme_image_url}
+                              alt={notification.meme_title || "Meme thumbnail"}
+                              className="h-full w-full object-cover"
+                              draggable={false}
+                            />
+                          </div>
+                        ) : (
+                          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border sm:h-12 sm:w-12 ${tone.badge}`}>
+                            <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${tone.iconColor}`} />
+                          </div>
+                        )}
 
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -312,6 +402,28 @@ export default function NotificationsPage({ user, onBack }) {
 
                           <p className="mt-1 text-sm leading-6 text-zinc-300">{notification.message}</p>
 
+                          {notification.meme_image_url ? (
+                            <div className={`mt-3 flex items-center gap-3 rounded-[1.1rem] border p-2 ${tone.preview}`}>
+                              <img
+                                src={notification.meme_image_url}
+                                alt={notification.meme_title || "Meme preview"}
+                                className="h-14 w-14 shrink-0 rounded-xl border border-white/10 object-cover"
+                                draggable={false}
+                              />
+                              <div className="min-w-0">
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-violet-300">
+                                Meme preview
+                              </p>
+                              <p className="truncate text-sm font-semibold text-white">
+                                {notification.meme_title || "Open to view the meme"}
+                              </p>
+                            </div>
+                              <div className={`ml-auto rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] ${tone.chip}`}>
+                                Open meme
+                              </div>
+                            </div>
+                          ) : null}
+
                           <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-zinc-500 sm:text-xs">
                             <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 font-semibold uppercase tracking-[0.18em] text-zinc-400">
                               {notification.type}
@@ -320,7 +432,7 @@ export default function NotificationsPage({ user, onBack }) {
                           </div>
                         </div>
                       </div>
-                    </Motion.article>
+                    </Motion.button>
                   );
                 })
               )}

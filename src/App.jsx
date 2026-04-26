@@ -236,6 +236,36 @@ async function fetchGlobalMemesFromSupabase() {
   return Array.isArray(fallback.data) ? fallback.data : [];
 }
 
+async function fetchMemeByIdFromSupabase(memeId) {
+  if (!memeId) return null;
+
+  const primary = await supabase
+    .from("meme-table")
+    .select("*, profiles(username)")
+    .eq("id", memeId)
+    .limit(1);
+
+  if (!primary.error && Array.isArray(primary.data) && primary.data[0]) {
+    return primary.data[0];
+  }
+
+  const fallback = await supabase
+    .from("meme-table")
+    .select("*")
+    .eq("id", memeId)
+    .limit(1);
+
+  if (!fallback.error && Array.isArray(fallback.data) && fallback.data[0]) {
+    return fallback.data[0];
+  }
+
+  if (primary.error && fallback.error) {
+    throw primary.error;
+  }
+
+  return null;
+}
+
 export default function App() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -288,6 +318,7 @@ export default function App() {
   const [memeList, setMemeList] = useState([]);
   const [currentMemeId, setCurrentMemeId] = useState(null);
   const [currentMemeIndex, setCurrentMemeIndex] = useState(-1);
+  const [notificationOpenedMeme, setNotificationOpenedMeme] = useState(null);
   const allMemesNormalized = useMemo(() => {
     return [...dbMemes, ...memes].map(m => normalizeMeme(m, user?.id));
   }, [dbMemes, user?.id]);
@@ -673,9 +704,12 @@ export default function App() {
 
   const currentMeme = useMemo(() => {
     if (currentMemeId == null) return null;
+    if (notificationOpenedMeme && String(notificationOpenedMeme.id) === String(currentMemeId)) {
+      return notificationOpenedMeme;
+    }
     const activeList = memeList.length > 0 ? memeList : allMemesNormalized;
     return activeList.find((meme) => String(meme.id) === String(currentMemeId)) || null;
-  }, [allMemesNormalized, currentMemeId, memeList]);
+  }, [allMemesNormalized, currentMemeId, memeList, notificationOpenedMeme]);
 
   useEffect(() => {
     if (currentMemeId == null) {
@@ -683,9 +717,9 @@ export default function App() {
       return;
     }
 
-    const nextIndex = memeList.findIndex((meme) => String(meme.id) === String(currentMemeId));
+    const activeList = memeList.length > 0 ? memeList : allMemesNormalized;
+    const nextIndex = activeList.findIndex((meme) => String(meme.id) === String(currentMemeId));
     if (nextIndex === -1) {
-      setCurrentMemeId(null);
       setCurrentMemeIndex(-1);
       return;
     }
@@ -693,7 +727,7 @@ export default function App() {
     if (nextIndex !== currentMemeIndex) {
       setCurrentMemeIndex(nextIndex);
     }
-  }, [currentMemeId, currentMemeIndex, memeList]);
+  }, [allMemesNormalized, currentMemeId, currentMemeIndex, memeList]);
 
   const searchPlaceholderTitles = useMemo(() => {
     const seen = new Set();
@@ -957,18 +991,57 @@ export default function App() {
       listener.subscription.unsubscribe();
     };
   }, []);
-  const openMeme = (meme) => {
-    if (!meme) return;
-    const activeList = memeList.length > 0 ? memeList : allMemesNormalized;
-    const nextIndex = activeList.findIndex((item) => String(item.id) === String(meme.id));
-    setCurrentMemeId(meme.id);
-    setCurrentMemeIndex(nextIndex);
-    window.history.replaceState({}, "", buildMemeRoute(meme));
-  };
+  const openMeme = useCallback(
+    (meme) => {
+      if (!meme) return;
+      setNotificationOpenedMeme(null);
+      const activeList = memeList.length > 0 ? memeList : allMemesNormalized;
+      const nextIndex = activeList.findIndex((item) => String(item.id) === String(meme.id));
+      setCurrentMemeId(meme.id);
+      setCurrentMemeIndex(nextIndex);
+      window.history.replaceState({}, "", buildMemeRoute(meme));
+    },
+    [allMemesNormalized, memeList]
+  );
+
+  const openMemeById = useCallback(
+    async (memeId) => {
+      if (!memeId) return;
+
+      const activeList = memeList.length > 0 ? memeList : allMemesNormalized;
+      const localMatch =
+        activeList.find((item) => String(item.id) === String(memeId)) ||
+        allMemesNormalized.find((item) => String(item.id) === String(memeId));
+
+      if (localMatch) {
+        openMeme(localMatch);
+        return;
+      }
+
+      try {
+        const fetchedMeme = await fetchMemeByIdFromSupabase(memeId);
+        if (!fetchedMeme) return;
+
+        const normalizedMeme = normalizeMeme(fetchedMeme, user?.id);
+        setNotificationOpenedMeme(normalizedMeme);
+        setDbMemes((current) => [
+          normalizedMeme,
+          ...current.filter((item) => String(item.id) !== String(normalizedMeme.id)),
+        ]);
+        setCurrentMemeId(normalizedMeme.id);
+        setCurrentMemeIndex(-1);
+        window.history.replaceState({}, "", buildMemeRoute(normalizedMeme));
+      } catch (error) {
+        console.error("Failed to open meme from notification:", error);
+      }
+    },
+    [allMemesNormalized, memeList, openMeme, user?.id]
+  );
 
   const closeModal = () => {
     setCurrentMemeId(null);
     setCurrentMemeIndex(-1);
+    setNotificationOpenedMeme(null);
     window.history.replaceState({}, "", "/");
   };
 
@@ -1223,7 +1296,7 @@ export default function App() {
       if (user) fetchProfile(user.id, user);
       fetchLeaderboard();
     },
-    [user?.id]
+    [user, user?.id]
   );
 
   const handleMemeDeleted = useCallback((memeId) => {
@@ -1673,7 +1746,7 @@ export default function App() {
                           <Bookmark size={13} className={viewMode === "favorites" ? "fill-violet-400" : ""} />
                           <span>{favorites.length}</span>
                         </button>
-                        <NotificationBell user={user} />
+                        <NotificationBell user={user} onOpenMeme={openMemeById} />
                         {!user ? (
                           <button
                             onClick={() => setIsLoginModalOpen(true)}
@@ -1789,7 +1862,7 @@ export default function App() {
                           <span className="hidden xs:inline">Auto:</span>
                           <span>{autoMemesCount}</span>
                         </button>
-                        <NotificationBell user={user} />
+                        <NotificationBell user={user} onOpenMeme={openMemeById} />
                       </motion.div>
                     </AnimatePresence>
                   </motion.div>

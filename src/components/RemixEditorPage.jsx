@@ -1,12 +1,6 @@
 import { ArrowLeft, BadgeCheck, Layers3, MousePointer2, Sparkles } from "lucide-react";
 import MemeEditor from "./MemeEditor";
 
-const modalChips = [
-  "Original stays untouched",
-  "Drag captions live",
-  "Save as a new meme",
-];
-
 const pageHighlights = [
   {
     label: "Original protected",
@@ -39,11 +33,11 @@ export default function RemixEditorPage({
     : "relative mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8";
 
   const panelClassName = isModal
-    ? "rounded-[2rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-2.5 py-4 shadow-xl shadow-black/10 backdrop-blur-2xl sm:px-5 sm:py-4"
+    ? "rounded-[2rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-2 py-3 shadow-xl shadow-black/10 backdrop-blur-2xl sm:px-5 sm:py-4"
     : "";
 
   const editorWrapperClassName = isModal
-    ? "mt-4 flex-1 min-h-0 overflow-y-auto pr-1 custom-scrollbar"
+    ? "mt-3 flex-1 min-h-0 overflow-y-auto pr-1 custom-scrollbar sm:mt-4"
     : "mt-8";
 
   const primaryActionLabel = isModal ? "Close editor" : "Back";
@@ -69,46 +63,21 @@ export default function RemixEditorPage({
       <div className={contentClassName}>
         <div className={panelClassName}>
           {isModal ? (
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="min-w-0">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-[color:var(--app-accent)]/20 bg-[color:var(--app-accent)]/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
-                    <Sparkles className="h-3.5 w-3.5" />
-                    Remix studio
-                  </div>
-                  <div className="mt-1.5 flex flex-col gap-0.5 lg:flex-row lg:items-end lg:gap-3">
-                    <h1 className="text-xl font-black tracking-tight text-[color:var(--app-text)] sm:text-2xl">
-                      Edit meme
-                    </h1>
-                    <p className="text-[11px] leading-tight text-[color:var(--app-muted)]">
-                      Keep the original safe and jump straight into the preview and controls.
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={onBack}
-                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-4 py-2.5 text-sm font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface)]"
-                >
-                  <ArrowLeft size={16} />
-                  {primaryActionLabel}
-                </button>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <Sparkles className="h-4 w-4 shrink-0 text-[color:var(--app-accent)] sm:h-5 sm:w-5" />
+                <h1 className="min-w-0 text-lg font-black tracking-tight text-[color:var(--app-text)] sm:text-2xl">
+                  Edit meme
+                </h1>
               </div>
 
-              <div className="flex flex-wrap gap-2 text-xs text-[color:var(--app-muted)]">
-                <span className="inline-flex items-center gap-2 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-1.5">
-                  <BadgeCheck size={13} className="text-emerald-500" />
-                  {modalChips[0]}
-                </span>
-                <span className="inline-flex items-center gap-2 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-1.5">
-                  <MousePointer2 size={13} className="text-cyan-500" />
-                  {modalChips[1]}
-                </span>
-                <span className="inline-flex items-center gap-2 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-1.5">
-                  <Layers3 size={13} className="text-[color:var(--app-accent)]" />
-                  {modalChips[2]}
-                </span>
-              </div>
+              <button
+                onClick={onBack}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-2 text-sm font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface)] sm:px-4 sm:py-2.5"
+              >
+                <ArrowLeft size={16} />
+                {primaryActionLabel}
+              </button>
             </div>
           ) : (
             <div className="flex flex-col gap-6 border-b border-white/10 pb-6 sm:gap-8 sm:pb-8">

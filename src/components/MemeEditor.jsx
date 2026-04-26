@@ -1142,13 +1142,14 @@ export default function MemeEditor({
                       onPointerDown={(event) => handlePointerDown(layer.id, event)}
                       onFocus={() => setSelectedLayerId(layer.id)}
                       onClick={() => setSelectedLayerId(layer.id)}
-                      className={`absolute z-20 flex max-w-[88%] cursor-grab select-none items-center justify-center rounded-2xl border border-white/10 bg-black/70 px-4 py-2 text-center uppercase leading-none shadow-lg shadow-black/30 transition duration-200 active:cursor-grabbing ${
+                      className={`absolute z-20 flex max-w-[88%] cursor-grab select-none touch-none items-center justify-center rounded-2xl border border-white/10 bg-black/70 px-4 py-2 text-center uppercase leading-none shadow-lg shadow-black/30 transition duration-200 active:cursor-grabbing ${
                         isSelected ? "ring-2 ring-violet-400/80 ring-offset-2 ring-offset-black/30" : ""
                       }`}
                       style={{
                         left: `${layer.x}%`,
                         top: `${layer.y}%`,
                         transform: "translate(-50%, -50%)",
+                        touchAction: "none",
                         fontFamily: layer.fontFamily,
                         fontSize: `${fontSize}px`,
                         color: layer.color,

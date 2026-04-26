@@ -109,7 +109,7 @@ export default function Footer() {
             <p className="mt-1 text-xs text-[color:var(--app-muted)]">
               Developed with{" "}
               <Heart size={14} className="inline-block align-[-2px] text-rose-400 fill-current" aria-hidden="true" />{" "}
-              by <span className="font-semibold text-violet-400/80">__Shivam__</span>
+              by <span className="font-semibold text-violet-400/80">Shivam.</span>
             </p>
           </div>
           <div className="flex gap-8 text-xs uppercase tracking-widest">

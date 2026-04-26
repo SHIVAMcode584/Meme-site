@@ -3,10 +3,10 @@ import { AnimatePresence, motion as Motion } from "framer-motion";
 import { Bell } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import Toast from "./Toast";
-import { resolveSenderUsernames } from "../utils/notifications";
+import { resolveMemePreviewsByIds, resolveSenderUsernames } from "../utils/notifications";
 import NotificationsPage from "./NotificationsPage";
 
-export default function NotificationBell({ user }) {
+export default function NotificationBell({ user, onOpenMeme }) {
   const [notifications, setNotifications] = useState([]);
   const [toast, setToast] = useState(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -56,6 +56,74 @@ export default function NotificationBell({ user }) {
       console.error("Notification load error:", error);
     }
   }, [hydrateNotifications, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return undefined;
+
+    const channel = supabase
+      .channel(`notifications-live-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${user.id}`,
+        },
+        async (payload) => {
+          await fetchNotifications();
+
+          if (payload?.new?.type === "meme") {
+            const notificationId = payload?.new?.id;
+            const senderLookup = await resolveSenderUsernames([payload?.new?.sender_id], supabase);
+            const senderUsername = senderLookup[payload?.new?.sender_id] || "Meme fan";
+            let memePreview = null;
+
+            try {
+              const previewLookup = await resolveMemePreviewsByIds([payload?.new?.meme_id], supabase);
+              memePreview = previewLookup[String(payload?.new?.meme_id)] || null;
+            } catch (previewError) {
+              console.warn("Live meme preview lookup failed:", previewError);
+            }
+
+            setToast({
+              type: "success",
+              title: `New meme from ${senderUsername}`,
+              message: memePreview?.title
+                ? `Tap to open "${memePreview.title}".`
+                : payload.new.message || "Tap to open the meme.",
+              actionLabel: "View meme",
+              previewImage: memePreview?.image_url || "",
+              previewTitle: memePreview?.title || "",
+              onAction: async () => {
+                if (notificationId) {
+                  const { error } = await supabase
+                    .from("notifications")
+                    .update({ is_read: true })
+                    .eq("id", notificationId)
+                    .eq("user_id", user.id);
+
+                  if (!error) {
+                    setNotifications((current) =>
+                      current.map((item) =>
+                        String(item.id) === String(notificationId) ? { ...item, is_read: true } : item
+                      )
+                    );
+                  }
+                }
+
+                onOpenMeme?.(payload.new.meme_id);
+              },
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchNotifications, onOpenMeme, user?.id]);
 
   useEffect(() => {
     if (!user?.id) {
@@ -118,7 +186,7 @@ export default function NotificationBell({ user }) {
 
       <AnimatePresence>
         {isOpen ? (
-          <NotificationsPage user={user} onBack={() => setIsOpen(false)} />
+          <NotificationsPage user={user} onBack={() => setIsOpen(false)} onOpenMeme={onOpenMeme} />
         ) : null}
       </AnimatePresence>
 

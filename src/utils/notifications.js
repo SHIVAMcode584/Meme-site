@@ -50,3 +50,79 @@ export async function resolveSenderUsernames(senderIds, client = supabase) {
     return lookup;
   }, {});
 }
+
+export async function resolveMemePreviewsByIds(memeIds, client = supabase) {
+  const ids = [...new Set((memeIds || []).filter(Boolean).map((id) => String(id)))];
+  if (ids.length === 0) return {};
+
+  const { data, error } = await client
+    .from("meme-table")
+    .select("id, title, image_url, image, slug")
+    .in("id", ids);
+
+  if (error) throw error;
+
+  return (data || []).reduce((lookup, meme) => {
+    lookup[String(meme.id)] = {
+      title: meme.title || "Meme",
+      image_url: meme.image_url || meme.image || "",
+      slug: meme.slug || "",
+    };
+    return lookup;
+  }, {});
+}
+
+export async function notifyUsersAboutNewMemes({
+  client = supabase,
+  memes = [],
+  senderId = null,
+  senderUsername = "Meme fan",
+}) {
+  const validMemes = (Array.isArray(memes) ? memes : [memes]).filter(
+    (meme) => meme?.id !== undefined && meme?.id !== null
+  );
+
+  if (!senderId || validMemes.length === 0) {
+    return { inserted: 0, recipients: 0 };
+  }
+
+  const { data: profileRows, error: profileError } = await client
+    .from("profiles")
+    .select("id")
+    .neq("id", senderId);
+
+  if (profileError) {
+    return { inserted: 0, recipients: 0, error: profileError };
+  }
+
+  const recipientIds = (profileRows || []).map((row) => row.id).filter(Boolean);
+  if (recipientIds.length === 0) {
+    return { inserted: 0, recipients: 0 };
+  }
+
+  const payloads = [];
+
+  validMemes.forEach((meme) => {
+    const memeTitle = String(meme.title || "new meme").trim() || "new meme";
+    const message = `New meme from ${senderUsername || "a creator"}: ${memeTitle}`;
+
+    recipientIds.forEach((recipientId) => {
+      payloads.push({
+        user_id: recipientId,
+        sender_id: senderId,
+        meme_id: meme.id,
+        type: "meme",
+        message,
+        is_read: false,
+      });
+    });
+  });
+
+  const { error } = await client.from("notifications").insert(payloads);
+
+  if (error) {
+    return { inserted: 0, recipients: recipientIds.length, error };
+  }
+
+  return { inserted: payloads.length, recipients: recipientIds.length };
+}
