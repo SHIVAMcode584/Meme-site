@@ -1,5 +1,23 @@
 export async function prepareMemeDeletion(supabase, memeId) {
-  if (!memeId) return [];
+  if (!memeId) {
+    return {
+      memeId: null,
+      ownerId: null,
+      deletedReportIds: [],
+    };
+  }
+
+  const { data: memeRecord, error: memeLookupError } = await supabase
+    .from("meme-table")
+    .select("id, user_id")
+    .eq("id", memeId)
+    .maybeSingle();
+
+  if (memeLookupError) {
+    throw memeLookupError;
+  }
+
+  const ownerId = memeRecord?.user_id ?? null;
 
   const callRpc = async () => {
     const { data, error } = await supabase.rpc("admin_delete_meme", {
@@ -41,8 +59,10 @@ export async function prepareMemeDeletion(supabase, memeId) {
     return (relatedReports || []).map((report) => report.id);
   };
 
+  let deletedReportIds = [];
+
   try {
-    return await callRpc();
+    deletedReportIds = await callRpc();
   } catch (error) {
     const rpcMissing =
       error?.code === "PGRST202" ||
@@ -53,6 +73,12 @@ export async function prepareMemeDeletion(supabase, memeId) {
       throw error;
     }
 
-    return fallbackClientDelete();
+    deletedReportIds = await fallbackClientDelete();
   }
+
+  return {
+    memeId: String(memeId),
+    ownerId,
+    deletedReportIds,
+  };
 }

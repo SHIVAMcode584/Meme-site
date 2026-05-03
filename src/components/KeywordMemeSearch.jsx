@@ -17,6 +17,7 @@ import { memes as localMemes } from "../data/memes";
 const TRENDING_KEYWORDS = ["sad", "happy", "angry", "love", "awkward", "roast"];
 const RECENT_KEYWORDS_STORAGE = "mood-meme-search-recent-v1";
 const DEBOUNCE_MS = 420;
+const SEARCH_REQUEST_TIMEOUT_MS = 8000;
 const MAX_RECENT = 6;
 
 function normalizeQuery(value) {
@@ -90,6 +91,8 @@ function getRowBatchSize() {
   return 4;
 }
 
+const INITIAL_GLOBAL_MEME_BATCH = 16;
+
 function dedupeByImage(items) {
   const seen = new Set();
   return (Array.isArray(items) ? items : []).filter((item) => {
@@ -157,6 +160,16 @@ function normalizeSupabaseRow(row) {
     keywords: normalizeKeywords(row?.keywords),
     source: "supabase",
     created_at: row?.created_at || "",
+  };
+}
+
+function createTimedAbortController(timeoutMs = SEARCH_REQUEST_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  return {
+    controller,
+    clearTimeout: () => window.clearTimeout(timeoutId),
   };
 }
 
@@ -255,7 +268,7 @@ export default function KeywordMemeSearch({ onUploadToRoastRiot }) {
   const [recentKeywords, setRecentKeywords] = useState([]);
   const [manualMessage, setManualMessage] = useState("");
   const [activePreview, setActivePreview] = useState(null);
-  const [pageSize] = useState(getRowBatchSize);
+  const [pageSize] = useState(INITIAL_GLOBAL_MEME_BATCH);
   const requestIdRef = useRef(0);
   const abortRef = useRef(null);
   const cacheRef = useRef(new Map());
@@ -336,7 +349,7 @@ export default function KeywordMemeSearch({ onUploadToRoastRiot }) {
       const requestId = requestIdRef.current;
 
       if (abortRef.current) abortRef.current.abort();
-      const controller = new AbortController();
+      const { controller, clearTimeout } = createTimedAbortController();
       abortRef.current = controller;
 
       setLoading(true);
@@ -437,7 +450,6 @@ export default function KeywordMemeSearch({ onUploadToRoastRiot }) {
           return;
         }
 
-        setResults([]);
         setSource("idle");
         setReason(error.message || "Search service unavailable.");
         setManualMessage(error.message || "Search service unavailable.");
@@ -445,6 +457,7 @@ export default function KeywordMemeSearch({ onUploadToRoastRiot }) {
         setNextAfter(null);
         setNextPage(1);
       } finally {
+        clearTimeout();
         if (!(ignore || requestId !== requestIdRef.current)) {
           setLoading(false);
         }
@@ -481,7 +494,7 @@ export default function KeywordMemeSearch({ onUploadToRoastRiot }) {
     const requestId = requestIdRef.current;
 
     if (abortRef.current) abortRef.current.abort();
-    const controller = new AbortController();
+    const { controller, clearTimeout } = createTimedAbortController();
     abortRef.current = controller;
 
     setLoadingMore(true);
@@ -578,6 +591,7 @@ export default function KeywordMemeSearch({ onUploadToRoastRiot }) {
       setManualMessage(error.message || "Could not load more meme results.");
       setHasMore(false);
     } finally {
+      clearTimeout();
       if (requestId === requestIdRef.current) {
         setLoadingMore(false);
       }

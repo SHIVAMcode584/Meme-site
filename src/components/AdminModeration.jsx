@@ -318,7 +318,9 @@ export default function AdminModeration({ user, onBack, onMemeDeleted, onMemePub
 
     const memeId = report.meme_id;
     try {
-      await prepareMemeDeletion(supabase, memeId);
+      const deletionResult = await prepareMemeDeletion(supabase, memeId);
+
+      onMemeDeleted?.(deletionResult);
     } catch (error) {
       console.error("Loading related meme cleanup data failed:", error);
       pushToast({
@@ -329,8 +331,8 @@ export default function AdminModeration({ user, onBack, onMemeDeleted, onMemePub
       return;
     }
 
-    onMemeDeleted?.(memeId);
     await fetchReports();
+    await fetchUsers();
     pushToast({
       type: "success",
       title: "Meme removed",

@@ -29,8 +29,6 @@ export default function UploadMeme({
   onSuccess,
   isBlockedUser = false,
   initialImageUrl = "",
-  initialTitle = "",
-  initialSelectionKey = "",
 }) {
   const fileInputRef = useRef(null);
   const [file, setFile] = useState(null);
@@ -83,20 +81,16 @@ export default function UploadMeme({
 
   useEffect(() => {
     const nextImageUrl = String(initialImageUrl || "").trim();
-    const nextTitle = String(initialTitle || "").trim();
-
-    if (!nextImageUrl && !nextTitle) return;
+    if (!nextImageUrl) return;
 
     setFile(null);
     setImageUrl(nextImageUrl);
     setImageSource(nextImageUrl);
-    setTitle(nextTitle);
-    clearKeywordSuggestions();
 
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-  }, [initialImageUrl, initialSelectionKey, initialTitle]);
+  }, [initialImageUrl]);
 
   const isProbablyImageFile = (nextFile) => {
     if (!nextFile) return false;

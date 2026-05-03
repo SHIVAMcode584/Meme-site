@@ -353,6 +353,13 @@ export default function App() {
     }
     setCurrentPath(nextPath);
   }, []);
+  const goHome = useCallback(
+    (nextViewMode = "all") => {
+      navigateTo("/");
+      setViewMode(nextViewMode);
+    },
+    [navigateTo]
+  );
   const SidebarLink = ({ icon, label, onClick, rightIcon }) => (
     <button
       onClick={onClick}
@@ -1269,14 +1276,9 @@ export default function App() {
 
   const handleOpenUploadFromSearch = useCallback((meme) => {
     if (!meme?.imageUrl) return;
-
-    const nextDraft = {
+    setUploadDraft({
       imageUrl: meme.imageUrl,
-      title: String(meme.title || "Mood meme").trim() || "Mood meme",
-      selectionKey: `${meme.id || meme.imageUrl || "mood-meme"}-${Date.now()}`,
-    };
-
-    setUploadDraft(nextDraft);
+    });
     setIsUploadModalOpen(true);
   }, []);
 
@@ -1299,8 +1301,12 @@ export default function App() {
     [user, user?.id]
   );
 
-  const handleMemeDeleted = useCallback((memeId) => {
-    const targetId = String(memeId);
+  const handleMemeDeleted = useCallback((deletedMeme) => {
+    const targetId = String(
+      typeof deletedMeme === "object" ? deletedMeme?.memeId ?? deletedMeme?.id : deletedMeme
+    );
+
+    if (!targetId || targetId === "undefined") return;
 
     setDbMemes((prev) => prev.filter((meme) => String(meme.id) !== targetId));
     setSemanticMemes((prev) => prev.filter((meme) => String(meme.id) !== targetId));
@@ -1321,7 +1327,7 @@ export default function App() {
       return next;
     });
 
-      if (currentMemeId && String(currentMemeId) === targetId) {
+    if (currentMemeId && String(currentMemeId) === targetId) {
       window.history.replaceState({}, "", "/");
       setCurrentMemeId(null);
       setCurrentMemeIndex(-1);
@@ -1349,9 +1355,15 @@ export default function App() {
       if (!memeId) return false;
 
       try {
-        await prepareMemeDeletion(supabase, memeId);
+        const deletionResult = await prepareMemeDeletion(supabase, memeId);
 
-        handleMemeDeleted(memeId);
+        handleMemeDeleted(deletionResult);
+
+        if (deletionResult?.ownerId && user?.id && String(deletionResult.ownerId) === String(user.id)) {
+          await fetchProfile(user.id, user);
+        }
+
+        await fetchLeaderboard();
         setNotification({
           type: "success",
           message: "Meme deleted successfully.",
@@ -1366,7 +1378,7 @@ export default function App() {
         return false;
       }
     },
-    [handleMemeDeleted]
+    [fetchLeaderboard, fetchProfile, handleMemeDeleted, user, user?.id]
   );
 
   const handleDeleteMeme = useCallback(
@@ -1475,8 +1487,7 @@ export default function App() {
           icon={<Home size={20}/>} 
           label="Home" 
           onClick={() => { 
-            navigateTo("/");
-            setViewMode("all"); 
+            goHome("all");
             setIsSidebarOpen(false); 
             setIsEditorModalOpen(false);
             setIsUploadModalOpen(false);
@@ -1488,7 +1499,7 @@ export default function App() {
           icon={<Trophy size={20}/>} 
           label="Leaderboard" 
           onClick={() => { 
-            setViewMode("leaderboard"); 
+            goHome("leaderboard");
             fetchLeaderboard(); 
             setIsSidebarOpen(false); 
             setIsEditorModalOpen(false);
@@ -1518,6 +1529,7 @@ export default function App() {
             setIsEditorModalOpen(false);
             setIsUploadModalOpen(false);
             closeModal();
+            setViewMode("all");
             navigateTo("/mood-search");
             window.scrollTo({ top: 0, behavior: "smooth" });
           }}
@@ -1528,7 +1540,7 @@ export default function App() {
               icon={<Image size={20}/>} 
               label="My Uploads" 
               onClick={() => { 
-                setViewMode("uploads");
+                goHome("uploads");
                 setIsSidebarOpen(false);
                 setIsEditorModalOpen(false);
                 setIsUploadModalOpen(false);
@@ -1540,7 +1552,7 @@ export default function App() {
               icon={<Bookmark size={20}/>} 
               label="Bookmarks" 
               onClick={() => { 
-                setViewMode("favorites");
+                goHome("favorites");
                 setIsSidebarOpen(false);
                 setIsEditorModalOpen(false);
                 setIsUploadModalOpen(false);
@@ -1618,7 +1630,7 @@ export default function App() {
           <div className="space-y-2 sm:space-y-4">
             <button 
               onClick={() => { 
-                setViewMode("profile");
+                goHome("profile");
                 setIsSidebarOpen(false);
                 setIsEditorModalOpen(false);
                 setIsUploadModalOpen(false);
@@ -2146,7 +2158,10 @@ export default function App() {
             <>
               {isMoodSearchPage ? (
                 <MoodMemeSearchPage
-                  onBackHome={() => navigateTo("/")}
+                  onBackHome={() => {
+                    setViewMode("all");
+                    navigateTo("/");
+                  }}
                   onUploadToRoastRiot={handleOpenUploadFromSearch}
                 />
               ) : (
@@ -2368,8 +2383,6 @@ export default function App() {
                       }}
                       isBlockedUser={isBlockedUser}
                       initialImageUrl={uploadDraft?.imageUrl || ""}
-                      initialTitle={uploadDraft?.title || ""}
-                      initialSelectionKey={uploadDraft?.selectionKey || ""}
                     />
                   </Suspense>
                 </div>
