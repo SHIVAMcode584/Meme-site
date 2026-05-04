@@ -137,6 +137,7 @@ const normalizeMeme = (m, currentUserId) => {
     m.is_auto === true ||
     m.is_auto === "true" ||
     m.original_source === "meme-api";
+  const imageUrl = m.imageUrl || m.image_url || m.image || "";
   
   return {
     ...m,
@@ -154,8 +155,9 @@ const normalizeMeme = (m, currentUserId) => {
     username: m.user_id 
       ? (currentUserId && m.user_id === currentUserId ? "You" : (profileData?.username || "User"))
       : (isAutoMeme ? "Auto" : "Owner"),
-    image: m.image_url || m.image || "",
-    isDatabaseMeme: Boolean(m.image_url || m.created_at || m.user_id),
+    imageUrl,
+    image: imageUrl,
+    isDatabaseMeme: Boolean(imageUrl || m.created_at || m.user_id),
     isAutoMeme,
   };
 };  

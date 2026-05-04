@@ -34,7 +34,7 @@ export default function MemeCard({
   const isFavorite = favorites.includes(meme.id);
   const isStaticMeme = !meme.user_id;
   const isAutoMeme = Boolean(meme?.isAutoMeme || meme?.is_auto || meme?.original_source === "meme-api");
-  const imageSrc = meme.image || meme.image_url;
+  const imageSrc = meme.imageUrl || meme.image || meme.image_url;
   const canReport = Boolean(
     user &&
       !isAdminUser &&

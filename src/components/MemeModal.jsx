@@ -50,7 +50,7 @@ export default function MemeModal({
   const currentPosition = currentIndex >= 0 ? currentIndex + 1 : 0;
   const canGoPrev = currentIndex > 0;
   const canGoNext = currentIndex >= 0 && currentIndex < totalMemes - 1;
-  const imageSrc = meme?.image || meme?.image_url;
+  const imageSrc = meme?.imageUrl || meme?.image || meme?.image_url;
 
   const isFavorite = favorites.includes(meme?.id);
   const isStaticMeme = meme && !meme.user_id;
@@ -113,8 +113,8 @@ export default function MemeModal({
 
     const previous = memeList[currentIndex - 1];
     const next = memeList[currentIndex + 1];
-    preloadImage(previous?.image || previous?.image_url);
-    preloadImage(next?.image || next?.image_url);
+    preloadImage(previous?.imageUrl || previous?.image || previous?.image_url);
+    preloadImage(next?.imageUrl || next?.image || next?.image_url);
   }, [currentIndex, meme, memeList, preloadImage, totalMemes]);
 
   const handleNavigate = useCallback((direction) => {
