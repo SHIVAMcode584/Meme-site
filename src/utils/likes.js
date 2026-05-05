@@ -38,6 +38,40 @@ const normalizeEntry = (entry) => {
   };
 };
 
+const buildMergedOwnerLikeMap = (rows = null) => {
+  const merged = new Map();
+  const seenPairs = new Set();
+
+  const addLike = (memeKey, userId) => {
+    const key = getKey(memeKey);
+    const normalizedUserId = String(userId || "");
+
+    if (!key || !normalizedUserId) return;
+
+    const pairKey = `${key}:${normalizedUserId}`;
+    if (seenPairs.has(pairKey)) return;
+
+    seenPairs.add(pairKey);
+
+    if (!merged.has(key)) {
+      merged.set(key, new Set());
+    }
+
+    merged.get(key).add(normalizedUserId);
+  };
+
+  if (Array.isArray(rows)) {
+    rows.forEach((row) => addLike(row?.meme_key, row?.user_id));
+  }
+
+  const localStore = readStore();
+  Object.entries(localStore).forEach(([memeKey, entry]) => {
+    normalizeEntry(entry).likedBy.forEach((userId) => addLike(memeKey, userId));
+  });
+
+  return merged;
+};
+
 const getLocalOwnerLikeSnapshot = (memeId, userId) => {
   const store = readStore();
   const entry = normalizeEntry(store[getKey(memeId)]);
@@ -121,7 +155,15 @@ async function fetchOwnerLikeRows() {
 export const isOwnerMeme = (meme) => !meme?.user_id;
 
 export const getOwnerMemeLikeSnapshot = (memeId, userId) => {
-  return getLocalOwnerLikeSnapshot(memeId, userId);
+  const merged = buildMergedOwnerLikeMap();
+  const key = getKey(memeId);
+  const likedBy = merged.get(key) || new Set();
+  const normalizedUserId = String(userId || "");
+
+  return {
+    liked: Boolean(normalizedUserId) && likedBy.has(normalizedUserId),
+    count: likedBy.size,
+  };
 };
 
 export async function fetchOwnerMemeLikeSnapshot(memeId, userId) {
@@ -129,30 +171,29 @@ export async function fetchOwnerMemeLikeSnapshot(memeId, userId) {
 
   const key = getKey(memeId);
   const rows = await fetchOwnerLikeRows();
-  if (!rows) return getLocalOwnerLikeSnapshot(key, userId);
+  const merged = buildMergedOwnerLikeMap(rows);
+  const likedBy = merged.get(key) || new Set();
 
-  const count = rows.filter((row) => String(row?.meme_key || "") === key).length;
-  const liked = rows.some(
-    (row) => String(row?.meme_key || "") === key && String(row?.user_id || "") === String(userId)
-  );
-
-  return { liked, count };
+  return {
+    liked: likedBy.has(String(userId)),
+    count: likedBy.size,
+  };
 }
 
 export function getAllOwnerLikeCounts() {
-  return getLocalAllOwnerLikeCounts();
+  const merged = buildMergedOwnerLikeMap();
+  return Object.fromEntries(
+    [...merged.entries()].map(([memeKey, likedBy]) => [memeKey, likedBy.size])
+  );
 }
 
 export async function fetchAllOwnerLikeCounts() {
   const rows = await fetchOwnerLikeRows();
-  if (!rows) return getLocalAllOwnerLikeCounts();
+  const merged = buildMergedOwnerLikeMap(rows);
 
-  return rows.reduce((acc, row) => {
-    const key = getKey(row?.meme_key);
-    if (!key) return acc;
-    acc[key] = (acc[key] || 0) + 1;
-    return acc;
-  }, {});
+  return Object.fromEntries(
+    [...merged.entries()].map(([memeKey, likedBy]) => [memeKey, likedBy.size])
+  );
 }
 
 export function getOwnerLikedMemeIdsForUser(userId) {
@@ -163,11 +204,12 @@ export async function fetchOwnerLikedMemeIdsForUser(userId) {
   if (!userId) return [];
 
   const rows = await fetchOwnerLikeRows();
-  if (!rows) return getLocalOwnerLikedMemeIdsForUser(userId);
+  const merged = buildMergedOwnerLikeMap(rows);
+  const normalizedUserId = String(userId);
 
-  return rows
-    .filter((row) => String(row?.user_id || "") === String(userId))
-    .map((row) => getKey(row?.meme_key))
+  return [...merged.entries()]
+    .filter(([, likedBy]) => likedBy.has(normalizedUserId))
+    .map(([memeKey]) => memeKey)
     .filter(Boolean);
 }
 
@@ -201,7 +243,9 @@ export async function setOwnerMemeLike(memeId, userId, shouldLike) {
       if (error) throw error;
     }
 
-    return fetchOwnerMemeLikeSnapshot(key, userId);
+    const snapshot = await fetchOwnerMemeLikeSnapshot(key, userId);
+    setLocalOwnerMemeLike(key, userId, shouldLike);
+    return snapshot;
   } catch {
     return setLocalOwnerMemeLike(key, userId, shouldLike);
   }
