@@ -47,7 +47,12 @@ import ThemeSwitcher from "./components/ThemeSwitcher";
 import SearchBar from "./components/SearchBar";
 import { memes } from "./data/memes";
 import { categories, smartSearch, suggestions } from "./utils/helpers";
-import { getAllOwnerLikeCounts, getOwnerLikedMemeIdsForUser } from "./utils/likes";
+import {
+  fetchAllOwnerLikeCounts,
+  fetchOwnerLikedMemeIdsForUser,
+  getAllOwnerLikeCounts,
+  getOwnerLikedMemeIdsForUser,
+} from "./utils/likes";
 import { prepareMemeDeletion } from "./utils/memeDeletion";
 import {
   DEFAULT_AVATAR_ID,
@@ -161,6 +166,41 @@ const normalizeMeme = (m, currentUserId) => {
     isAutoMeme,
   };
 };  
+
+const normalizeMemeIdentityPart = (value) =>
+  String(value || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+
+const getMemeDedupKey = (meme) => {
+  const imageUrl = normalizeMemeIdentityPart(meme?.imageUrl || meme?.image_url || meme?.image || "");
+  if (imageUrl) return `image:${imageUrl}`;
+
+  const slug = normalizeMemeIdentityPart(meme?.slug || "");
+  if (slug) return `slug:${slug}`;
+
+  const title = normalizeMemeIdentityPart(meme?.title || "");
+  if (title) return `title:${title}`;
+
+  return `id:${normalizeMemeIdentityPart(meme?.id || "")}`;
+};
+
+const dedupeMemes = (items = [], currentUserId) => {
+  const seen = new Set();
+  const result = [];
+
+  for (const item of items) {
+    const normalized = normalizeMeme(item, currentUserId);
+    const key = getMemeDedupKey(normalized);
+    if (!key || seen.has(key)) continue;
+
+    seen.add(key);
+    result.push(normalized);
+  }
+
+  return result;
+};
 
 const getMemeRouteTarget = (url) => {
   const memeQuery = url.searchParams.get("meme");
@@ -322,7 +362,7 @@ export default function App() {
   const [currentMemeIndex, setCurrentMemeIndex] = useState(-1);
   const [notificationOpenedMeme, setNotificationOpenedMeme] = useState(null);
   const allMemesNormalized = useMemo(() => {
-    return [...dbMemes, ...memes].map(m => normalizeMeme(m, user?.id));
+    return dedupeMemes([...dbMemes, ...memes], user?.id);
   }, [dbMemes, user?.id]);
   const autoMemesCount = useMemo(
     () => allMemesNormalized.filter((meme) => meme.isAutoMeme).length,
@@ -570,7 +610,13 @@ export default function App() {
       }, {});
 
       setDbLikeCounts(counts);
-      setOwnerLikeCounts(getAllOwnerLikeCounts());
+
+      try {
+        const ownerCounts = await fetchAllOwnerLikeCounts();
+        setOwnerLikeCounts(ownerCounts);
+      } catch {
+        setOwnerLikeCounts(getAllOwnerLikeCounts());
+      }
     };
 
     fetchLikeCounts();
@@ -612,8 +658,13 @@ export default function App() {
       }
 
       const dbIds = (data || []).map((row) => String(row.meme_id));
-      const ownerIds = getOwnerLikedMemeIdsForUser(user.id);
-      setLikedMemeIds([...new Set([...dbIds, ...ownerIds])]);
+      try {
+        const ownerIds = await fetchOwnerLikedMemeIdsForUser(user.id);
+        setLikedMemeIds([...new Set([...dbIds, ...ownerIds])]);
+      } catch {
+        const ownerIds = getOwnerLikedMemeIdsForUser(user.id);
+        setLikedMemeIds([...new Set([...dbIds, ...ownerIds])]);
+      }
     };
 
     fetchUserLikedMemeIds();
@@ -1031,15 +1082,12 @@ export default function App() {
         const fetchedMeme = await fetchMemeByIdFromSupabase(memeId);
         if (!fetchedMeme) return;
 
-        const normalizedMeme = normalizeMeme(fetchedMeme, user?.id);
-        setNotificationOpenedMeme(normalizedMeme);
-        setDbMemes((current) => [
-          normalizedMeme,
-          ...current.filter((item) => String(item.id) !== String(normalizedMeme.id)),
-        ]);
-        setCurrentMemeId(normalizedMeme.id);
-        setCurrentMemeIndex(-1);
-        window.history.replaceState({}, "", buildMemeRoute(normalizedMeme));
+      const normalizedMeme = normalizeMeme(fetchedMeme, user?.id);
+      setNotificationOpenedMeme(normalizedMeme);
+      setDbMemes((current) => dedupeMemes([normalizedMeme, ...current], user?.id));
+      setCurrentMemeId(normalizedMeme.id);
+      setCurrentMemeIndex(-1);
+      window.history.replaceState({}, "", buildMemeRoute(normalizedMeme));
       } catch (error) {
         console.error("Failed to open meme from notification:", error);
       }
@@ -1268,7 +1316,7 @@ export default function App() {
   };
 
   const handleUploadMeme = (meme) => {
-    setDbMemes((prev) => [normalizeMeme(meme, user?.id), ...prev]);
+    setDbMemes((prev) => dedupeMemes([meme, ...prev], user?.id));
     if (meme?.id !== undefined && meme?.id !== null) {
       setDbLikeCounts((prev) => ({ ...prev, [String(meme.id)]: prev[String(meme.id)] || 0 }));
     }
@@ -1289,13 +1337,9 @@ export default function App() {
       const nextMemes = Array.isArray(memesToAdd) ? memesToAdd : [];
       if (nextMemes.length === 0) return;
 
-      const normalizedNextMemes = nextMemes.map((meme) => normalizeMeme(meme, user?.id));
-      const nextIds = new Set(normalizedNextMemes.map((meme) => String(meme.id)));
+      const normalizedNextMemes = dedupeMemes(nextMemes, user?.id);
 
-      setDbMemes((prev) => [
-        ...normalizedNextMemes,
-        ...prev.filter((meme) => !nextIds.has(String(meme.id))),
-      ]);
+      setDbMemes((prev) => dedupeMemes([...normalizedNextMemes, ...prev], user?.id));
 
       if (user) fetchProfile(user.id, user);
       fetchLeaderboard();
@@ -1444,7 +1488,7 @@ export default function App() {
         }
 
         const formatted = nextMemes.map((m) => normalizeMeme(m));
-        setDbMemes(formatted);
+        setDbMemes(dedupeMemes(formatted, user?.id));
       } finally {
         const elapsed = Date.now() - startedAt;
         const remaining = Math.max(0, 1000 - elapsed);

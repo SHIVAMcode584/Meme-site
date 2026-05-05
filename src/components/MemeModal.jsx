@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion as Motion } from "framer-motion";
 import { supabase } from "../lib/supabase";
-import { getOwnerMemeLikeSnapshot, setOwnerMemeLike } from "../utils/likes";
+import { fetchOwnerMemeLikeSnapshot, setOwnerMemeLike } from "../utils/likes";
 import CommentsSection from "./CommentsSection";
 import ReportModal from "./ReportModal";
 
@@ -65,18 +65,22 @@ export default function MemeModal({
   const canDelete = Boolean(isAdminUser && onDeleteMeme && meme?.user_id);
 
   useEffect(() => {
-    if (!meme) return;
+    if (!meme) return undefined;
+    let isMounted = true;
     setLocalLikeCount(likeCounts[String(meme.id)] || 0);
 
     const fetchLikedState = async () => {
       if (!user) {
-        setLiked(false);
+        if (isMounted) setLiked(false);
         return;
       }
 
       if (isStaticMeme) {
-        const snapshot = getOwnerMemeLikeSnapshot(meme.id, user.id);
+        const snapshot = await fetchOwnerMemeLikeSnapshot(meme.id, user.id);
+        if (!isMounted) return;
         setLiked(snapshot.liked);
+        setLocalLikeCount(snapshot.count);
+        onLikeCountChange?.(meme.id, snapshot.count, true);
         return;
       }
 
@@ -87,10 +91,15 @@ export default function MemeModal({
         .eq("meme_id", meme.id)
         .maybeSingle();
 
+      if (!isMounted) return;
       setLiked(Boolean(data));
     };
 
     fetchLikedState();
+
+    return () => {
+      isMounted = false;
+    };
   }, [meme, user, likeCounts, isStaticMeme]);
 
   useEffect(() => {
@@ -295,7 +304,7 @@ export default function MemeModal({
 
     try {
       if (isStaticMeme) {
-        const snapshot = setOwnerMemeLike(meme.id, user.id, nextLiked);
+        const snapshot = await setOwnerMemeLike(meme.id, user.id, nextLiked);
         setLiked(snapshot.liked);
         setLocalLikeCount(snapshot.count);
         onLikeCountChange?.(meme.id, snapshot.count, true);

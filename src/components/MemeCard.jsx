@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { motion as Motion, AnimatePresence } from "framer-motion";
 import { supabase } from "../lib/supabase";
-import { getOwnerMemeLikeSnapshot, setOwnerMemeLike } from "../utils/likes";
+import { fetchOwnerMemeLikeSnapshot, setOwnerMemeLike } from "../utils/likes";
 import CommentsSection from "./CommentsSection";
 import ReportModal from "./ReportModal";
 
@@ -62,7 +62,7 @@ export default function MemeCard({
       }
 
       if (isStaticMeme) {
-        const snapshot = getOwnerMemeLikeSnapshot(meme.id, user.id);
+        const snapshot = await fetchOwnerMemeLikeSnapshot(meme.id, user.id);
         if (!isMounted) return;
 
         setLiked(snapshot.liked);
@@ -114,7 +114,7 @@ export default function MemeCard({
 
     try {
       if (isStaticMeme) {
-        const snapshot = setOwnerMemeLike(meme.id, user.id, nextLiked);
+        const snapshot = await setOwnerMemeLike(meme.id, user.id, nextLiked);
         setLiked(snapshot.liked);
         setLocalLikeCount(snapshot.count);
         onLikeCountChange?.(meme.id, snapshot.count, true);
@@ -163,7 +163,21 @@ export default function MemeCard({
 
   const getOptimizedUrl = (url) => {
     if (!url || !url.includes("cloudinary.com")) return url;
-    return url.replace("/upload/", "/upload/f_auto,q_auto,w_500,c_scale/");
+
+    const uploadMarker = "/upload/";
+    const uploadIndex = url.indexOf(uploadMarker);
+    if (uploadIndex === -1) return url;
+
+    const uploadPath = url.slice(uploadIndex + uploadMarker.length);
+    const firstSegment = uploadPath.split("/")[0] || "";
+
+    // Many of our saved meme URLs already contain Cloudinary transforms
+    // such as `q_auto/f_auto`. Rewriting those again breaks the image URL.
+    if (/[,_]|^(?:q_|f_|c_|w_|h_)/i.test(firstSegment)) {
+      return url;
+    }
+
+    return url.replace(uploadMarker, "/upload/f_auto,q_auto,w_500,c_scale/");
   };
 
   const handleDownload = async () => {
