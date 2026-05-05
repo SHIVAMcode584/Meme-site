@@ -100,6 +100,7 @@ function normalizeSupabaseRow(row) {
 
   return {
     id: String(row?.id || row?.slug || `supabase-${String(row?.title || "meme")}`),
+    user_id: row?.user_id || null,
     title: String(row?.title || row?.name || "Meme"),
     imageUrl,
     subreddit: profileData?.username ? `@${profileData.username}` : "r/memes",
@@ -111,6 +112,13 @@ function normalizeSupabaseRow(row) {
     source: "supabase",
     created_at: row?.created_at || "",
     score: Number(row?.score || 0),
+    profiles:
+      row?.profiles ||
+      (profileData?.username
+        ? {
+            username: profileData.username,
+          }
+        : null),
   };
 }
 
