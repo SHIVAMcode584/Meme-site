@@ -261,7 +261,7 @@ export async function loadSupabaseMemes(client) {
 
   const primary = await client
     .from("meme-table")
-    .select("id, title, image_url, category, mood, keywords, slug, created_at, profiles(username)")
+    .select("id, title, image_url, category, mood, keywords, slug, created_at, user_id, profiles(username)")
     .order("created_at", { ascending: false })
     .limit(SUPABASE_ROW_LIMIT);
 
@@ -270,7 +270,7 @@ export async function loadSupabaseMemes(client) {
   if (primary.error) {
     const fallback = await client
       .from("meme-table")
-      .select("id, title, image_url, category, mood, keywords, slug, created_at")
+      .select("id, title, image_url, category, mood, keywords, slug, created_at, user_id")
       .order("created_at", { ascending: false })
       .limit(SUPABASE_ROW_LIMIT);
 
